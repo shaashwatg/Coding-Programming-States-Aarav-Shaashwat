@@ -1,0 +1,3 @@
+# Runtime dependency (the desktop user interface, built in the next module).
+# The data layer itself uses only the Python standard library.
+PySide6==6.11.3
