@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from servesync.core.i18n import tr
+
 
 class ServeSyncError(Exception):
     """Base class for every expected, user-presentable error."""
@@ -59,7 +61,9 @@ class RecordNotFoundError(ServeSyncError):
     """A requested record (by ID or key) does not exist."""
 
     def __init__(self, entity: str, key: object) -> None:
-        super().__init__(f"{entity} #{key} could not be found. It may have been removed.")
+        super().__init__(
+            tr("{entity} #{key} could not be found. It may have been removed.", entity=tr(entity), key=key)
+        )
         self.entity = entity
         self.key = key
 

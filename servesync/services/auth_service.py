@@ -20,6 +20,7 @@ import math
 from datetime import timedelta
 
 from servesync.core.errors import AuthenticationError, BusinessRuleError, RecordNotFoundError, ValidationError
+from servesync.core.i18n import mark, tr, tr_n
 from servesync.core.security import DEFAULT_ITERATIONS, hash_password, needs_rehash, verify_password
 from servesync.core.validators import validate_field, validate_password_strength
 from servesync.data import DataStore
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
-GENERIC_FAILURE = "The username or password is incorrect."
+GENERIC_FAILURE = mark("The username or password is incorrect.")
 
 
 class AuthService(Service):
@@ -47,19 +48,23 @@ class AuthService(Service):
         """Verify credentials and return a :class:`Session`, or raise :class:`AuthenticationError`."""
         name = (username or "").strip()
         if not name or not password:
-            raise AuthenticationError("Enter both your username and password.")
+            raise AuthenticationError(tr("Enter both your username and password."))
 
         account = self._store.accounts.find_by_username(name)
         now = self._clock.now()
         if account is None or account.account_id is None:
             verify_password(password, self._timing_decoy())  # same cost as a real check
             logger.info("Failed sign-in for an unknown username")
-            raise AuthenticationError(GENERIC_FAILURE)
+            raise AuthenticationError(tr(GENERIC_FAILURE))
 
         if account.is_locked(now) and account.locked_until is not None:
             minutes = max(1, math.ceil((account.locked_until - now).total_seconds() / 60))
             raise AuthenticationError(
-                f"Too many unsuccessful attempts. Try again in {minutes} minute{'s' if minutes != 1 else ''}."
+                tr_n(
+                    "Too many unsuccessful attempts. Try again in {count} minute.",
+                    "Too many unsuccessful attempts. Try again in {count} minutes.",
+                    minutes,
+                )
             )
 
         if not verify_password(password, account.password_hash):
@@ -69,13 +74,15 @@ class AuthService(Service):
             logger.warning("Failed sign-in for account #%s (attempt %s)", account.account_id, attempts)
             if locked_until is not None:
                 raise AuthenticationError(
-                    f"Too many unsuccessful attempts. For security, this account is locked for "
-                    f"{int(LOCKOUT_DURATION.total_seconds() // 60)} minutes."
+                    tr(
+                        ("Too many unsuccessful attempts. For security, this account is locked for {int} minutes."),
+                        int=int(LOCKOUT_DURATION.total_seconds() // 60),
+                    )
                 )
-            raise AuthenticationError(GENERIC_FAILURE)
+            raise AuthenticationError(tr(GENERIC_FAILURE))
 
         if not account.is_active:
-            raise AuthenticationError("This account has been turned off. Please contact your administrator.")
+            raise AuthenticationError(tr("This account has been turned off. Please contact your administrator."))
 
         self._store.accounts.record_successful_login(account.account_id, now)
         if needs_rehash(account.password_hash, iterations=self._iterations):
@@ -89,10 +96,10 @@ class AuthService(Service):
         """Let any signed-in user change their own password."""
         account = self._store.accounts.get(session.account_id)
         if not verify_password(current_password, account.password_hash):
-            raise ValidationError.single("current_password", "Your current password is incorrect.")
+            raise ValidationError.single("current_password", tr("Your current password is incorrect."))
         self._validate_new_password(new_password, confirm, account.username)
         if new_password == current_password:
-            raise ValidationError.single("new_password", "Choose a password different from your current one.")
+            raise ValidationError.single("new_password", tr("Choose a password different from your current one."))
         self._store.accounts.update_password_hash(session.account_id, self._hash(new_password))
         logger.info("Account #%s changed its password", session.account_id)
 
@@ -121,7 +128,7 @@ class AuthService(Service):
         session.require(Permission.MANAGE_ACCOUNTS)
         needs_volunteer = role is UserRole.VOLUNTEER
         if needs_volunteer and (volunteer_id is None or not self._store.volunteers.exists(volunteer_id)):
-            raise ValidationError.single("volunteer_id", "Choose the volunteer this account belongs to.")
+            raise ValidationError.single("volunteer_id", tr("Choose the volunteer this account belongs to."))
         self._validate_new_password(password, confirm, username, field="password")
         account = UserAccount(
             username=username,
@@ -138,13 +145,13 @@ class AuthService(Service):
         account = self._store.accounts.get(account_id)
         if not active:
             if account_id == session.account_id:
-                raise BusinessRuleError("You can't turn off the account you are signed in with.")
+                raise BusinessRuleError(tr("You can't turn off the account you are signed in with."))
             if (
                 account.role is UserRole.ADMIN
                 and account.is_active
                 and self._store.accounts.count_active(UserRole.ADMIN) <= 1
             ):
-                raise BusinessRuleError("At least one administrator account must stay active.")
+                raise BusinessRuleError(tr("At least one administrator account must stay active."))
         self._store.accounts.set_active(account_id, active)
 
     def list_accounts(self, session: Session) -> list[UserAccount]:
@@ -155,7 +162,7 @@ class AuthService(Service):
         try:
             return self._store.accounts.get(session.account_id)
         except RecordNotFoundError as exc:
-            raise AuthenticationError("Your account no longer exists. Please sign in again.") from exc
+            raise AuthenticationError(tr("Your account no longer exists. Please sign in again.")) from exc
 
     # ---------------------------------------------------------------- helpers
 
@@ -171,4 +178,4 @@ class AuthService(Service):
     def _validate_new_password(password: str, confirm: str, username: str, *, field: str = "new_password") -> None:
         validate_field(field, validate_password_strength, password, username)
         if password != confirm:
-            raise ValidationError.single("confirm_password", "The two passwords don't match.")
+            raise ValidationError.single("confirm_password", tr("The two passwords don't match."))

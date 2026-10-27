@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 )
 
 from servesync import __app_name__
+from servesync.core.i18n import tr
 from servesync.models import Theme
 from servesync.models.preferences import MAX_FONT_SCALE, MIN_FONT_SCALE
 from servesync.services import Permission
@@ -105,7 +106,11 @@ class MainWindow(QMainWindow):
         ctx.events.announcement.connect(self.announcer.announce)
         ctx.events.appearance_changed.connect(self._restyle_icons)
         self.statusBar().showMessage(
-            f"Signed in as {ctx.session.username}. Press Ctrl+K to ask a question, or F1 for help.", 10000
+            tr(
+                ("Signed in as {username}. Press Ctrl+K to ask a question, or F1 for help."),
+                username=ctx.session.username,
+            ),
+            10000,
         )
         self.navigate(next(iter(self.pages)))
 
@@ -121,7 +126,7 @@ class MainWindow(QMainWindow):
 
         logo = QLabel()
         logo.setPixmap(assets.logo_pixmap(38))
-        logo.setAccessibleName("ServeSync logo")
+        logo.setAccessibleName(tr("ServeSync logo"))
         row.addWidget(logo)
         self.brand = QWidget()
         names = QVBoxLayout(self.brand)
@@ -154,19 +159,19 @@ class MainWindow(QMainWindow):
             row.addWidget(button)
         row.addSpacing(10)
 
-        self.ask_button = QPushButton("Ask")
+        self.ask_button = QPushButton(tr("Ask"))
         self.ask_button.setObjectName("AskButton")
         self.ask_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.ask_button.setAccessibleName("Ask ServeSync")
-        self.ask_button.setToolTip("Ask a question or jump to a page (Ctrl+K)")
+        self.ask_button.setAccessibleName(tr("Ask ServeSync"))
+        self.ask_button.setToolTip(tr("Ask a question or jump to a page (Ctrl+K)"))
         self.ask_button.clicked.connect(self.show_assistant)
         row.addWidget(self.ask_button)
         row.addSpacing(6)
 
-        self.cta = QPushButton("Add volunteer" if leader else "Find a shift")
+        self.cta = QPushButton(tr("Add volunteer") if leader else tr("Find a shift"))
         self.cta.setObjectName("CallToAction")
         self.cta.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cta.setToolTip("Register a new volunteer (Ctrl+N)" if leader else "Browse open shifts (Ctrl+N)")
+        self.cta.setToolTip(tr("Register a new volunteer (Ctrl+N)") if leader else tr("Browse open shifts (Ctrl+N)"))
         self.cta.clicked.connect(self._call_to_action)
         row.addWidget(self.cta)
         row.addSpacing(6)
@@ -174,15 +179,15 @@ class MainWindow(QMainWindow):
         self.account = QToolButton()
         self.account.setObjectName("UserMenu")
         self.account.setText(f"{self.ctx.session.username}  ▾")
-        self.account.setAccessibleName(f"Account menu for {self.ctx.session.username}")
+        self.account.setAccessibleName(tr("Account menu for {username}", username=self.ctx.session.username))
         self.account.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(self.account)
-        menu.addAction(f"Signed in as {self.ctx.session.role.label}").setEnabled(False)
+        menu.addAction(tr("Signed in as {label}", label=self.ctx.session.role.label)).setEnabled(False)
         menu.addSeparator()
-        menu.addAction("Change password...", self._change_password)
-        menu.addAction("Help", self.show_help)
+        menu.addAction(tr("Change password..."), self._change_password)
+        menu.addAction(tr("Help"), self.show_help)
         menu.addSeparator()
-        menu.addAction("Sign out", self.sign_out)
+        menu.addAction(tr("Sign out"), self.sign_out)
         self.account.setMenu(menu)
         row.addWidget(self.account)
         self.top_bar = bar
@@ -211,53 +216,53 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda: self._move_indicator(animated=False))
 
     def _build_menus(self) -> None:
-        file_menu = self.menuBar().addMenu("&File")
-        sign_out = QAction("Sign out", self)
+        file_menu = self.menuBar().addMenu(tr("&File"))
+        sign_out = QAction(tr("Sign out"), self)
         sign_out.triggered.connect(self.sign_out)
         file_menu.addAction(sign_out)
-        quit_action = QAction("Quit", self)
+        quit_action = QAction(tr("Quit"), self)
         quit_action.setShortcut(QKeySequence.StandardKey.Quit)
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
-        go_menu = self.menuBar().addMenu("&Go")
+        go_menu = self.menuBar().addMenu(tr("&Go"))
         for index, page in enumerate(self.pages.values(), start=1):
             action = QAction(page.title, self)
             action.setShortcut(QKeySequence(f"Ctrl+{index}"))
             action.triggered.connect(lambda _checked=False, key=page.key: self.navigate(key))
             go_menu.addAction(action)
-        view_menu = self.menuBar().addMenu("&View")
+        view_menu = self.menuBar().addMenu(tr("&View"))
         for text, keys, step in (
-            ("Larger text", ("Ctrl++", "Ctrl+="), 1),  # "=" too, for keyboards where "+" needs Shift
-            ("Smaller text", ("Ctrl+-",), -1),
+            (tr("Larger text"), ("Ctrl++", "Ctrl+="), 1),  # "=" too, for keyboards where "+" needs Shift
+            (tr("Smaller text"), ("Ctrl+-",), -1),
         ):
             action = QAction(text, self)
             action.setShortcuts([QKeySequence(key) for key in keys])
             action.triggered.connect(lambda _checked=False, step=step: self.change_text_size(step))
             view_menu.addAction(action)
-        reset = QAction("Normal text size", self)
+        reset = QAction(tr("Normal text size"), self)
         reset.setShortcut(QKeySequence("Ctrl+0"))
         reset.triggered.connect(lambda: self.change_text_size(0))
         view_menu.addAction(reset)
-        contrast = QAction("High contrast on/off", self)
+        contrast = QAction(tr("High contrast on/off"), self)
         contrast.setShortcut(QKeySequence("Ctrl+Shift+H"))
         contrast.triggered.connect(self.toggle_high_contrast)
         view_menu.addAction(contrast)
-        help_menu = self.menuBar().addMenu("&Help")
-        ask = QAction("Ask ServeSync", self)
+        help_menu = self.menuBar().addMenu(tr("&Help"))
+        ask = QAction(tr("Ask ServeSync"), self)
         ask.setShortcut(QKeySequence("Ctrl+K"))
         ask.triggered.connect(self.show_assistant)
         help_menu.addAction(ask)
-        guide = QAction("Getting started", self)
+        guide = QAction(tr("Getting started"), self)
         guide.setShortcut(QKeySequence(Qt.Key.Key_F1))
         guide.triggered.connect(self.show_help)
         help_menu.addAction(guide)
-        shortcuts = QAction("Keyboard shortcuts", self)
+        shortcuts = QAction(tr("Keyboard shortcuts"), self)
         shortcuts.triggered.connect(lambda: self.show_help(tab=1))
         help_menu.addAction(shortcuts)
-        recent = QAction("Recent messages", self)
+        recent = QAction(tr("Recent messages"), self)
         recent.triggered.connect(self.show_recent_messages)
         help_menu.addAction(recent)
-        about = QAction(f"About {__app_name__}", self)
+        about = QAction(tr("About {app}", app=__app_name__), self)
         about.triggered.connect(lambda: self.show_help(tab=2))
         help_menu.addAction(about)
 
@@ -288,7 +293,7 @@ class MainWindow(QMainWindow):
             page.reload()
         self.setWindowTitle(f"{page.title} - {__app_name__}")
         self._move_indicator(animated=True)
-        self.announcer.announce(f"{page.title} page")
+        self.announcer.announce(tr("{title} page", title=page.title))
 
     @guarded
     def _call_to_action(self) -> None:
@@ -296,7 +301,10 @@ class MainWindow(QMainWindow):
             dialog = VolunteerDialog(self.ctx, None, self)
             if dialog.exec() and dialog.saved is not None:
                 self.ctx.changed(
-                    f"Added {dialog.saved.full_name}. Approve them on the Volunteers page when they're ready."
+                    tr(
+                        ("Added {full_name}. Approve them on the Volunteers page when they're ready."),
+                        full_name=dialog.saved.full_name,
+                    )
                 )
                 self.navigate("volunteers")
         else:
@@ -305,7 +313,7 @@ class MainWindow(QMainWindow):
     def _focus_search(self) -> None:
         page = self.stack.currentWidget()
         if isinstance(page, Page) and not page.focus_search():
-            self.statusBar().showMessage("This page has no search box.", 3000)
+            self.statusBar().showMessage(tr("This page has no search box."), 3000)
 
     def show_help(self, tab: int = 0) -> None:
         HelpDialog(self.ctx.session.role, self, start_tab=tab).exec()
@@ -321,20 +329,20 @@ class MainWindow(QMainWindow):
     def commands(self) -> list[Command]:
         """Everything Ask ServeSync can jump to, with the same shortcuts as the menus."""
         items = [
-            Command(f"Go to {page.title}", partial(self.navigate, page.key), f"Ctrl+{index}")
+            Command(tr("Go to {title}", title=page.title), partial(self.navigate, page.key), f"Ctrl+{index}")
             for index, page in enumerate(self.pages.values(), start=1)
         ]
         items += [
             Command(self.cta.text(), self._call_to_action, "Ctrl+N"),
-            Command("Larger text", lambda: self.change_text_size(1), "Ctrl+="),
-            Command("Smaller text", lambda: self.change_text_size(-1), "Ctrl+-"),
-            Command("High contrast on/off", self.toggle_high_contrast, "Ctrl+Shift+H"),
-            Command("Comfort and accessibility settings", lambda: self.navigate("settings")),
-            Command("Keyboard shortcuts", lambda: self.show_help(tab=1)),
-            Command("Getting started help", self.show_help, "F1"),
-            Command("Recent messages", self.show_recent_messages),
-            Command("Change password", self._change_password),
-            Command("Sign out", self.sign_out),
+            Command(tr("Larger text"), lambda: self.change_text_size(1), "Ctrl+="),
+            Command(tr("Smaller text"), lambda: self.change_text_size(-1), "Ctrl+-"),
+            Command(tr("High contrast on/off"), self.toggle_high_contrast, "Ctrl+Shift+H"),
+            Command(tr("Comfort and accessibility settings"), lambda: self.navigate("settings")),
+            Command(tr("Keyboard shortcuts"), lambda: self.show_help(tab=1)),
+            Command(tr("Getting started help"), self.show_help, "F1"),
+            Command(tr("Recent messages"), self.show_recent_messages),
+            Command(tr("Change password"), self._change_password),
+            Command(tr("Sign out"), self.sign_out),
         ]
         return items
 
@@ -353,23 +361,25 @@ class MainWindow(QMainWindow):
             target = TEXT_STEPS[max(0, min(index + step, len(TEXT_STEPS) - 1))]
         target = max(MIN_FONT_SCALE, min(target, MAX_FONT_SCALE))
         if target == current:
-            self.announcer.announce("Text is already at its " + ("largest" if step > 0 else "smallest") + " size")
+            self.announcer.announce(
+                tr("Text is already at its largest size") if step > 0 else tr("Text is already at its smallest size")
+            )
             return
         self.ctx.services.settings.set_appearance(self.ctx.session, font_scale=target)
         self.ctx.events.appearance_changed.emit()
-        self.announcer.announce(f"Text size {target:.0%}")
+        self.announcer.announce(tr("Text size {target:.0%}", target=target))
 
     @guarded
     def toggle_high_contrast(self) -> None:
         on = current_appearance().theme is not Theme.HIGH_CONTRAST
         self.ctx.services.settings.set_appearance(self.ctx.session, theme=Theme.HIGH_CONTRAST if on else Theme.SYSTEM)
         self.ctx.events.appearance_changed.emit()
-        self.announcer.announce("High contrast on" if on else "High contrast off")
+        self.announcer.announce(tr("High contrast on") if on else tr("High contrast off"))
 
     @guarded
     def _change_password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
-            self.statusBar().showMessage("Password changed.", 5000)
+            self.statusBar().showMessage(tr("Password changed."), 5000)
 
     def sign_out(self) -> None:
         self._signing_out = True

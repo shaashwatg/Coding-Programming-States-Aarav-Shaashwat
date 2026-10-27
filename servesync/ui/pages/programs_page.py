@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
+from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import Opportunity, OpportunityStatus, ShiftOverview
 from servesync.services import Permission
 from servesync.ui.context import AppContext
@@ -39,7 +40,7 @@ def program_status_color(status: OpportunityStatus) -> str | None:
 
 class ProgramsPage(Page):
     key = "programs"
-    title = "Programs"
+    title = mark("Programs")
     icon_name = "clipboard-list"
 
     def __init__(self, ctx: AppContext) -> None:
@@ -47,10 +48,12 @@ class ProgramsPage(Page):
         self._story_url = ""
         self.layout_.addWidget(
             PageHeader(
-                "Programs and shifts",
-                "Pick a program to see its shifts. Open a shift to manage its roster, take attendance, "
-                "or find volunteers with Smart Match.",
-                [make_button("New program", kind="primary", on_click=self._new_program)],
+                tr("Programs and shifts"),
+                tr(
+                    "Pick a program to see its shifts. Open a shift to manage its roster, "
+                    "take attendance, or find volunteers with Smart Match."
+                ),
+                [make_button(tr("New program"), kind="primary", on_click=self._new_program)],
             )
         )
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -60,23 +63,25 @@ class ProgramsPage(Page):
         left_column.setContentsMargins(0, 0, 12, 0)
         filters = QHBoxLayout()
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search programs")
-        self.search_box.setAccessibleName("Search programs")
+        self.search_box.setPlaceholderText(tr("Search programs"))
+        self.search_box.setAccessibleName(tr("Search programs"))
         self.search_box.setClearButtonEnabled(True)
         self.search_box.textChanged.connect(lambda _t: self.reload())
-        self.status_filter: EnumComboBox[OpportunityStatus] = EnumComboBox(OpportunityStatus, all_label="All programs")
-        self.status_filter.setAccessibleName("Filter programs by status")
+        self.status_filter: EnumComboBox[OpportunityStatus] = EnumComboBox(
+            OpportunityStatus, all_label=tr("All programs")
+        )
+        self.status_filter.setAccessibleName(tr("Filter programs by status"))
         self.status_filter.currentIndexChanged.connect(lambda _i: self.reload())
         filters.addWidget(self.search_box, 2)
         filters.addWidget(self.status_filter, 1)
         left_column.addLayout(filters)
         self.programs: RecordTable[Opportunity] = RecordTable(
             [
-                Column("Program", lambda o: o.title, stretch=True),
-                Column("Status", lambda o: o.status.label, color=lambda o: program_status_color(o.status)),
+                Column(tr("Program"), lambda o: o.title, stretch=True),
+                Column(tr("Status"), lambda o: o.status.label, color=lambda o: program_status_color(o.status)),
             ],
-            empty_message="No programs match. Choose New program to create one.",
-            accessible_name="Programs",
+            empty_message=tr("No programs match. Choose New program to create one."),
+            accessible_name=tr("Programs"),
         )
         self.programs.selection_changed.connect(lambda _o: self._show_program())
         self.programs.activated.connect(lambda _o: self._edit_program())
@@ -95,70 +100,70 @@ class ProgramsPage(Page):
         self.program_title = make_label("", "name", wrap=True)
         self.program_meta = make_label("", "muted", wrap=True)
         self.program_description = make_label("", wrap=True)
-        self.story_button = make_button("Watch the story video", kind="link", on_click=self._open_story)
-        self.story_button.setToolTip("Opens in your web browser")
+        self.story_button = make_button(tr("Watch the story video"), kind="link", on_click=self._open_story)
+        self.story_button.setToolTip(tr("Opens in your web browser"))
         for widget in (self.program_title, self.program_meta, self.program_description, self.story_button):
             text.addWidget(widget)
         text.addStretch(1)
         top.addLayout(text, 1)
         detail.body.addLayout(top)
         lifecycle = QHBoxLayout()
-        self.edit_button = make_button("Edit program", on_click=self._edit_program)
-        self.publish_button = make_button("Publish", kind="primary", on_click=self._publish)
-        self.close_button = make_button("Close program", on_click=self._close)
+        self.edit_button = make_button(tr("Edit program"), on_click=self._edit_program)
+        self.publish_button = make_button(tr("Publish"), kind="primary", on_click=self._publish)
+        self.close_button = make_button(tr("Close program"), on_click=self._close)
         for button in (self.edit_button, self.publish_button, self.close_button):
             lifecycle.addWidget(button)
         lifecycle.addStretch(1)
         detail.body.addLayout(lifecycle)
         right_column.addWidget(detail)
 
-        shifts = Panel("Shifts")
+        shifts = Panel(tr("Shifts"))
         shift_filters = QHBoxLayout()
         self.when_filter = QComboBox()
-        self.when_filter.setAccessibleName("Which shifts to show")
-        for label, value in (("Upcoming", "upcoming"), ("Past", "past"), ("All", "all")):
+        self.when_filter.setAccessibleName(tr("Which shifts to show"))
+        for label, value in ((tr("Upcoming"), "upcoming"), (tr("Past"), "past"), (tr("All"), "all")):
             self.when_filter.addItem(label, value)
         self.when_filter.currentIndexChanged.connect(lambda _i: self._show_shifts())
         shift_filters.addWidget(self.when_filter)
         shift_filters.addStretch(1)
-        self.add_shift_button = make_button("Add shifts", kind="primary", on_click=self._add_shifts)
+        self.add_shift_button = make_button(tr("Add shifts"), kind="primary", on_click=self._add_shifts)
         shift_filters.addWidget(self.add_shift_button)
         shifts.body.addLayout(shift_filters)
         self.shifts: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
-                    "When",
+                    tr("When"),
                     lambda o: format_when(o.shift.starts_at, o.shift.ends_at),
                     sort=lambda o: o.shift.starts_at,
                     stretch=True,
                 ),
                 Column(
-                    "Filled",
-                    lambda o: f"{o.filled} of {o.shift.capacity}",
+                    tr("Filled"),
+                    lambda o: tr("{filled} of {capacity}", filled=o.filled, capacity=o.shift.capacity),
                     sort=lambda o: o.fill_ratio,
                     align_right=True,
                 ),
                 Column(
-                    "Open",
+                    tr("Open"),
                     lambda o: o.open_spots,
                     color=lambda o: current_palette().attention if o.open_spots else None,
                     align_right=True,
                 ),
-                Column("Notes", lambda o: o.shift.notes),
+                Column(tr("Notes"), lambda o: o.shift.notes),
             ],
-            empty_message="No shifts here yet. Choose Add shifts to schedule some.",
-            accessible_name="Shifts for the selected program",
+            empty_message=tr("No shifts here yet. Choose Add shifts to schedule some."),
+            accessible_name=tr("Shifts for the selected program"),
         )
         self.shifts.activated.connect(lambda o: self._open_shift(o))
         self.shifts.selection_changed.connect(lambda _o: self._update_shift_buttons())
         shifts.body.addWidget(self.shifts, 1)
         shift_actions = QHBoxLayout()
-        self.open_button = make_button("Open roster", on_click=lambda: self._open_shift(self.shifts.selected()))
+        self.open_button = make_button(tr("Open roster"), on_click=lambda: self._open_shift(self.shifts.selected()))
         self.match_button = make_button(
-            "Smart Match", on_click=lambda: self._open_shift(self.shifts.selected(), smart=True)
+            tr("Smart Match"), on_click=lambda: self._open_shift(self.shifts.selected(), smart=True)
         )
-        self.edit_shift_button = make_button("Edit shift", on_click=self._edit_shift)
-        self.delete_shift_button = make_button("Delete shift", kind="danger", on_click=self._delete_shift)
+        self.edit_shift_button = make_button(tr("Edit shift"), on_click=self._edit_shift)
+        self.delete_shift_button = make_button(tr("Delete shift"), kind="danger", on_click=self._delete_shift)
         for button in (self.open_button, self.match_button, self.edit_shift_button, self.delete_shift_button):
             shift_actions.addWidget(button)
         shift_actions.addStretch(1)
@@ -189,7 +194,7 @@ class ProgramsPage(Page):
         for widget in (self.edit_button, self.add_shift_button):
             widget.setEnabled(enabled)
         if program is None:
-            self.program_title.setText("No program selected")
+            self.program_title.setText(tr("No program selected"))
             self.program_meta.setText("")
             self.program_description.setText("")
             self.story_button.hide()
@@ -203,19 +208,29 @@ class ProgramsPage(Page):
         self.program_title.setText(program.title)
         skills = ", ".join(sorted(program.required_skills, key=str.casefold)) or "none"
         self.program_meta.setText(
-            f"{program.status.label} {program.category.label.lower()} program at {program.location}. "
-            f"Coordinator: {program.coordinator_name}. Ages {program.min_age}+. Helpful skills: {skills}."
+            tr(
+                (
+                    "{label} {lower} program at {location}. Coordinator: "
+                    "{coordinator_name}. Ages {min_age}+. Helpful skills: {skills}."
+                ),
+                label=program.status.label,
+                lower=program.category.label.lower(),
+                location=program.location,
+                coordinator_name=program.coordinator_name,
+                min_age=program.min_age,
+                skills=skills,
+            )
         )
         self.program_description.setText(program.description)
         self._story_url = program.story_video_url
         self.story_button.setVisible(bool(self._story_url))
         status = program.status
         self.publish_button.setVisible(status is not OpportunityStatus.OPEN)
-        self.publish_button.setText("Publish" if status is OpportunityStatus.DRAFT else "Reopen")
+        self.publish_button.setText(tr("Publish") if status is OpportunityStatus.DRAFT else tr("Reopen"))
         self.close_button.setVisible(status is not OpportunityStatus.CLOSED)
         self.add_shift_button.setEnabled(status is not OpportunityStatus.CLOSED)
         self.add_shift_button.setToolTip(
-            "" if status is not OpportunityStatus.CLOSED else "Reopen the program to add shifts."
+            "" if status is not OpportunityStatus.CLOSED else tr("Reopen the program to add shifts.")
         )
         self._show_shifts()
 
@@ -247,7 +262,7 @@ class ProgramsPage(Page):
         self.match_button.setEnabled(bool(upcoming))
         self.edit_shift_button.setEnabled(bool(upcoming))
         self.delete_shift_button.setEnabled(bool(upcoming) and overview is not None and overview.filled == 0)
-        self.delete_shift_button.setToolTip("Only empty, upcoming shifts can be deleted.")
+        self.delete_shift_button.setToolTip(tr("Only empty, upcoming shifts can be deleted."))
 
     # -------------------------------------------------------------- actions
 
@@ -255,7 +270,7 @@ class ProgramsPage(Page):
     def _new_program(self) -> None:
         dialog = OpportunityDialog(self.ctx, None, self)
         if dialog.exec() and dialog.saved is not None:
-            self.ctx.changed(f"Created {dialog.saved.title}.")
+            self.ctx.changed(tr("Created {title}.", title=dialog.saved.title))
 
     @guarded
     def _edit_program(self) -> None:
@@ -264,7 +279,7 @@ class ProgramsPage(Page):
             return
         dialog = OpportunityDialog(self.ctx, program, self)
         if dialog.exec() and dialog.saved is not None:
-            self.ctx.changed(f"Saved {dialog.saved.title}.")
+            self.ctx.changed(tr("Saved {title}.", title=dialog.saved.title))
 
     @guarded
     def _publish(self) -> None:
@@ -274,23 +289,30 @@ class ProgramsPage(Page):
         self.ctx.services.opportunities.change_status(
             self.ctx.session, program.opportunity_id or 0, OpportunityStatus.OPEN
         )
-        self.ctx.changed(f"{program.title} is open for sign-ups.")
+        self.ctx.changed(tr("{title} is open for sign-ups.", title=program.title))
 
     @guarded
     def _close(self) -> None:
         program = self.programs.selected()
         if program is None or not confirm(
             self,
-            "Close program",
-            f"Close {program.title}? Upcoming sign-ups will be cancelled and volunteers won't see it. "
-            "Past history is kept, and you can reopen it later.",
-            "Close program",
+            tr("Close program"),
+            tr(
+                (
+                    "Close {title}? Upcoming sign-ups will be cancelled and volunteers "
+                    "won't see it. Past history is kept, and you can reopen it later."
+                ),
+                title=program.title,
+            ),
+            tr("Close program"),
         ):
             return
         cancelled = self.ctx.services.opportunities.change_status(
             self.ctx.session, program.opportunity_id or 0, OpportunityStatus.CLOSED
         )
-        self.ctx.changed(f"Closed {program.title}. Cancelled {cancelled} upcoming sign-up(s).")
+        self.ctx.changed(
+            tr("Closed {title}. Cancelled {cancelled} upcoming sign-up(s).", title=program.title, cancelled=cancelled)
+        )
 
     @guarded
     def _add_shifts(self) -> None:
@@ -299,7 +321,14 @@ class ProgramsPage(Page):
             return
         dialog = ShiftDialog(self.ctx, program, None, self)
         if dialog.exec():
-            self.ctx.changed(f"Added {dialog.created} shift{'s' if dialog.created != 1 else ''} to {program.title}.")
+            self.ctx.changed(
+                tr_n(
+                    "Added {count} shift to {title}.",
+                    "Added {count} shifts to {title}.",
+                    dialog.created,
+                    title=program.title,
+                )
+            )
 
     @guarded
     def _edit_shift(self) -> None:
@@ -307,17 +336,20 @@ class ProgramsPage(Page):
         if program is None or overview is None:
             return
         if ShiftDialog(self.ctx, program, overview.shift, self).exec():
-            self.ctx.changed("Shift updated.")
+            self.ctx.changed(tr("Shift updated."))
 
     @guarded
     def _delete_shift(self) -> None:
         overview = self.shifts.selected()
         if overview is None or not confirm(
-            self, "Delete shift", f"Delete the shift on {format_when(overview.shift.starts_at)}?", "Delete shift"
+            self,
+            tr("Delete shift"),
+            tr("Delete the shift on {format_when}?", format_when=format_when(overview.shift.starts_at)),
+            tr("Delete shift"),
         ):
             return
         self.ctx.services.opportunities.delete_shift(self.ctx.session, overview.shift.shift_id or 0)
-        self.ctx.changed("Shift deleted.")
+        self.ctx.changed(tr("Shift deleted."))
 
     @guarded
     def _open_shift(self, overview: ShiftOverview | None, smart: bool = False) -> None:

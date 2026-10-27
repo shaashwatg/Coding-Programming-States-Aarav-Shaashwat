@@ -26,17 +26,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.i18n import Language, current_language, format_clock, format_long_day, mark, tr
 from servesync.models import Appearance, MessageDuration, ShiftOverview, Theme
 from servesync.services import Permission
 from servesync.ui.context import AppContext
-from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
+from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog, language_switch
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
     EnumComboBox,
     PageHeader,
     Panel,
-    format_date,
     from_qdate,
     guarded,
     make_button,
@@ -51,12 +51,12 @@ TEXT_SIZES = (0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
 
 
 def _clock(moment: datetime) -> str:
-    return f"{moment.hour % 12 or 12}:{moment:%M} {'AM' if moment.hour < 12 else 'PM'}"
+    return format_clock(moment)
 
 
 class CalendarPage(Page):
     key = "calendar"
-    title = "Calendar"
+    title = mark("Calendar")
     icon_name = "calendar-days"
 
     def __init__(self, ctx: AppContext) -> None:
@@ -65,10 +65,10 @@ class CalendarPage(Page):
         leader = ctx.session.can(Permission.MANAGE_SCHEDULE)
         self.layout_.addWidget(
             PageHeader(
-                "Calendar",
-                "Dots mark days with shifts; marigold dots still have open spots. Pick a day to see its shifts."
+                tr("Calendar"),
+                tr("Dots mark days with shifts; marigold dots still have open spots. Pick a day to see its shifts.")
                 if leader
-                else "Dots mark days with open shifts. Pick a day, then a shift, to see details and sign up.",
+                else tr("Dots mark days with open shifts. Pick a day, then a shift, to see details and sign up."),
             )
         )
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -85,20 +85,20 @@ class CalendarPage(Page):
         self.day_table: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
-                    "Time",
+                    tr("Time"),
                     lambda o: f"{_clock(o.shift.starts_at)} – {_clock(o.shift.ends_at)}",
                     sort=lambda o: o.shift.starts_at,
                 ),
-                Column("Program", lambda o: o.opportunity_title, stretch=True),
+                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True),
                 Column(
-                    "Spots open",
+                    tr("Spots open"),
                     lambda o: o.open_spots,
                     color=lambda o: current_palette().attention if o.open_spots else None,
                     align_right=True,
                 ),
             ],
-            empty_message="No shifts on this day.",
-            accessible_name="Shifts on the selected day",
+            empty_message=tr("No shifts on this day."),
+            accessible_name=tr("Shifts on the selected day"),
         )
         self.info = ShiftInfoPanel(ctx)
         self.info.changed.connect(self.reload)
@@ -125,7 +125,7 @@ class CalendarPage(Page):
     def _show_day(self) -> None:
         day = from_qdate(self.calendar.selectedDate())
         shifts = [o for o in self._month_shifts if o.shift.starts_at.date() == day]
-        self.day_title.setText(f"{day:%A}, {format_date(day)}")
+        self.day_title.setText(format_long_day(day))
         self.day_table.set_records(shifts, keep_selection=lambda o: o.shift.shift_id)
         if self.day_table.selected() is None:
             self.day_table.select_first()
@@ -139,34 +139,47 @@ class CalendarPage(Page):
 
 class SettingsPage(Page):
     key = "settings"
-    title = "Settings"
+    title = mark("Settings")
     icon_name = "settings"
 
     def __init__(self, ctx: AppContext) -> None:
         super().__init__(ctx, scrollable=True)
         self.layout_.addWidget(
-            PageHeader("Settings", "Make ServeSync comfortable for you, and keep your organization's details current.")
+            PageHeader(
+                tr("Settings"),
+                tr("Make ServeSync comfortable for you, and keep your organization's details current."),
+            )
         )
 
         # Comfort and accessibility (everyone; saved to *their* account) -------
-        access = Panel("Comfort and accessibility")
+        access = Panel(tr("Comfort and accessibility"))
         access.body.addWidget(
             make_label(
-                "Your choices follow your account to any computer. Shortcuts: Ctrl+= and Ctrl+- change text size, "
-                "Ctrl+Shift+H turns high contrast on or off.",
+                tr(
+                    "Your choices follow your account to any computer. Shortcuts: Ctrl+= "
+                    "and Ctrl+- change text size, Ctrl+Shift+H turns high contrast on or "
+                    "off."
+                ),
                 "muted",
                 wrap=True,
             )
         )
-        access.body.addWidget(make_label("Color theme", "section"))
+        # Bilingual on purpose: someone who can't read the current language can still find theirs.
+        access.body.addWidget(make_label("Language / Idioma", "section"))
+        language_row = QHBoxLayout()
+        language_row.addWidget(language_switch(self._choose_language))
+        language_row.addStretch(1)
+        access.body.addLayout(language_row)
+
+        access.body.addWidget(make_label(tr("Color theme"), "section"))
         themes = QHBoxLayout()
         themes.setSpacing(0)
         self.theme_group = QButtonGroup(self)
         descriptions = {
-            Theme.SYSTEM: "Match my computer",
-            Theme.LIGHT: "Light",
-            Theme.DARK: "Dark (less glare)",
-            Theme.HIGH_CONTRAST: "High contrast",
+            Theme.SYSTEM: tr("Match my computer"),
+            Theme.LIGHT: tr("Light"),
+            Theme.DARK: tr("Dark (less glare)"),
+            Theme.HIGH_CONTRAST: tr("High contrast"),
         }
         members = list(Theme)
         for index, theme in enumerate(members):
@@ -176,44 +189,46 @@ class SettingsPage(Page):
             button.setProperty("first", index == 0)
             button.setProperty("last", index == len(members) - 1)
             button.setProperty("theme", theme.value)
-            button.setAccessibleName(f"Theme: {descriptions[theme]}")
+            button.setAccessibleName(tr("Theme: {item}", item=descriptions[theme]))
             self.theme_group.addButton(button, index)
             themes.addWidget(button)
         themes.addStretch(1)
         access.body.addLayout(themes)
 
-        access.body.addWidget(make_label("Text size", "section"))
+        access.body.addWidget(make_label(tr("Text size"), "section"))
         size_row = QHBoxLayout()
         self.text_size = QSlider(Qt.Orientation.Horizontal)
         self.text_size.setRange(0, len(TEXT_SIZES) - 1)
         self.text_size.setPageStep(1)
         self.text_size.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.text_size.setAccessibleName("Text size")
+        self.text_size.setAccessibleName(tr("Text size"))
         self.size_label = make_label("", "muted")
         size_row.addWidget(self.text_size, 1)
         size_row.addWidget(self.size_label)
         access.body.addLayout(size_row)
 
-        access.body.addWidget(make_label("Reading and motion", "section"))
-        self.reduce_motion = QCheckBox("Reduce motion — no sliding, fading, or growing animations")
+        access.body.addWidget(make_label(tr("Reading and motion"), "section"))
+        self.reduce_motion = QCheckBox(tr("Reduce motion — no sliding, fading, or growing animations"))
         self.text_spacing = QCheckBox(
-            "Extra letter and word spacing — easier for many readers, including with dyslexia"
+            tr("Extra letter and word spacing — easier for many readers, including with dyslexia")
         )
-        self.simplified = QCheckBox("Simplified layout — hide extra panels so each screen shows only the essentials")
+        self.simplified = QCheckBox(
+            tr("Simplified layout — hide extra panels so each screen shows only the essentials")
+        )
         for box in (self.reduce_motion, self.text_spacing, self.simplified):
             access.body.addWidget(box)
 
         timing_row = QHBoxLayout()
-        timing_label = make_label("Keep confirmation messages on screen", None)
+        timing_label = make_label(tr("Keep confirmation messages on screen"), None)
         self.message_duration: EnumComboBox[MessageDuration] = EnumComboBox(
             MessageDuration,
             label=lambda m: {
-                MessageDuration.STANDARD: "for 6 seconds",
-                MessageDuration.LONG: "for 20 seconds",
-                MessageDuration.UNTIL_CLOSED: "until I close them",
+                MessageDuration.STANDARD: tr("for 6 seconds"),
+                MessageDuration.LONG: tr("for 20 seconds"),
+                MessageDuration.UNTIL_CLOSED: tr("until I close them"),
             }[m],
         )
-        self.message_duration.setAccessibleName("Keep confirmation messages on screen")
+        self.message_duration.setAccessibleName(tr("Keep confirmation messages on screen"))
         timing_label.setBuddy(self.message_duration)
         timing_row.addWidget(timing_label)
         timing_row.addWidget(self.message_duration)
@@ -221,8 +236,8 @@ class SettingsPage(Page):
         access.body.addLayout(timing_row)
 
         buttons = QHBoxLayout()
-        buttons.addWidget(make_button("Save comfort settings", kind="primary", on_click=self._apply_display))
-        buttons.addWidget(make_button("Restore defaults", on_click=self._restore_defaults))
+        buttons.addWidget(make_button(tr("Save comfort settings"), kind="primary", on_click=self._apply_display))
+        buttons.addWidget(make_button(tr("Restore defaults"), on_click=self._restore_defaults))
         buttons.addStretch(1)
         access.body.addLayout(buttons)
         self.text_size.valueChanged.connect(lambda value: self.size_label.setText(f"{TEXT_SIZES[value]:.0%}"))
@@ -230,7 +245,7 @@ class SettingsPage(Page):
 
         # Organization (administrators) ----------------------------------------
         self._admin = ctx.session.can(Permission.MANAGE_SETTINGS)
-        org = Panel("Organization")
+        org = Panel(tr("Organization"))
         form = QFormLayout()
         self.org_name = QLineEdit()
         self.org_name.setMaxLength(80)
@@ -243,9 +258,9 @@ class SettingsPage(Page):
         self.org_errors = make_label("", "error", wrap=True)
         self.org_errors.hide()
         for label, widget in (
-            ("Name", self.org_name),
-            ("Mission statement", self.mission),
-            ("Value of one volunteer hour", self.hour_value),
+            (tr("Name"), self.org_name),
+            (tr("Mission statement"), self.mission),
+            (tr("Value of one volunteer hour"), self.hour_value),
         ):
             widget.setAccessibleName(label)
             widget.setEnabled(self._admin)
@@ -253,8 +268,11 @@ class SettingsPage(Page):
         org.body.addLayout(form)
         org.body.addWidget(
             make_label(
-                "The value of a volunteer hour turns hours into dollars on the dashboard and in reports. "
-                "Independent Sector's national estimate (April 2026) is $36.14; many states publish their own.",
+                tr(
+                    "The value of a volunteer hour turns hours into dollars on the "
+                    "dashboard and in reports. Independent Sector's national estimate "
+                    "(April 2026) is $36.14; many states publish their own."
+                ),
                 "hint",
                 wrap=True,
             )
@@ -262,31 +280,37 @@ class SettingsPage(Page):
         org.body.addWidget(self.org_errors)
         if self._admin:
             org.body.addWidget(
-                make_button("Save organization details", kind="primary", on_click=self._save_org),
+                make_button(tr("Save organization details"), kind="primary", on_click=self._save_org),
                 0,
                 Qt.AlignmentFlag.AlignLeft,
             )
         else:
-            org.body.addWidget(make_label("Only administrators can change these details.", "muted"))
+            org.body.addWidget(make_label(tr("Only administrators can change these details."), "muted"))
         self.layout_.addWidget(org)
 
         # Account ----------------------------------------------------------
-        account = Panel("Your account")
+        account = Panel(tr("Your account"))
         account.body.addWidget(
-            make_label(f"Signed in as {ctx.session.username} ({ctx.session.role.label}).", wrap=True)
+            make_label(
+                tr("Signed in as {username} ({label}).", username=ctx.session.username, label=ctx.session.role.label),
+                wrap=True,
+            )
         )
         account.body.addWidget(
-            make_button("Change password", on_click=self._change_password), 0, Qt.AlignmentFlag.AlignLeft
+            make_button(tr("Change password"), on_click=self._change_password), 0, Qt.AlignmentFlag.AlignLeft
         )
         self.layout_.addWidget(account)
 
         if ctx.session.can(Permission.MANAGE_SETTINGS) and not ctx.services.store.db.is_in_memory:
-            data = Panel("Data and backup")
+            data = Panel(tr("Data and backup"))
             folder = Path(ctx.services.store.db.path).parent
             data.body.addWidget(
                 make_label(
-                    "Everything ServeSync stores — records, photos, and settings — lives in this folder on this "
-                    "computer. To back up, close ServeSync and copy the folder to a USB drive or cloud storage.",
+                    tr(
+                        "Everything ServeSync stores — records, photos, and settings — lives "
+                        "in this folder on this computer. To back up, close ServeSync and copy "
+                        "the folder to a USB drive or cloud storage."
+                    ),
                     "muted",
                     wrap=True,
                 )
@@ -327,7 +351,15 @@ class SettingsPage(Page):
             message_duration=self.message_duration.value() or MessageDuration.STANDARD,
         )
         self.ctx.events.appearance_changed.emit()
-        self.ctx.events.status_message.emit("Comfort settings saved.")
+        self.ctx.events.status_message.emit(tr("Comfort settings saved."))
+
+    @guarded
+    def _choose_language(self, language: Language) -> None:
+        """Takes effect right away (the window redraws in the new language)."""
+        if language is current_language():
+            return
+        self.ctx.services.settings.set_appearance(self.ctx.session, language=language)
+        self.ctx.events.appearance_changed.emit()
 
     @guarded
     def _restore_defaults(self) -> None:
@@ -350,9 +382,9 @@ class SettingsPage(Page):
             self.org_errors.setText("\n".join(error.errors.values()))
             self.org_errors.show()
             return
-        self.ctx.changed("Organization details saved.")
+        self.ctx.changed(tr("Organization details saved."))
 
     @guarded
     def _change_password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
-            self.ctx.events.status_message.emit("Password changed.")
+            self.ctx.events.status_message.emit(tr("Password changed."))

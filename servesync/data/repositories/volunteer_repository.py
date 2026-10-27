@@ -13,6 +13,7 @@ from servesync.core.errors import (
     RecordNotFoundError,
     ValidationError,
 )
+from servesync.core.i18n import mark, tr
 from servesync.data.converters import (
     chunked,
     contains_pattern,
@@ -35,8 +36,8 @@ from servesync.models import (
     Weekday,
 )
 
-_ENTITY = "Volunteer"
-_DUPLICATE_EMAIL = "Another volunteer already uses this email address."
+_ENTITY = mark("Volunteer")
+_DUPLICATE_EMAIL = mark("Another volunteer already uses this email address.")
 
 _SELECT_VOLUNTEER = """
     SELECT volunteer_id, first_name, last_name, email, phone, birth_date, joined_on,
@@ -83,7 +84,7 @@ class VolunteerRepository(Repository):
                     self._to_params(volunteer),
                 )
             except DuplicateRecordError as exc:
-                raise ValidationError.single("email", _DUPLICATE_EMAIL) from exc
+                raise ValidationError.single("email", tr(_DUPLICATE_EMAIL)) from exc
             new_id = int(cursor.lastrowid or 0)
             self._write_skills(new_id, volunteer.skills)
             self._write_availability(new_id, volunteer.availability)
@@ -112,7 +113,7 @@ class VolunteerRepository(Repository):
                     params,
                 )
             except DuplicateRecordError as exc:
-                raise ValidationError.single("email", _DUPLICATE_EMAIL) from exc
+                raise ValidationError.single("email", tr(_DUPLICATE_EMAIL)) from exc
             if cursor.rowcount == 0:
                 raise RecordNotFoundError(_ENTITY, volunteer_id)
             self._db.execute("DELETE FROM volunteer_skills WHERE volunteer_id = ?", (volunteer_id,))
@@ -146,8 +147,10 @@ class VolunteerRepository(Repository):
             cursor = self._db.execute("DELETE FROM volunteers WHERE volunteer_id = ?", (volunteer_id,))
         except RecordInUseError as exc:
             raise RecordInUseError(
-                "This volunteer has service history, so the record is kept for reporting. "
-                "Mark the volunteer Inactive instead."
+                tr(
+                    "This volunteer has service history, so the record is kept for "
+                    "reporting. Mark the volunteer Inactive instead."
+                )
             ) from exc
         if cursor.rowcount == 0:
             raise RecordNotFoundError(_ENTITY, volunteer_id)
@@ -191,8 +194,8 @@ class VolunteerRepository(Repository):
             pattern = contains_pattern(text)
             digits = "".join(ch for ch in text if ch.isdigit())
             clauses.append(
-                "(first_name || ' ' || last_name LIKE ? ESCAPE '\\'"
-                f" OR {display_name_sql()} LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'"
+                "(first_name || ' ' || last_name LIKE ? ESCAPE '\\' OR "
+                f"{display_name_sql()} LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'"
                 + (" OR phone LIKE ? ESCAPE '\\'" if digits else "")
                 + ")"
             )

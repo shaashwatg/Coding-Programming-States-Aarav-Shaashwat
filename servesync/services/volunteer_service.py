@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from servesync.core.errors import BusinessRuleError
+from servesync.core.i18n import tr
 from servesync.models import (
     AssignmentStatus,
     AvailabilitySlot,
@@ -44,9 +45,9 @@ class VolunteerService(Service):
         """Add a new volunteer (usually as an Applicant awaiting approval)."""
         session.require(Permission.MANAGE_VOLUNTEERS)
         if volunteer.volunteer_id is not None:
-            raise BusinessRuleError("This volunteer is already registered.")
+            raise BusinessRuleError(tr("This volunteer is already registered."))
         if volunteer.status is VolunteerStatus.INACTIVE:
-            raise BusinessRuleError("New volunteers start as Applicant or Active.")
+            raise BusinessRuleError(tr("New volunteers start as Applicant or Active."))
         saved = self._store.volunteers.add(volunteer)
         logger.info("Volunteer #%s registered by account #%s", saved.volunteer_id, session.account_id)
         return saved
@@ -119,7 +120,7 @@ class VolunteerService(Service):
         themselves cannot alter leader-controlled fields.
         """
         if volunteer.volunteer_id is None:
-            raise BusinessRuleError("Register the volunteer before editing their profile.")
+            raise BusinessRuleError(tr("Register the volunteer before editing their profile."))
         session.require_self_or(Permission.MANAGE_VOLUNTEERS, volunteer.volunteer_id)
         existing = self._store.volunteers.get(volunteer.volunteer_id)
 

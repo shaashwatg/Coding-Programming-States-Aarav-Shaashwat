@@ -9,6 +9,7 @@ from html import escape
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget
 
 from servesync import __app_name__, __version__
+from servesync.core.i18n import Language, current_language, format_clock, tr
 from servesync.models import UserRole
 from servesync.ui.widgets.common import make_label
 
@@ -92,7 +93,7 @@ SHORTCUTS = """
 <h3>Comfort and accessibility</h3>
 <p>Go to <b>Settings</b> to choose a theme (Match my computer, Light, Dark, or High contrast), make text up to
 twice as large, add extra letter spacing, reduce motion, simplify the layout, and choose how long messages stay
-on screen. Your choices follow your account to any computer. Missed a message? See
+on screen, and switch the language. Your choices follow your account to any computer. Missed a message? See
 <b>Help &gt; Recent messages</b>.</p>
 """
 
@@ -113,17 +114,147 @@ Maryland, April 2026 ($36.14 national estimate).</li>
 """
 
 
+# ---------------------------------------------------------------- Español
+
+LEADER_GUIDE_ES = """
+<h2>Primeros pasos</h2>
+<p>ServeSync le ayuda a reclutar voluntarios, planificar programas, cubrir turnos y llevar un registro fiel
+del servicio.</p>
+<h3>Todos los días</h3>
+<ul>
+<li>El <b>Panel</b> muestra lo que necesita su atención: solicitantes por revisar y turnos de esta semana que aún
+necesitan personas.</li>
+<li>Abra cualquier turno para ver su lista. Antes de que empiece, inscriba a las personas; cuando empiece, registre
+la asistencia.</li>
+</ul>
+<h3>Reclutamiento</h3>
+<ul>
+<li>Elija <b>Agregar voluntario</b> (arriba a la derecha) para registrar a alguien. Las personas nuevas empiezan como
+<i>Solicitantes</i>.</li>
+<li>En <b>Voluntarios</b>, seleccione a un solicitante y elija <b>Aprobar</b> cuando haya completado
+la orientación.</li>
+<li>Archive a quienes se retiren; su historial de servicio siempre se conserva.</li>
+</ul>
+<h3>Programas y turnos</h3>
+<ul>
+<li>En <b>Programas</b>, cree un programa y luego agregue turnos. Use <i>Repetir cada semana</i> para el trabajo
+recurrente.</li>
+<li>Los programas empiezan como borradores. Elija <b>Publicar</b> para que los voluntarios puedan verlos e
+inscribirse.</li>
+<li>Agregue su propia foto del programa y un enlace a un video para que los voluntarios sientan el impacto.</li>
+</ul>
+<h3>Informes</h3>
+<ul>
+<li>En <b>Informes</b>, elija una pregunta (horas de voluntariado, impacto del programa, asistencia a turnos,
+reclutamiento o el historial de servicio de una persona), un período y, si quiere, un programa o una categoría.</li>
+<li>Lea <i>Lo más destacado</i> para ver los hallazgos en lenguaje sencillo, elija <b>Columnas</b> para ver más
+detalle y luego <b>Exportar CSV</b> o <b>Guardar PDF</b>. Lo que exporta es exactamente lo que ve.</li>
+</ul>
+<h3>Pregúntale a ServeSync</h3>
+<ul>
+<li>Presione <b>Ctrl+K</b> (o elija <b>Preguntar</b> arriba) y escriba una pregunta como
+<i>¿Quién está libre el sábado por la mañana?</i> o <i>¿Cómo va la despensa de alimentos?</i></li>
+<li>También puede escribir el nombre de una página para ir directamente. Las respuestas salen solo de los registros
+de esta computadora.</li>
+</ul>
+<h3>Smart Match</h3>
+<ul>
+<li>En un turno, abra la pestaña <b>Smart Match</b> para ver a los mejores voluntarios disponibles, con una
+puntuación de 0 a 100.</li>
+<li>Cada barra de color muestra las cinco razones de la puntuación: disponibilidad, habilidades, confiabilidad,
+experiencia y reparto justo. Las marcas con ! son cosas que conviene verificar.</li>
+<li>Smart Match nunca sugiere a nadie que sea demasiado joven, que ya tenga otro turno o que aún no esté aprobado.</li>
+<li>Si un programa no ofrece apoyo para las necesidades de acceso de alguien (por ejemplo, entrada sin escalones),
+esa persona aparece después de los demás con una nota que explica por qué. Nadie se oculta ni se rechaza nunca por
+una necesidad de acceso.</li>
+</ul>
+"""
+
+VOLUNTEER_GUIDE_ES = """
+<h2>Primeros pasos</h2>
+<p>¡Bienvenido! Así puede encontrar formas de ayudar y llevar el control de su servicio.</p>
+<ul>
+<li><b>Inicio</b> muestra sus próximos turnos, sus horas y los turnos que Smart Match eligió para usted.</li>
+<li>Elija <b>Buscar un turno</b> (arriba a la derecha) para ver todo lo que está abierto. Seleccione un turno para ver
+los detalles y luego elija <b>Inscribirme</b>. Si no puede inscribirse, ServeSync le dice por qué.</li>
+<li><b>Calendario</b> muestra cada turno abierto por fecha.</li>
+<li>¿Necesita cancelar? Seleccione el turno en <b>Inicio</b> y elija <b>Cancelar inscripción</b> en cualquier
+momento antes de que empiece.</li>
+<li>Mantenga al día su disponibilidad y sus habilidades en <b>Mi perfil</b> para que las recomendaciones se ajusten a
+su vida. También puede agregar el nombre que usa, sus pronombres y cualquier necesidad de acceso (entrada sin
+escalones, tareas sentado, transporte público, un espacio tranquilo, sin costo o a distancia).</li>
+<li><b>Mis horas</b> enumera su servicio verificado. Elija <b>Guardar PDF</b> para la escuela, becas o empleadores.</li>
+<li>Presione <b>Ctrl+K</b> y pregunte cosas como <i>¿Cuándo es mi próximo turno?</i> o
+<i>¿En qué debería inscribirme?</i></li>
+</ul>
+"""
+
+SHORTCUTS_ES = """
+<h2>Atajos de teclado</h2>
+<p>Todo en ServeSync funciona con el teclado. En una Mac, use Comando donde vea Ctrl.</p>
+<table cellpadding="6">
+<tr><td><b>Ctrl+K</b></td><td>Hacerle una pregunta a ServeSync, o escribir el nombre de una página
+para ir allí</td></tr>
+<tr><td><b>Ctrl+1 ... Ctrl+6</b></td><td>Ir a cada página, en orden</td></tr>
+<tr><td><b>Ctrl+N</b></td><td>La acción principal arriba a la derecha (Agregar voluntario o Buscar un turno)</td></tr>
+<tr><td><b>Ctrl+F</b></td><td>Ir al cuadro de búsqueda de la página actual</td></tr>
+<tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>Texto más grande, más pequeño o tamaño normal (se guarda para
+usted)</td></tr>
+<tr><td><b>Ctrl+Shift+H</b></td><td>Activar o desactivar el alto contraste</td></tr>
+<tr><td><b>Teclas de flecha</b></td><td>En un gráfico: moverse entre barras o puntos; cada valor se lee en voz
+alta</td></tr>
+<tr><td><b>F1</b></td><td>Abrir esta ayuda</td></tr>
+<tr><td><b>Tab / Shift+Tab</b></td><td>Moverse entre controles (el control activo tiene un contorno azul)</td></tr>
+<tr><td><b>Enter</b></td><td>Abrir la fila seleccionada o presionar el botón resaltado</td></tr>
+<tr><td><b>Esc</b></td><td>Cerrar una ventana sin guardar</td></tr>
+</table>
+<h3>Comodidad y accesibilidad</h3>
+<p>Vaya a <b>Configuración</b> para elegir un tema (Igual que mi computadora, Claro, Oscuro o Alto contraste), hacer el
+texto hasta el doble de grande, agregar más espacio entre letras, reducir el movimiento, simplificar el diseño, elegir
+cuánto tiempo se muestran los mensajes y cambiar el idioma. Sus preferencias le siguen a cualquier computadora.
+¿Se perdió un mensaje? Vea <b>Ayuda &gt; Mensajes recientes</b>.</p>
+"""
+
+ABOUT_ES = f"""
+<h2>Acerca de {__app_name__}</h2>
+<p>Versión {__version__}. Gestión de voluntarios para organizaciones sin fines de lucro, creada para la competencia
+FBLA Coding &amp; Programming (2026-2027).</p>
+<h3>Créditos</h3>
+<ul>
+<li>Fuentes: Atkinson Hyperlegible (Braille Institute of America) y Source Serif 4 (Adobe),
+ambas bajo la SIL Open Font License 1.1.</li>
+<li>Íconos: Lucide, licencia ISC.</li>
+<li>Herramientas de interfaz: Qt for Python (PySide6), LGPL v3.</li>
+<li>Valor de una hora de voluntariado: Independent Sector y el Do Good Institute, Universidad de
+Maryland, abril de 2026 (estimación nacional de $36.14).</li>
+<li>Traducción al español: equipo de ServeSync.</li>
+</ul>
+<p>Las personas, los lugares y las organizaciones de la demostración son ficticios.</p>
+"""
+
+
+def _pages(role: UserRole) -> tuple[str, str, str]:
+    """The guide, shortcuts and about pages in the current language."""
+    if current_language() is Language.SPANISH:
+        return (LEADER_GUIDE_ES if role.is_leader else VOLUNTEER_GUIDE_ES, SHORTCUTS_ES, ABOUT_ES)
+    return (LEADER_GUIDE if role.is_leader else VOLUNTEER_GUIDE, SHORTCUTS, ABOUT)
+
+
 class HelpDialog(QDialog):
     def __init__(self, role: UserRole, parent: QWidget | None = None, *, start_tab: int = 0) -> None:
         super().__init__(parent)
-        self.setWindowTitle("ServeSync help")
+        self.setWindowTitle(tr("ServeSync help"))
         self.resize(720, 620)
         column = QVBoxLayout(self)
         column.setContentsMargins(20, 18, 20, 16)
-        column.addWidget(make_label("Help", "title"))
+        column.addWidget(make_label(tr("Help"), "title"))
         tabs = QTabWidget()
-        guide = LEADER_GUIDE if role.is_leader else VOLUNTEER_GUIDE
-        for title, html in (("Getting started", guide), ("Keyboard shortcuts", SHORTCUTS), ("About", ABOUT)):
+        guide, shortcuts, about = _pages(role)
+        for title, html in (
+            (tr("Getting started"), guide),
+            (tr("Keyboard shortcuts"), shortcuts),
+            (tr("About"), about),
+        ):
             browser = QTextBrowser()
             browser.setOpenExternalLinks(False)
             browser.setHtml(html)
@@ -141,20 +272,20 @@ class RecentMessagesDialog(QDialog):
 
     def __init__(self, history: Sequence[tuple[datetime, str]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Recent messages")
+        self.setWindowTitle(tr("Recent messages"))
         self.resize(560, 420)
         column = QVBoxLayout(self)
         column.setContentsMargins(20, 18, 20, 16)
-        column.addWidget(make_label("Recent messages", "title"))
+        column.addWidget(make_label(tr("Recent messages"), "title"))
         browser = QTextBrowser()
-        browser.setAccessibleName("Recent messages, newest first")
+        browser.setAccessibleName(tr("Recent messages, newest first"))
         if history:
             items = "".join(
-                f"<li><b>{moment:%I:%M %p}</b> \u2014 {escape(text)}</li>" for moment, text in reversed(history)
+                f"<li><b>{format_clock(moment)}</b> \u2014 {escape(text)}</li>" for moment, text in reversed(history)
             )
             browser.setHtml(f"<ul>{items}</ul>")
         else:
-            browser.setHtml("<p>No messages yet.</p>")
+            browser.setHtml(f"<p>{escape(tr('No messages yet.'))}</p>")
         column.addWidget(browser, 1)
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close.rejected.connect(self.reject)

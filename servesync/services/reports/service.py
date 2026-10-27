@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime, time, timedelta
 
 from servesync.core.errors import ValidationError
+from servesync.core.i18n import tr
 from servesync.services.base import Service
 from servesync.services.reports import analytics
 from servesync.services.reports.model import DatePreset, Report, ReportFilters, ReportKind
@@ -27,13 +28,13 @@ class ReportService(Service):
         if kind is ReportKind.SERVICE_RECORD:
             volunteer_id = filters.volunteer_id or session.volunteer_id
             if volunteer_id is None:
-                raise ValidationError.single("volunteer_id", "Choose the volunteer this service record is for.")
+                raise ValidationError.single("volunteer_id", tr("Choose the volunteer this service record is for."))
             session.require_self_or(Permission.VIEW_REPORTS, volunteer_id)
             volunteer = self._store.volunteers.get(volunteer_id)
         else:
             session.require(Permission.VIEW_REPORTS)
         if filters.opportunity_id is not None and not self._store.opportunities.exists(filters.opportunity_id):
-            raise ValidationError.single("opportunity_id", "That program no longer exists. Choose another.")
+            raise ValidationError.single("opportunity_id", tr("That program no longer exists. Choose another."))
 
         inputs = analytics.ReportInputs(
             facts=self._store.assignments.service_facts(start=filters.start, end=filters.end),

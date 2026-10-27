@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from servesync.config import MAX_SHIFT_HOURS
+from servesync.core.i18n import tr
 from servesync.core.validators import ErrorCollector, parse_datetime, parse_enum, parse_hours
 from servesync.models._common import validate_optional_id, validate_reference_id
 from servesync.models.enums import AssignmentStatus
@@ -22,7 +23,7 @@ def _now_to_minute() -> datetime:
 
 
 def _parse_optional_hours(value: object) -> float | None:
-    return None if value is None else parse_hours(value, "Hours served", maximum=MAX_SHIFT_HOURS)
+    return None if value is None else parse_hours(value, tr("Hours served"), maximum=MAX_SHIFT_HOURS)
 
 
 @dataclass(slots=True)
@@ -38,19 +39,21 @@ class Assignment:
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
-        self.shift_id = errors.check("shift_id", validate_reference_id, self.shift_id, "Shift")
-        self.volunteer_id = errors.check("volunteer_id", validate_reference_id, self.volunteer_id, "Volunteer")
-        self.status = errors.check("status", parse_enum, self.status, AssignmentStatus, "Attendance status")
+        self.shift_id = errors.check("shift_id", validate_reference_id, self.shift_id, tr("Shift"))
+        self.volunteer_id = errors.check("volunteer_id", validate_reference_id, self.volunteer_id, tr("Volunteer"))
+        self.status = errors.check("status", parse_enum, self.status, AssignmentStatus, tr("Attendance status"))
         self.hours_served = errors.check("hours_served", _parse_optional_hours, self.hours_served)
-        self.signed_up_at = errors.check("signed_up_at", parse_datetime, self.signed_up_at, "Sign-up time")
-        self.assignment_id = errors.check("assignment_id", validate_optional_id, self.assignment_id, "Assignment ID")
+        self.signed_up_at = errors.check("signed_up_at", parse_datetime, self.signed_up_at, tr("Sign-up time"))
+        self.assignment_id = errors.check(
+            "assignment_id", validate_optional_id, self.assignment_id, tr("Assignment ID")
+        )
 
         # Semantic invariant (also enforced by a CHECK constraint in SQLite):
         # hours exist if, and only if, the volunteer actually attended.
         if self.status is AssignmentStatus.ATTENDED and self.hours_served is None:
-            errors.add("hours_served", "Enter the hours served when marking a volunteer as attended.")
+            errors.add("hours_served", tr("Enter the hours served when marking a volunteer as attended."))
         if self.status is not AssignmentStatus.ATTENDED and self.hours_served is not None:
-            errors.add("hours_served", "Hours can only be recorded for volunteers who attended.")
+            errors.add("hours_served", tr("Hours can only be recorded for volunteers who attended."))
         errors.raise_if_any()
 
     @property

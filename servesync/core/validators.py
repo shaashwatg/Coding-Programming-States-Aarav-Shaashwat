@@ -29,6 +29,7 @@ from enum import Enum
 from typing import Any, TypeVar, cast
 
 from servesync.core.errors import ValidationError
+from servesync.core.i18n import mark, tr
 
 T = TypeVar("T")
 E = TypeVar("E", bound=Enum)
@@ -104,7 +105,7 @@ def _as_text(value: object, label: str) -> str:
     if value is None:
         return ""
     if not isinstance(value, str):
-        raise InvalidInputError(f"{label} must be text.")
+        raise InvalidInputError(tr("{label} must be text.", label=tr(label)))
     return value
 
 
@@ -132,9 +133,16 @@ def clean_text(
         text = _WHITESPACE_RUN.sub(" ", text).strip()
 
     if required and not text:
-        raise InvalidInputError(f"{label} is required.")
+        raise InvalidInputError(tr("{label} is required.", label=tr(label)))
     if len(text) > max_length:
-        raise InvalidInputError(f"{label} must be {max_length} characters or fewer (currently {len(text)}).")
+        raise InvalidInputError(
+            tr(
+                "{label} must be {max_length} characters or fewer (currently {len}).",
+                label=tr(label),
+                max_length=max_length,
+                len=len(text),
+            )
+        )
     return text
 
 
@@ -144,7 +152,7 @@ _NAME_PATTERN = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ '\-.])*$")
 NAME_MAX_LENGTH = 50
 
 
-def clean_name(value: object, label: str = "Name") -> str:
+def clean_name(value: object, label: str = mark("Name")) -> str:
     """
     Validate a person's first or last name.
 
@@ -154,13 +162,15 @@ def clean_name(value: object, label: str = "Name") -> str:
     """
     text = clean_text(value, label, max_length=NAME_MAX_LENGTH).replace("’", "'")
     if not _NAME_PATTERN.match(text):
-        raise InvalidInputError(f"{label} can contain only letters, spaces, apostrophes, hyphens, and periods.")
+        raise InvalidInputError(
+            tr(("{label} can contain only letters, spaces, apostrophes, hyphens, and periods."), label=tr(label))
+        )
     if text[-1] in " '-":
-        raise InvalidInputError(f"{label} cannot end with a space, apostrophe, or hyphen.")
+        raise InvalidInputError(tr("{label} cannot end with a space, apostrophe, or hyphen.", label=tr(label)))
     return text
 
 
-def clean_optional_name(value: object, label: str = "Name") -> str:
+def clean_optional_name(value: object, label: str = mark("Name")) -> str:
     """Like :func:`clean_name`, but blank is allowed (returns "")."""
     if value is None or (isinstance(value, str) and not value.strip()):
         return ""
@@ -173,7 +183,7 @@ _PRONOUN_PATTERN = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ /,'\-])*$")
 PRONOUNS_MAX_LENGTH = 30
 
 
-def clean_pronouns(value: object, label: str = "Pronouns") -> str:
+def clean_pronouns(value: object, label: str = mark("Pronouns")) -> str:
     """
     Optional pronouns, written however the person writes them.
 
@@ -186,7 +196,9 @@ def clean_pronouns(value: object, label: str = "Pronouns") -> str:
         return ""
     text = re.sub(r"\s*/\s*", "/", text)
     if not _PRONOUN_PATTERN.match(text) or text[-1] in "/,'- ":
-        raise InvalidInputError(f"{label} can contain letters with / or , between them, for example she/her.")
+        raise InvalidInputError(
+            tr(("{label} can contain letters with / or , between them, for example she/her."), label=tr(label))
+        )
     return text
 
 
@@ -223,28 +235,28 @@ def clean_email(value: object) -> str:
     domain label is 1-63 characters and does not start or end with a hyphen;
     the top-level domain is alphabetic (".org", not ".123").
     """
-    text = clean_text(value, "Email address", max_length=EMAIL_MAX_LENGTH).lower()
+    text = clean_text(value, tr("Email address"), max_length=EMAIL_MAX_LENGTH).lower()
     if " " in text:
-        raise InvalidInputError("Email address cannot contain spaces.")
+        raise InvalidInputError(tr("Email address cannot contain spaces."))
 
     match = _EMAIL_SHAPE.match(text)
     if match is None:
-        raise InvalidInputError("Email address must look like name@example.org.")
+        raise InvalidInputError(tr("Email address must look like name@example.org."))
 
     local, domain = match.group("local"), match.group("domain")
     if len(local) > EMAIL_LOCAL_MAX_LENGTH:
-        raise InvalidInputError("The part before the @ is too long (64 characters maximum).")
+        raise InvalidInputError(tr("The part before the @ is too long (64 characters maximum)."))
     if local.startswith(".") or local.endswith(".") or ".." in local:
-        raise InvalidInputError("Email address has a misplaced period before the @.")
+        raise InvalidInputError(tr("Email address has a misplaced period before the @."))
 
     labels = domain.split(".")
     if len(labels) < 2:
-        raise InvalidInputError("Email domain must include an ending such as .org or .com.")
+        raise InvalidInputError(tr("Email domain must include an ending such as .org or .com."))
     if any(not _DOMAIN_LABEL.match(label) for label in labels):
-        raise InvalidInputError("Email domain is not valid (check for extra periods or hyphens).")
+        raise InvalidInputError(tr("Email domain is not valid (check for extra periods or hyphens)."))
     top_level = labels[-1]
     if not top_level.isalpha() or len(top_level) < 2:
-        raise InvalidInputError("Email domain must end with a real ending such as .org or .com.")
+        raise InvalidInputError(tr("Email domain must end with a real ending such as .org or .com."))
     return text
 
 
@@ -267,7 +279,7 @@ def suggest_email_correction(email: str) -> str | None:
 _PHONE_ALLOWED = re.compile(r"^[0-9\s().\-+]+$")
 
 
-def clean_phone(value: object, label: str = "Phone number", *, required: bool = True) -> str:
+def clean_phone(value: object, label: str = mark("Phone number"), *, required: bool = True) -> str:
     """
     Validate a U.S./Canada phone number and return its 10 digits.
 
@@ -281,21 +293,33 @@ def clean_phone(value: object, label: str = "Phone number", *, required: bool = 
     if not text:
         return ""
     if not _PHONE_ALLOWED.match(text):
-        raise InvalidInputError(f"{label} can contain only digits, spaces, and ( ) - . + characters.")
+        raise InvalidInputError(
+            tr("{label} can contain only digits, spaces, and ( ) - . + characters.", label=tr(label))
+        )
 
     digits = re.sub(r"\D", "", text)
     if len(digits) == 11 and digits.startswith("1"):
         digits = digits[1:]
     if len(digits) != 10:
-        raise InvalidInputError(f"{label} must have 10 digits, for example (206) 555-0142.")
+        raise InvalidInputError(tr("{label} must have 10 digits, for example (206) 555-0142.", label=tr(label)))
 
     area_code, exchange = digits[:3], digits[3:6]
     if area_code[0] in "01":
-        raise InvalidInputError(f"{label}: area code {area_code} is not valid (it cannot start with 0 or 1).")
+        raise InvalidInputError(
+            tr(
+                ("{label}: area code {area_code} is not valid (it cannot start with 0 or 1)."),
+                label=tr(label),
+                area_code=area_code,
+            )
+        )
     if area_code[1:] == "11":
-        raise InvalidInputError(f"{label}: {area_code} is a service code, not an area code.")
+        raise InvalidInputError(
+            tr("{label}: {area_code} is a service code, not an area code.", label=tr(label), area_code=area_code)
+        )
     if exchange[0] in "01":
-        raise InvalidInputError(f"{label}: the three digits after the area code cannot start with 0 or 1.")
+        raise InvalidInputError(
+            tr(("{label}: the three digits after the area code cannot start with 0 or 1."), label=tr(label))
+        )
     return digits
 
 
@@ -326,7 +350,7 @@ _DATETIME_FORMATS: tuple[tuple[re.Pattern[str], str], ...] = (
 _MERIDIEM_SUFFIX = re.compile(r"\s*([AP]M)$")
 
 
-def parse_date(value: object, label: str = "Date") -> date:
+def parse_date(value: object, label: str = mark("Date")) -> date:
     """
     Parse a calendar date.
 
@@ -342,18 +366,20 @@ def parse_date(value: object, label: str = "Date") -> date:
         text = clean_text(value, label, max_length=20)
         fmt = next((f for pattern, f in _DATE_FORMATS if pattern.match(text)), None)
         if fmt is None:
-            raise InvalidInputError(f"{label} must be written as MM/DD/YYYY or YYYY-MM-DD.")
+            raise InvalidInputError(tr("{label} must be written as MM/DD/YYYY or YYYY-MM-DD.", label=tr(label)))
         try:
             parsed = datetime.strptime(text, fmt).date()
         except ValueError as exc:
-            raise InvalidInputError(f"{label} '{text}' is not a real calendar date.") from exc
+            raise InvalidInputError(
+                tr("{label} '{text}' is not a real calendar date.", label=tr(label), text=text)
+            ) from exc
 
     if not 1900 <= parsed.year <= 2100:
-        raise InvalidInputError(f"{label} must be between the years 1900 and 2100.")
+        raise InvalidInputError(tr("{label} must be between the years 1900 and 2100.", label=tr(label)))
     return parsed
 
 
-def parse_datetime(value: object, label: str = "Date and time") -> datetime:
+def parse_datetime(value: object, label: str = mark("Date and time")) -> datetime:
     """
     Parse a date and time to minute precision (seconds are dropped).
 
@@ -370,16 +396,20 @@ def parse_datetime(value: object, label: str = "Date and time") -> datetime:
         text = _MERIDIEM_SUFFIX.sub(r" \1", raw.upper().replace("T", " "))
         fmt = next((f for pattern, f in _DATETIME_FORMATS if pattern.match(text)), None)
         if fmt is None:
-            raise InvalidInputError(f"{label} must be written like 2026-11-14 09:30 or 11/14/2026 9:30 AM.")
+            raise InvalidInputError(
+                tr("{label} must be written like 2026-11-14 09:30 or 11/14/2026 9:30 AM.", label=tr(label))
+            )
         try:
             parsed = datetime.strptime(text, fmt)
         except ValueError as exc:
-            raise InvalidInputError(f"{label} '{raw}' is not a real date and time.") from exc
+            raise InvalidInputError(
+                tr("{label} '{raw}' is not a real date and time.", label=tr(label), raw=raw)
+            ) from exc
 
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone().replace(tzinfo=None)
     if not 1900 <= parsed.year <= 2100:
-        raise InvalidInputError(f"{label} must be between the years 1900 and 2100.")
+        raise InvalidInputError(tr("{label} must be between the years 1900 and 2100.", label=tr(label)))
     return parsed.replace(second=0, microsecond=0)
 
 
@@ -397,14 +427,20 @@ def validate_birth_date(value: object, *, minimum_age: int, as_of: date) -> date
     Semantic: not in the future, not older than 120 years, and the volunteer
     is at least ``minimum_age`` on ``as_of`` (the date they joined).
     """
-    born = parse_date(value, "Birth date")
+    born = parse_date(value, tr("Birth date"))
     if born > as_of:
-        raise InvalidInputError("Birth date cannot be after the date the volunteer joined.")
+        raise InvalidInputError(tr("Birth date cannot be after the date the volunteer joined."))
     age = calculate_age(born, as_of)
     if age > 120:
-        raise InvalidInputError("Birth date is more than 120 years ago — please double-check the year.")
+        raise InvalidInputError(tr("Birth date is more than 120 years ago — please double-check the year."))
     if age < minimum_age:
-        raise InvalidInputError(f"Volunteers must be at least {minimum_age} years old (this person was {age}).")
+        raise InvalidInputError(
+            tr(
+                ("Volunteers must be at least {minimum_age} years old (this person was {age})."),
+                minimum_age=minimum_age,
+                age=age,
+            )
+        )
     return born
 
 
@@ -423,20 +459,22 @@ def parse_int(value: object, label: str, *, minimum: int, maximum: int) -> int:
     Semantic: must fall within ``minimum``..``maximum``.
     """
     if isinstance(value, bool):  # bool is a subclass of int — reject explicitly
-        raise InvalidInputError(f"{label} must be a whole number.")
+        raise InvalidInputError(tr("{label} must be a whole number.", label=tr(label)))
     if isinstance(value, int):
         number = value
     else:
         text = clean_text(value, label, max_length=12).replace(",", "")
         if not _INTEGER_TEXT.match(text):
-            raise InvalidInputError(f"{label} must be a whole number.")
+            raise InvalidInputError(tr("{label} must be a whole number.", label=tr(label)))
         number = int(text)
     if not minimum <= number <= maximum:
-        raise InvalidInputError(f"{label} must be between {minimum} and {maximum}.")
+        raise InvalidInputError(
+            tr("{label} must be between {minimum} and {maximum}.", label=tr(label), minimum=minimum, maximum=maximum)
+        )
     return number
 
 
-def parse_hours(value: object, label: str = "Hours", *, maximum: float = 24.0) -> float:
+def parse_hours(value: object, label: str = mark("Hours"), *, maximum: float = 24.0) -> float:
     """
     Parse a number of service hours (rounded to two decimals).
 
@@ -444,7 +482,7 @@ def parse_hours(value: object, label: str = "Hours", *, maximum: float = 24.0) -
     Semantic: finite, greater than zero, and no more than ``maximum``.
     """
     if isinstance(value, bool):
-        raise InvalidInputError(f"{label} must be a number.")
+        raise InvalidInputError(tr("{label} must be a number.", label=tr(label)))
     if isinstance(value, (int, float)):
         hours = float(value)
     else:
@@ -452,13 +490,13 @@ def parse_hours(value: object, label: str = "Hours", *, maximum: float = 24.0) -
         try:
             hours = float(text)
         except ValueError as exc:
-            raise InvalidInputError(f"{label} must be a number such as 2 or 2.5.") from exc
+            raise InvalidInputError(tr("{label} must be a number such as 2 or 2.5.", label=tr(label))) from exc
     if not math.isfinite(hours):
-        raise InvalidInputError(f"{label} must be a real number.")
+        raise InvalidInputError(tr("{label} must be a real number.", label=tr(label)))
     if hours <= 0:
-        raise InvalidInputError(f"{label} must be greater than zero.")
+        raise InvalidInputError(tr("{label} must be greater than zero.", label=tr(label)))
     if hours > maximum:
-        raise InvalidInputError(f"{label} cannot be more than {maximum:g}.")
+        raise InvalidInputError(tr("{label} cannot be more than {maximum:g}.", label=tr(label), maximum=maximum))
     return round(hours, 2)
 
 
@@ -479,7 +517,7 @@ def parse_enum(value: object, enum_type: type[E], label: str) -> E:
     for member in enum_type:
         if text in (str(member.value).upper(), member.name.upper()):
             return member
-    raise InvalidInputError(f"'{value}' is not a valid {label.lower()}.")
+    raise InvalidInputError(tr("'{value}' is not a valid {lower}.", value=value, lower=label.lower()))
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +528,7 @@ _URL_HOST = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[
 URL_MAX_LENGTH = 300
 
 
-def clean_url(value: object, label: str = "Link", *, required: bool = False) -> str:
+def clean_url(value: object, label: str = mark("Link"), *, required: bool = False) -> str:
     """
     Validate a web link (returned with an https:// prefix if none was typed).
 
@@ -503,17 +541,19 @@ def clean_url(value: object, label: str = "Link", *, required: bool = False) -> 
     if not text:
         return ""
     if " " in text:
-        raise InvalidInputError(f"{label} cannot contain spaces.")
+        raise InvalidInputError(tr("{label} cannot contain spaces.", label=tr(label)))
     if "://" not in text:
         if ":" in text.split("/")[0]:
-            raise InvalidInputError(f"{label} must be a web address starting with https://.")
+            raise InvalidInputError(tr("{label} must be a web address starting with https://.", label=tr(label)))
         text = f"https://{text}"
     scheme, _, rest = text.partition("://")
     if scheme.lower() not in ("http", "https"):
-        raise InvalidInputError(f"{label} must be a web address starting with https://.")
+        raise InvalidInputError(tr("{label} must be a web address starting with https://.", label=tr(label)))
     host = rest.split("/")[0].split("?")[0].split("#")[0].lower()
     if not _URL_HOST.match(host):
-        raise InvalidInputError(f"{label} needs a real website address, such as https://example.org/story.")
+        raise InvalidInputError(
+            tr(("{label} needs a real website address, such as https://example.org/story."), label=tr(label))
+        )
     return f"{scheme.lower()}://{rest}"
 
 
@@ -533,11 +573,13 @@ def clean_username(value: object) -> str:
     Syntactic: 3-30 characters; letters, digits, period, underscore, hyphen.
     Semantic: must start with a letter so it is never confused with an ID.
     """
-    text = clean_text(value, "Username", max_length=30).lower()
+    text = clean_text(value, tr("Username"), max_length=30).lower()
     if not _USERNAME_PATTERN.match(text):
         raise InvalidInputError(
-            "Username must be 3-30 characters, start with a letter, and use only "
-            "letters, numbers, periods, underscores, or hyphens."
+            tr(
+                "Username must be 3-30 characters, start with a letter, and use only "
+                "letters, numbers, periods, underscores, or hyphens."
+            )
         )
     return text
 
@@ -551,17 +593,21 @@ def validate_password_strength(password: object, username: str = "") -> str:
     does not contain the username.
     """
     if not isinstance(password, str):
-        raise InvalidInputError("Password must be text.")
+        raise InvalidInputError(tr("Password must be text."))
     if len(password) < PASSWORD_MIN_LENGTH:
-        raise InvalidInputError(f"Password must be at least {PASSWORD_MIN_LENGTH} characters.")
+        raise InvalidInputError(
+            tr("Password must be at least {PASSWORD_MIN_LENGTH} characters.", PASSWORD_MIN_LENGTH=PASSWORD_MIN_LENGTH)
+        )
     if len(password) > PASSWORD_MAX_LENGTH:
-        raise InvalidInputError(f"Password must be {PASSWORD_MAX_LENGTH} characters or fewer.")
+        raise InvalidInputError(
+            tr("Password must be {PASSWORD_MAX_LENGTH} characters or fewer.", PASSWORD_MAX_LENGTH=PASSWORD_MAX_LENGTH)
+        )
     if _CONTROL_CHARS.search(password):
-        raise InvalidInputError("Password contains characters that cannot be typed.")
+        raise InvalidInputError(tr("Password contains characters that cannot be typed."))
     if not any(ch.isalpha() for ch in password) or not any(ch.isdigit() for ch in password):
-        raise InvalidInputError("Password must include at least one letter and one number.")
+        raise InvalidInputError(tr("Password must include at least one letter and one number."))
     if len(set(password)) == 1:
-        raise InvalidInputError("Password cannot be a single repeated character.")
+        raise InvalidInputError(tr("Password cannot be a single repeated character."))
     if len(username) >= 3 and username.lower() in password.lower():
-        raise InvalidInputError("Password cannot contain your username.")
+        raise InvalidInputError(tr("Password cannot contain your username."))
     return password

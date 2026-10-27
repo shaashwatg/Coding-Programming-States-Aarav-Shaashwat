@@ -17,6 +17,7 @@ from PySide6.QtCore import QMarginsF, QSizeF, QUrl
 from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from servesync.core.errors import DataStoreError
+from servesync.core.i18n import tr
 from servesync.services.reports import Report
 from servesync.services.reports.export import to_csv, to_html
 
@@ -30,7 +31,10 @@ def _atomic_write(path: Path, data: bytes) -> None:
         os.replace(temp_name, path)
     except OSError as exc:
         raise DataStoreError(
-            f"Couldn't save to {path.name}. Check that the folder exists and isn't read-only, then try again."
+            tr(
+                ("Couldn't save to {name}. Check that the folder exists and isn't read-only, then try again."),
+                name=path.name,
+            )
         ) from exc
 
 
@@ -64,5 +68,5 @@ def save_pdf(report: Report, path: Path, columns: Sequence[str] | None, charts: 
         try:
             data = temp_path.read_bytes()
         except OSError as exc:
-            raise DataStoreError("The PDF couldn't be created. Try saving to a different folder.") from exc
+            raise DataStoreError(tr("The PDF couldn't be created. Try saving to a different folder.")) from exc
     _atomic_write(path, data)

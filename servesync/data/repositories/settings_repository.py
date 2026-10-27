@@ -14,6 +14,7 @@ import math
 from enum import Enum
 
 from servesync.config import DEFAULT_VOLUNTEER_HOUR_VALUE
+from servesync.core.i18n import tr
 from servesync.core.validators import InvalidInputError, clean_text, parse_enum, validate_field
 from servesync.data.repositories.base import Repository
 from servesync.models import Appearance, Theme
@@ -31,9 +32,11 @@ def _parse_hour_value(raw: object) -> float:
     try:
         number = float(str(raw).strip().lstrip("$").replace(",", ""))
     except ValueError as exc:
-        raise InvalidInputError("Hour value must be a dollar amount such as 36.14.") from exc
+        raise InvalidInputError(tr("Hour value must be a dollar amount such as 36.14.")) from exc
     if not math.isfinite(number) or not 0 < number <= MAX_HOUR_VALUE:
-        raise InvalidInputError(f"Hour value must be between $0.01 and ${MAX_HOUR_VALUE:,.0f}.")
+        raise InvalidInputError(
+            tr("Hour value must be between $0.01 and ${MAX_HOUR_VALUE:,.0f}.", MAX_HOUR_VALUE=MAX_HOUR_VALUE)
+        )
     return round(number, 2)
 
 
@@ -75,10 +78,10 @@ class SettingsRepository(Repository):
     # --------------------------------------------------------- organization
 
     def organization_name(self) -> str:
-        return self._get(SettingKey.ORGANIZATION_NAME) or "My Nonprofit"
+        return self._get(SettingKey.ORGANIZATION_NAME) or tr("My Nonprofit")
 
     def set_organization_name(self, name: str) -> str:
-        cleaned = validate_field("organization_name", clean_text, name, "Organization name", max_length=80)
+        cleaned = validate_field("organization_name", clean_text, name, tr("Organization name"), max_length=80)
         self._set(SettingKey.ORGANIZATION_NAME, cleaned)
         return cleaned
 
@@ -87,7 +90,7 @@ class SettingsRepository(Repository):
 
     def set_mission_statement(self, mission: str) -> str:
         cleaned = validate_field(
-            "mission_statement", clean_text, mission, "Mission statement", max_length=300, required=False
+            "mission_statement", clean_text, mission, tr("Mission statement"), max_length=300, required=False
         )
         self._set(SettingKey.MISSION_STATEMENT, cleaned)
         return cleaned
@@ -140,6 +143,6 @@ class SettingsRepository(Repository):
             return Theme.LIGHT
 
     def set_theme(self, theme: Theme | str) -> Theme:
-        parsed: Theme = validate_field("theme", parse_enum, theme, Theme, "Theme")
+        parsed: Theme = validate_field("theme", parse_enum, theme, Theme, tr("Theme"))
         self._set(SettingKey.THEME, parsed.value)
         return parsed

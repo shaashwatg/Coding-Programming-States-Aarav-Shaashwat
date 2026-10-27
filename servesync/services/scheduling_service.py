@@ -13,6 +13,7 @@ import dataclasses
 import logging
 
 from servesync.core.errors import BusinessRuleError
+from servesync.core.i18n import tr
 from servesync.models import Assignment, AssignmentStatus, ShiftOverview, Volunteer
 from servesync.services.base import Service
 from servesync.services.rules import signup_blockers
@@ -60,10 +61,12 @@ class SchedulingService(Service):
         signup = self._store.assignments.get(assignment_id)
         session.require_self_or(Permission.MANAGE_SCHEDULE, signup.volunteer_id)
         if signup.status is not AssignmentStatus.SCHEDULED:
-            raise BusinessRuleError(f"Only scheduled sign-ups can be cancelled (this one is {signup.status.label}).")
+            raise BusinessRuleError(
+                tr("Only scheduled sign-ups can be cancelled (this one is {label}).", label=signup.status.label)
+            )
         shift = self._store.shifts.get(signup.shift_id)
         if shift.has_started(self._clock.now()):
-            raise BusinessRuleError("This shift has already started. A coordinator can record a no-show instead.")
+            raise BusinessRuleError(tr("This shift has already started. A coordinator can record a no-show instead."))
         cancelled = self._store.assignments.update(
             dataclasses.replace(signup, status=AssignmentStatus.CANCELLED, hours_served=None)
         )

@@ -34,6 +34,7 @@ from types import TracebackType
 from typing import Any
 
 from servesync.core.errors import DataStoreError, DuplicateRecordError, RecordInUseError
+from servesync.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -61,29 +62,33 @@ def translate_sqlite_errors() -> Iterator[None]:
         unique = _UNIQUE_FAILURE.search(message)
         if unique:
             column = unique.group("columns").split(",")[0].strip().split(".")[-1]
-            raise DuplicateRecordError(f"That {column.replace('_', ' ')} is already in use.", field=column) from exc
+            raise DuplicateRecordError(
+                tr("That {replace} is already in use.", replace=column.replace("_", " ")), field=column
+            ) from exc
         if "FOREIGN KEY" in message:
-            raise RecordInUseError("This record is linked to other records, so it cannot be changed this way.") from exc
+            raise RecordInUseError(
+                tr("This record is linked to other records, so it cannot be changed this way.")
+            ) from exc
         logger.error("Integrity rule rejected a write: %s", message)
-        raise DataStoreError("A value was outside the allowed range and was not saved.") from exc
+        raise DataStoreError(tr("A value was outside the allowed range and was not saved.")) from exc
     except sqlite3.OperationalError as exc:
         logger.exception("SQLite operational error")
         text = str(exc).lower()
         if "locked" in text or "busy" in text:
-            raise DataStoreError("The data file is busy. Close any other ServeSync windows and try again.") from exc
+            raise DataStoreError(tr("The data file is busy. Close any other ServeSync windows and try again.")) from exc
         if "readonly" in text or "unable to open" in text or "disk" in text:
             raise DataStoreError(
-                "ServeSync could not read or write its data file. Check that the disk has free space."
+                tr("ServeSync could not read or write its data file. Check that the disk has free space.")
             ) from exc
-        raise DataStoreError("A database operation failed. Details were saved to the log.") from exc
+        raise DataStoreError(tr("A database operation failed. Details were saved to the log.")) from exc
     except sqlite3.DatabaseError as exc:
         logger.exception("SQLite database error")
         if "not a database" in str(exc).lower():
-            raise DataStoreError("The data file is damaged or is not a ServeSync database.") from exc
-        raise DataStoreError("A database operation failed. Details were saved to the log.") from exc
+            raise DataStoreError(tr("The data file is damaged or is not a ServeSync database.")) from exc
+        raise DataStoreError(tr("A database operation failed. Details were saved to the log.")) from exc
     except sqlite3.Error as exc:  # ProgrammingError, InterfaceError, ...
         logger.exception("Unexpected SQLite error")
-        raise DataStoreError("An unexpected database error occurred. Details were saved to the log.") from exc
+        raise DataStoreError(tr("An unexpected database error occurred. Details were saved to the log.")) from exc
 
 
 class Database:

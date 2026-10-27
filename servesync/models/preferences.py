@@ -20,6 +20,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 
+from servesync.core.i18n import Language, mark, tr
 from servesync.core.validators import ErrorCollector, InvalidInputError, parse_enum
 from servesync.models.enums import MessageDuration, Theme
 
@@ -32,18 +33,25 @@ _TRUE = "1"
 _FALSE = "0"
 
 
-def parse_font_scale(raw: object, label: str = "Text size") -> float:
+def parse_font_scale(raw: object, label: str = mark("Text size")) -> float:
     """Semantic: text size between 85% and 200% of normal."""
     if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw):
-        raise InvalidInputError(f"{label} must be a number.")
+        raise InvalidInputError(tr("{label} must be a number.", label=tr(label)))
     if not MIN_FONT_SCALE <= float(raw) <= MAX_FONT_SCALE:
-        raise InvalidInputError(f"{label} must be between {MIN_FONT_SCALE:.0%} and {MAX_FONT_SCALE:.0%}.")
+        raise InvalidInputError(
+            tr(
+                "{label} must be between {MIN_FONT_SCALE:.0%} and {MAX_FONT_SCALE:.0%}.",
+                label=tr(label),
+                MIN_FONT_SCALE=MIN_FONT_SCALE,
+                MAX_FONT_SCALE=MAX_FONT_SCALE,
+            )
+        )
     return round(float(raw), 2)
 
 
 def _parse_flag(raw: object, label: str) -> bool:
     if not isinstance(raw, bool):
-        raise InvalidInputError(f"{label} must be on or off.")
+        raise InvalidInputError(tr("{label} must be on or off.", label=tr(label)))
     return raw
 
 
@@ -64,6 +72,9 @@ class Appearance:
     simplified                    Cognitive load: hides secondary panels so
                                   each screen has one job
     message_duration              2.2.1 Timing Adjustable / 2.2.3 No Timing
+    language                      3.1.1 Language of Page — English or Spanish,
+                                  for the many volunteers and families who
+                                  read Spanish more comfortably
     ============================  ==============================================
     """
 
@@ -73,18 +84,20 @@ class Appearance:
     text_spacing: bool = False
     simplified: bool = False
     message_duration: MessageDuration = MessageDuration.STANDARD
+    language: Language = Language.ENGLISH
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
-        theme = errors.check("theme", parse_enum, self.theme, Theme, "Theme")
+        theme = errors.check("theme", parse_enum, self.theme, Theme, tr("Theme"))
         scale = errors.check("font_scale", parse_font_scale, self.font_scale)
         duration = errors.check(
-            "message_duration", parse_enum, self.message_duration, MessageDuration, "Message timing"
+            "message_duration", parse_enum, self.message_duration, MessageDuration, tr("Message timing")
         )
+        language = errors.check("language", parse_enum, self.language, Language, tr("Language"))
         for name, label in (
-            ("reduce_motion", "Reduce motion"),
-            ("text_spacing", "Extra text spacing"),
-            ("simplified", "Simplified layout"),
+            ("reduce_motion", tr("Reduce motion")),
+            ("text_spacing", tr("Extra text spacing")),
+            ("simplified", tr("Simplified layout")),
         ):
             errors.check(name, _parse_flag, getattr(self, name), label)
         errors.raise_if_any()
@@ -92,6 +105,7 @@ class Appearance:
         object.__setattr__(self, "theme", theme)
         object.__setattr__(self, "font_scale", scale)
         object.__setattr__(self, "message_duration", duration)
+        object.__setattr__(self, "language", language)
 
     # ------------------------------------------------------------ storage
 
@@ -104,6 +118,7 @@ class Appearance:
             "text_spacing": _TRUE if self.text_spacing else _FALSE,
             "simplified": _TRUE if self.simplified else _FALSE,
             "message_duration": self.message_duration.value,
+            "language": self.language.value,
         }
 
     @classmethod
@@ -134,8 +149,10 @@ def _decode(name: str, raw: str) -> object:
         return Theme(raw)
     if name == "message_duration":
         return MessageDuration(raw)
+    if name == "language":
+        return Language(raw)
     if name == "font_scale":
         return parse_font_scale(float(raw))
     if raw not in (_TRUE, _FALSE):
-        raise InvalidInputError(f"{name} must be 0 or 1.")
+        raise InvalidInputError(tr("{name} must be 0 or 1.", name=name))
     return raw == _TRUE

@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from servesync.core.errors import BusinessRuleError
+from servesync.core.i18n import tr, weekday_plural
 from servesync.models import (
     AssignmentStatus,
     AvailabilitySlot,
@@ -48,6 +49,7 @@ from servesync.models import (
     VolunteerParticipation,
     VolunteerStatus,
 )
+from servesync.models.enums import describe_slot
 from servesync.services.base import Service
 from servesync.services.rules import describe_access_gaps, signup_blockers
 from servesync.services.session import Permission, Session
@@ -165,79 +167,126 @@ def total_score(factors: tuple[ScoreFactor, ...]) -> int:
 
 def _availability_factor(volunteer: Volunteer, shift: Shift) -> ScoreFactor:
     slot = AvailabilitySlot.for_datetime(shift.starts_at)
-    when = f"{slot.weekday.label} {slot.day_part.label.lower()}s"
+    when = describe_slot(slot.weekday, slot.day_part)
     if slot in volunteer.availability:
-        return ScoreFactor("Availability", AVAILABILITY_POINTS, AVAILABILITY_POINTS, f"Usually free on {when}")
+        return ScoreFactor(
+            tr("Availability"), AVAILABILITY_POINTS, AVAILABILITY_POINTS, tr("Usually free on {when}", when=when)
+        )
     if any(other.weekday is slot.weekday for other in volunteer.availability):
         return ScoreFactor(
-            "Availability",
+            tr("Availability"),
             AVAILABILITY_POINTS / 3,
             AVAILABILITY_POINTS,
-            f"Free on {slot.weekday.label}s, but not usually in the {slot.day_part.label.lower()}",
+            tr(
+                "Free on {days}, but not usually in the {part}",
+                days=weekday_plural(int(slot.weekday)),
+                part=slot.day_part.label.lower(),
+            ),
             is_concern=True,
         )
-    return ScoreFactor("Availability", 0.0, AVAILABILITY_POINTS, f"Hasn't listed {when} as available", is_concern=True)
+    return ScoreFactor(
+        tr("Availability"),
+        0.0,
+        AVAILABILITY_POINTS,
+        tr("Hasn't listed {when} as available", when=when),
+        is_concern=True,
+    )
 
 
 def _skill_factor(volunteer: Volunteer, opportunity: Opportunity) -> ScoreFactor:
     needed = {skill.casefold(): skill for skill in opportunity.required_skills}
     if not needed:
         return ScoreFactor(
-            "Skills", SKILL_POINTS * NO_SKILLS_NEEDED_SHARE, SKILL_POINTS, "No special skills needed for this program"
+            tr("Skills"),
+            SKILL_POINTS * NO_SKILLS_NEEDED_SHARE,
+            SKILL_POINTS,
+            tr("No special skills needed for this program"),
         )
     held = {skill.casefold() for skill in volunteer.skills}
     matched = sorted(needed[key] for key in needed if key in held)
     missing = sorted(needed[key] for key in needed if key not in held)
     points = SKILL_POINTS * len(matched) / len(needed)
     if not missing:
-        return ScoreFactor("Skills", points, SKILL_POINTS, f"Has every needed skill: {', '.join(matched)}")
+        return ScoreFactor(
+            tr("Skills"), points, SKILL_POINTS, tr("Has every needed skill: {join}", join=", ".join(matched))
+        )
     if matched:
         return ScoreFactor(
-            "Skills",
+            tr("Skills"),
             points,
             SKILL_POINTS,
-            f"Has {', '.join(matched)}; missing {', '.join(missing)}",
+            tr("Has {matched}; missing {missing}", matched=", ".join(matched), missing=", ".join(missing)),
             is_concern=True,
         )
-    return ScoreFactor("Skills", 0.0, SKILL_POINTS, f"Missing needed skills: {', '.join(missing)}", is_concern=True)
+    return ScoreFactor(
+        tr("Skills"), 0.0, SKILL_POINTS, tr("Missing needed skills: {join}", join=", ".join(missing)), is_concern=True
+    )
 
 
 def _reliability_factor(participation: VolunteerParticipation | None) -> ScoreFactor:
     reliability = participation.reliability if participation else None
     if reliability is None:
         return ScoreFactor(
-            "Reliability",
+            tr("Reliability"),
             RELIABILITY_POINTS * NEWCOMER_RELIABILITY,
             RELIABILITY_POINTS,
-            "New volunteer with no attendance history yet",
+            tr("New volunteer with no attendance history yet"),
         )
     percent = round(reliability * 100)
     return ScoreFactor(
-        "Reliability",
+        tr("Reliability"),
         RELIABILITY_POINTS * reliability,
         RELIABILITY_POINTS,
-        f"Showed up for {percent}% of past shifts",
+        tr("Showed up for {percent}% of past shifts", percent=percent),
         is_concern=reliability < 0.8,
     )
 
 
 def _experience_factor(visits: int, title: str) -> ScoreFactor:
     if visits >= EXPERIENCED_VISITS:
-        return ScoreFactor("Experience", EXPERIENCE_POINTS, EXPERIENCE_POINTS, f"Has served '{title}' {visits} times")
+        return ScoreFactor(
+            tr("Experience"),
+            EXPERIENCE_POINTS,
+            EXPERIENCE_POINTS,
+            tr("Has served '{title}' {visits} times", title=title, visits=visits),
+        )
     if visits > 0:
-        times = "once" if visits == 1 else "twice"
-        return ScoreFactor("Experience", EXPERIENCE_POINTS * 0.6, EXPERIENCE_POINTS, f"Has served '{title}' {times}")
-    return ScoreFactor("Experience", 0.0, EXPERIENCE_POINTS, f"Would be new to '{title}'")
+        return ScoreFactor(
+            tr("Experience"),
+            EXPERIENCE_POINTS * 0.6,
+            EXPERIENCE_POINTS,
+            tr("Has served '{title}' once", title=title)
+            if visits == 1
+            else tr("Has served '{title}' twice", title=title),
+        )
+    return ScoreFactor(tr("Experience"), 0.0, EXPERIENCE_POINTS, tr("Would be new to '{title}'", title=title))
 
 
 def _fair_share_factor(recent_hours: float) -> ScoreFactor:
     points = FAIR_SHARE_POINTS * max(0.0, 1 - recent_hours / HEAVY_LOAD_HOURS)
-    hours_text = f"{recent_hours:g} h in the last {RECENT_WINDOW_DAYS} days"
+    hours_text = tr(
+        "{recent_hours:g} h in the last {RECENT_WINDOW_DAYS} days",
+        recent_hours=recent_hours,
+        RECENT_WINDOW_DAYS=RECENT_WINDOW_DAYS,
+    )
     if recent_hours <= LIGHT_HOURS:
-        return ScoreFactor("Fair share", points, FAIR_SHARE_POINTS, f"Light recent load ({hours_text})")
+        return ScoreFactor(
+            tr("Fair share"), points, FAIR_SHARE_POINTS, tr("Light recent load ({hours_text})", hours_text=hours_text)
+        )
     if recent_hours <= BUSY_HOURS:
-        return ScoreFactor("Fair share", points, FAIR_SHARE_POINTS, f"Moderate recent load ({hours_text})")
-    return ScoreFactor("Fair share", points, FAIR_SHARE_POINTS, f"Busy lately ({hours_text})", is_concern=True)
+        return ScoreFactor(
+            tr("Fair share"),
+            points,
+            FAIR_SHARE_POINTS,
+            tr("Moderate recent load ({hours_text})", hours_text=hours_text),
+        )
+    return ScoreFactor(
+        tr("Fair share"),
+        points,
+        FAIR_SHARE_POINTS,
+        tr("Busy lately ({hours_text})", hours_text=hours_text),
+        is_concern=True,
+    )
 
 
 # ------------------------------------------------------------------ service
@@ -251,9 +300,14 @@ class MatchingService(Service):
         overview = self._store.shifts.get_overview(shift_id)
         shift = overview.shift
         if shift.has_started(now):
-            raise BusinessRuleError("Smart Match works on upcoming shifts; this one has already started.")
+            raise BusinessRuleError(tr("Smart Match works on upcoming shifts; this one has already started."))
         if overview.opportunity_status is not OpportunityStatus.OPEN:
-            raise BusinessRuleError(f"Publish '{overview.opportunity_title}' (set it to Open) to use Smart Match.")
+            raise BusinessRuleError(
+                tr(
+                    "Publish '{opportunity_title}' (set it to Open) to use Smart Match.",
+                    opportunity_title=overview.opportunity_title,
+                )
+            )
         if overview.is_full:
             return []
 

@@ -31,7 +31,10 @@ EXCLUDES = [
 a = Analysis(  # noqa: F821
     ["main.py"],
     pathex=[str(ROOT)],
-    datas=[(str(ROOT / "servesync" / "ui" / "assets"), "servesync/ui/assets")],
+    datas=[
+        (str(ROOT / "servesync" / "ui" / "assets"), "servesync/ui/assets"),
+        (str(ROOT / "servesync" / "locale"), "servesync/locale"),  # Spanish translation
+    ],
     hiddenimports=["PySide6.QtSvg"],
     excludes=EXCLUDES,
     noarchive=False,

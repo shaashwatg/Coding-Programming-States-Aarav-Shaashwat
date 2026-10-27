@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 from servesync.core.errors import DataStoreError, ValidationError
+from servesync.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,15 @@ class PhotoStore:
     def save(self, opportunity_id: int, data: bytes) -> None:
         # Syntactic: really a JPEG. Semantic: small enough to load quickly.
         if not data.startswith(_JPEG_SIGNATURE):
-            raise ValidationError.single("photo", "Photos must be saved as JPEG images.")
+            raise ValidationError.single("photo", tr("Photos must be saved as JPEG images."))
         if len(data) > MAX_PHOTO_BYTES:
             raise ValidationError.single(
-                "photo", f"Photos must be {MAX_PHOTO_BYTES // 1024} kB or smaller (this one is {len(data) // 1024} kB)."
+                "photo",
+                tr(
+                    "Photos must be {value} kB or smaller (this one is {value2} kB).",
+                    value=MAX_PHOTO_BYTES // 1024,
+                    value2=len(data) // 1024,
+                ),
             )
         if self._folder is None:
             self._memory[opportunity_id] = bytes(data)
@@ -54,7 +60,7 @@ class PhotoStore:
             os.replace(temp_name, self._path(opportunity_id))
         except OSError as exc:
             logger.exception("Could not save photo for program #%s", opportunity_id)
-            raise DataStoreError("The photo could not be saved. Check that the disk has free space.") from exc
+            raise DataStoreError(tr("The photo could not be saved. Check that the disk has free space.")) from exc
 
     def load(self, opportunity_id: int) -> bytes | None:
         if self._folder is None:
@@ -73,4 +79,4 @@ class PhotoStore:
         try:
             self._path(opportunity_id).unlink(missing_ok=True)
         except OSError as exc:
-            raise DataStoreError("The photo could not be removed.") from exc
+            raise DataStoreError(tr("The photo could not be removed.")) from exc

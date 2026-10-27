@@ -8,11 +8,12 @@ from datetime import datetime
 from typing import Any
 
 from servesync.core.errors import RecordInUseError, RecordNotFoundError
+from servesync.core.i18n import mark, tr
 from servesync.data.converters import datetime_from_db, datetime_to_db
 from servesync.data.repositories.base import Repository
 from servesync.models import OpportunityCategory, OpportunityStatus, Shift, ShiftOverview
 
-_ENTITY = "Shift"
+_ENTITY = mark("Shift")
 
 _SELECT_SHIFT = "SELECT shift_id, opportunity_id, starts_at, ends_at, capacity, notes FROM shifts"
 
@@ -33,7 +34,7 @@ class ShiftRepository(Repository):
         self._require_new(shift.shift_id, _ENTITY)
         with self._db.transaction():
             if not self._exists("opportunities", "opportunity_id", shift.opportunity_id):
-                raise RecordNotFoundError("Opportunity", shift.opportunity_id)
+                raise RecordNotFoundError(tr("Opportunity"), shift.opportunity_id)
             cursor = self._db.execute(
                 """
                 INSERT INTO shifts (opportunity_id, starts_at, ends_at, capacity, notes)
@@ -47,7 +48,7 @@ class ShiftRepository(Repository):
         shift_id = self._require_saved(shift.shift_id, _ENTITY)
         with self._db.transaction():
             if not self._exists("opportunities", "opportunity_id", shift.opportunity_id):
-                raise RecordNotFoundError("Opportunity", shift.opportunity_id)
+                raise RecordNotFoundError(tr("Opportunity"), shift.opportunity_id)
             cursor = self._db.execute(
                 """
                 UPDATE shifts
@@ -68,8 +69,10 @@ class ShiftRepository(Repository):
             cursor = self._db.execute("DELETE FROM shifts WHERE shift_id = ?", (shift_id,))
         except RecordInUseError as exc:
             raise RecordInUseError(
-                "Volunteers have signed up for this shift. Cancel their sign-ups first, "
-                "or keep the shift for the record."
+                tr(
+                    "Volunteers have signed up for this shift. Cancel their sign-ups "
+                    "first, or keep the shift for the record."
+                )
             ) from exc
         if cursor.rowcount == 0:
             raise RecordNotFoundError(_ENTITY, shift_id)

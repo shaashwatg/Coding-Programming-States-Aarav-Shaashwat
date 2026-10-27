@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.i18n import tr
 from servesync.core.validators import suggest_email_correction
 from servesync.models import RecruitmentSource, Volunteer, VolunteerStatus
 from servesync.services import Permission
@@ -49,33 +50,37 @@ class VolunteerDialog(FormDialog):
         self._original = volunteer
         self._is_leader = ctx.session.can(Permission.MANAGE_VOLUNTEERS)
         editing_self = volunteer is not None and not self._is_leader
-        title = "Add volunteer" if volunteer is None else ("Edit my profile" if editing_self else "Edit volunteer")
+        title = (
+            tr("Add volunteer")
+            if volunteer is None
+            else (tr("Edit my profile") if editing_self else tr("Edit volunteer"))
+        )
         instructions = (
-            "Fields marked * are required. Availability and skills help Smart Match suggest the right shifts."
+            tr("Fields marked * are required. Availability and skills help Smart Match suggest the right shifts.")
             if volunteer is None or self._is_leader
-            else "Keep your contact details and availability current. Fields marked * are required."
+            else tr("Keep your contact details and availability current. Fields marked * are required.")
         )
         super().__init__(
-            title, instructions, parent, save_text="Add volunteer" if volunteer is None else "Save changes"
+            title, instructions, parent, save_text=tr("Add volunteer") if volunteer is None else tr("Save changes")
         )
         self.saved: Volunteer | None = None
         self._suggested: str | None = None
         today = QDate.currentDate()
 
-        self.add_section("Contact")
+        self.add_section(tr("Contact"))
         self.first_name = QLineEdit()
         self.first_name.setMaxLength(50)
-        self.add_field("first_name", "First name *", self.first_name)
+        self.add_field("first_name", tr("First name *"), self.first_name)
         self.last_name = QLineEdit()
         self.last_name.setMaxLength(50)
-        self.add_field("last_name", "Last name *", self.last_name)
+        self.add_field("last_name", tr("Last name *"), self.last_name)
         self.preferred_name = QLineEdit()
         self.preferred_name.setMaxLength(50)
         self.add_field(
             "preferred_name",
-            "Name they go by",
+            tr("Name they go by"),
             self.preferred_name,
-            "Optional. Shown everywhere instead of the first name (e.g. a nickname or chosen name).",
+            tr("Optional. Shown everywhere instead of the first name (e.g. a nickname or chosen name)."),
         )
         self.pronouns = QComboBox()
         self.pronouns.setEditable(True)
@@ -84,8 +89,8 @@ class VolunteerDialog(FormDialog):
         line = self.pronouns.lineEdit()
         if line is not None:
             line.setMaxLength(30)
-            line.setPlaceholderText("Optional — pick or type")
-        self.add_field("pronouns", "Pronouns", self.pronouns, "Only shown if shared. ServeSync never guesses.")
+            line.setPlaceholderText(tr("Optional — pick or type"))
+        self.add_field("pronouns", tr("Pronouns"), self.pronouns, tr("Only shown if shared. ServeSync never guesses."))
 
         self.email = QLineEdit()
         self.email.setPlaceholderText("name@example.org")
@@ -96,7 +101,7 @@ class VolunteerDialog(FormDialog):
         email_column.addWidget(self.email)
         suggestion_row = QHBoxLayout()
         self.suggestion = make_label("", "hint")
-        self.use_suggestion = QPushButton("Use it")
+        self.use_suggestion = QPushButton(tr("Use it"))
         self.use_suggestion.setProperty("kind", "link")
         self.use_suggestion.clicked.connect(self._apply_suggestion)
         suggestion_row.addWidget(self.suggestion)
@@ -106,44 +111,44 @@ class VolunteerDialog(FormDialog):
         self.suggestion.hide()
         self.use_suggestion.hide()
         self.email.editingFinished.connect(self._check_email)
-        self.add_field("email", "Email *", email_box)
+        self.add_field("email", tr("Email *"), email_box)
         self._fields["email"] = (self.email, self._fields["email"][1])  # errors highlight the input itself
 
         self.phone = QLineEdit()
         self.phone.setPlaceholderText("(206) 555-0142")
         self.phone.setMaxLength(25)
-        self.add_field("phone", "Phone *", self.phone, "U.S. or Canada number, any common format.")
+        self.add_field("phone", tr("Phone *"), self.phone, tr("U.S. or Canada number, any common format."))
 
         self.birth_date = _date_edit(today)
         self.birth_date.setDate(today.addYears(-18))
-        self.add_field("birth_date", "Birth date *", self.birth_date, "Volunteers must be at least 14.")
+        self.add_field("birth_date", tr("Birth date *"), self.birth_date, tr("Volunteers must be at least 14."))
 
-        self.add_section("Emergency contact")
+        self.add_section(tr("Emergency contact"))
         self.emergency_name = QLineEdit()
         self.emergency_name.setMaxLength(80)
         self.add_field(
             "emergency_contact_name",
-            "Name",
+            tr("Name"),
             self.emergency_name,
-            "Required for volunteers under 18 (a parent or guardian).",
+            tr("Required for volunteers under 18 (a parent or guardian)."),
         )
         self.emergency_phone = QLineEdit()
         self.emergency_phone.setMaxLength(25)
-        self.add_field("emergency_contact_phone", "Phone", self.emergency_phone)
+        self.add_field("emergency_contact_phone", tr("Phone"), self.emergency_phone)
 
-        self.add_section("How they can help")
+        self.add_section(tr("How they can help"))
         self.skills = SkillPicker(ctx.services.volunteers.skill_names())
-        self.add_field("skills", "Skills", self.skills)
+        self.add_field("skills", tr("Skills"), self.skills)
         self.availability = AvailabilityGrid()
-        self.add_field("availability", "Usually available", self.availability)
+        self.add_field("availability", tr("Usually available"), self.availability)
 
-        self.add_section("Access and support (optional)")
+        self.add_section(tr("Access and support (optional)"))
         self.access = AccessPicker(for_program=False)
         self.add_field(
             "access_needs",
-            "What helps",
+            tr("What helps"),
             self.access,
-            "Used to suggest programs that fit and shown to coordinators. Never used to turn anyone away.",
+            tr("Used to suggest programs that fit and shown to coordinators. Never used to turn anyone away."),
         )
 
         self.status: EnumComboBox[VolunteerStatus] = EnumComboBox(VolunteerStatus)
@@ -153,17 +158,20 @@ class VolunteerDialog(FormDialog):
         self.notes = QPlainTextEdit()
         self.notes.setFixedHeight(80)
         if self._is_leader:
-            self.add_section("Recruitment (leaders only)")
-            self.add_field("recruitment_source", "How they heard about us", self.source)
-            self.add_field("joined_on", "Joined on", self.joined_on)
+            self.add_section(tr("Recruitment (leaders only)"))
+            self.add_field("recruitment_source", tr("How they heard about us"), self.source)
+            self.add_field("joined_on", tr("Joined on"), self.joined_on)
             if volunteer is None:
                 self.status.removeItem(
                     self.status.findData(VolunteerStatus.INACTIVE.value)
                 )  # new people can't start archived
                 self.add_field(
-                    "status", "Status", self.status, "Applicants can't be scheduled until a leader approves them."
+                    "status",
+                    tr("Status"),
+                    self.status,
+                    tr("Applicants can't be scheduled until a leader approves them."),
                 )
-            self.add_field("notes", "Staff notes", self.notes, "Visible to leaders only.")
+            self.add_field("notes", tr("Staff notes"), self.notes, tr("Visible to leaders only."))
 
         if volunteer is not None:
             self._load(volunteer)
@@ -191,7 +199,7 @@ class VolunteerDialog(FormDialog):
 
     def _check_email(self) -> None:
         fix = suggest_email_correction(self.email.text().strip())
-        self.suggestion.setText(f"Did you mean {fix}?" if fix else "")
+        self.suggestion.setText(tr("Did you mean {fix}?", fix=fix) if fix else "")
         self.suggestion.setVisible(bool(fix))
         self.use_suggestion.setVisible(bool(fix))
         self._suggested = fix
@@ -243,9 +251,9 @@ class VolunteerDialog(FormDialog):
                 names = ", ".join(f"{d.full_name} ({d.email})" for d in duplicates[:3])
                 if not confirm(
                     self,
-                    "Possible duplicate",
-                    f"This looks like someone already on file: {names}.\n\nAdd a new record anyway?",
-                    "Add anyway",
+                    tr("Possible duplicate"),
+                    tr(("This looks like someone already on file: {names}.\n\nAdd a new record anyway?"), names=names),
+                    tr("Add anyway"),
                 ):
                     return False
             self.saved = services.volunteers.register(session, volunteer)

@@ -31,10 +31,11 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QLibraryInfo, Qt, QTranslator
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPalette, QTransform
 from PySide6.QtWidgets import QApplication
 
+from servesync.core.i18n import Language, set_language
 from servesync.models import Appearance, Theme
 
 # ------------------------------------------------------------ scale tokens
@@ -241,7 +242,9 @@ def resolve_theme(theme: Theme, app: QGuiApplication | None = None) -> Theme:
 
 
 def apply_appearance(app: QApplication, appearance: Appearance) -> Palette:
-    """Apply colors, fonts, spacing, and the stylesheet to the whole application."""
+    """Apply language, colors, fonts, spacing, and the stylesheet to the whole application."""
+    set_language(appearance.language)
+    _install_qt_translations(app, appearance.language)
     palette = PALETTES[resolve_theme(appearance.theme, app)]
     _state["palette"] = palette
     _state["scale"] = float(appearance.font_scale)
@@ -268,6 +271,23 @@ def apply_appearance(app: QApplication, appearance: Appearance) -> Palette:
         build_stylesheet(palette, size, _arrow_images(palette.text_muted), _check_image(palette.on_primary))
     )
     return palette
+
+
+_translators: list[QTranslator] = []
+
+
+def _install_qt_translations(app: QApplication, language: Language) -> None:
+    """Qt's own words (OK, Cancel, Close, Yes, No; text-box menus) in the same language as ServeSync."""
+    for translator in _translators:
+        app.removeTranslator(translator)
+    _translators.clear()
+    if language is Language.ENGLISH:
+        return
+    translator = QTranslator(app)
+    folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if translator.load(f"qtbase_{language.value}", folder):
+        app.installTranslator(translator)
+        _translators.append(translator)
 
 
 def apply_theme(app: QApplication, theme: Theme, font_scale: float) -> Palette:

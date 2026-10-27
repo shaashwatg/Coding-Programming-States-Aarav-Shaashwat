@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from servesync.core.i18n import mark, tr
 from servesync.core.validators import InvalidInputError, clean_text
 
 SKILL_MAX_LENGTH = 40
@@ -20,11 +21,11 @@ def validate_optional_id(value: object, label: str) -> int | None:
 def validate_reference_id(value: object, label: str) -> int:
     """A foreign key must be a positive integer."""
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise InvalidInputError(f"{label} must refer to a saved record.")
+        raise InvalidInputError(tr("{label} must refer to a saved record.", label=tr(label)))
     return value
 
 
-def clean_skill_set(values: object, label: str = "Skills") -> frozenset[str]:
+def clean_skill_set(values: object, label: str = mark("Skills")) -> frozenset[str]:
     """
     Normalize a collection of skill names.
 
@@ -34,13 +35,19 @@ def clean_skill_set(values: object, label: str = "Skills") -> frozenset[str]:
     if values is None:
         return frozenset()
     if isinstance(values, str) or not isinstance(values, Iterable):
-        raise InvalidInputError(f"{label} must be a list of names.")
+        raise InvalidInputError(tr("{label} must be a list of names.", label=tr(label)))
 
     seen: dict[str, str] = {}
     for raw in values:
-        name = clean_text(raw, "Skill name", max_length=SKILL_MAX_LENGTH, required=False)
+        name = clean_text(raw, tr("Skill name"), max_length=SKILL_MAX_LENGTH, required=False)
         if name and name.casefold() not in seen:
             seen[name.casefold()] = name
     if len(seen) > MAX_SKILLS_PER_RECORD:
-        raise InvalidInputError(f"{label}: choose {MAX_SKILLS_PER_RECORD} or fewer.")
+        raise InvalidInputError(
+            tr(
+                "{label}: choose {MAX_SKILLS_PER_RECORD} or fewer.",
+                label=tr(label),
+                MAX_SKILLS_PER_RECORD=MAX_SKILLS_PER_RECORD,
+            )
+        )
     return frozenset(seen.values())

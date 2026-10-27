@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from servesync.core.errors import ServeSyncError, ValidationError
+from servesync.core.i18n import tr, tr_n
 from servesync.models import AccessNeed, AvailabilitySlot, DayPart, Weekday
 from servesync.ui.widgets.common import make_label, set_prop
 
@@ -44,9 +45,7 @@ class FormDialog(QDialog):
     and override :meth:`submit`.
     """
 
-    def __init__(
-        self, title: str, instructions: str, parent: QWidget | None = None, *, save_text: str = "Save"
-    ) -> None:
+    def __init__(self, title: str, instructions: str, parent: QWidget | None = None, *, save_text: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -74,7 +73,7 @@ class FormDialog(QDialog):
         outer.addWidget(scroll, 1)
 
         self.buttons = QDialogButtonBox()
-        self.save_button = QPushButton(save_text)
+        self.save_button = QPushButton(save_text or tr("Save"))
         self.save_button.setProperty("kind", "primary")
         self.save_button.setDefault(True)
         self.buttons.addButton(self.save_button, QDialogButtonBox.ButtonRole.AcceptRole)
@@ -130,7 +129,7 @@ class FormDialog(QDialog):
                 error.setText(message)
                 error.show()
                 set_prop(widget, "invalid", True)
-                widget.setAccessibleDescription(f"Error: {message}")
+                widget.setAccessibleDescription(tr("Error: {message}", message=message))
                 first = first or widget
             else:
                 leftover.append(message)
@@ -138,7 +137,7 @@ class FormDialog(QDialog):
             self.banner.setText("\n".join(leftover))
             self.banner.show()
         count = len(messages)
-        self.banner.setAccessibleName(f"{count} problem{'s' if count != 1 else ''} to fix")
+        self.banner.setAccessibleName(tr_n("{count} problem to fix", "{count} problems to fix", count))
         if first is not None:
             first.setFocus(Qt.FocusReason.OtherFocusReason)
 
@@ -180,7 +179,7 @@ class AvailabilityGrid(QWidget):
             grid.addWidget(QLabel(day.label), row, 0)
             for column, part in enumerate(DayPart, start=1):
                 box = QCheckBox()
-                box.setAccessibleName(f"Available {day.label} {part.label.lower()}")
+                box.setAccessibleName(tr("Available {label} {lower}", label=day.label, lower=part.label.lower()))
                 box.setToolTip(f"{day.label} {part.label.lower()}")
                 grid.addWidget(box, row, column, Qt.AlignmentFlag.AlignHCenter)
                 self._boxes[AvailabilitySlot(day, part)] = box
@@ -203,15 +202,15 @@ class SkillPicker(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         self.list = QListWidget()
-        self.list.setAccessibleName("Skills")
+        self.list.setAccessibleName(tr("Skills"))
         self.list.setMaximumHeight(170)
         layout.addWidget(self.list)
         row = QHBoxLayout()
         self.new_skill = QLineEdit()
-        self.new_skill.setPlaceholderText("Add a skill that isn't listed")
-        self.new_skill.setAccessibleName("New skill name")
+        self.new_skill.setPlaceholderText(tr("Add a skill that isn't listed"))
+        self.new_skill.setAccessibleName(tr("New skill name"))
         self.new_skill.setMaxLength(40)
-        add = QPushButton("Add skill")
+        add = QPushButton(tr("Add skill"))
         add.clicked.connect(self._add_typed)
         self.new_skill.returnPressed.connect(self._add_typed)
         row.addWidget(self.new_skill, 1)
@@ -271,10 +270,14 @@ class AccessPicker(QWidget):
         grid.setHorizontalSpacing(18)
         grid.setVerticalSpacing(4)
         self.boxes: dict[AccessNeed, QCheckBox] = {}
+        texts = {need: need.offer_label if for_program else need.label for need in AccessNeed}
+        # Two columns when the wording is short; one when it's long (Spanish runs ~30% longer),
+        # so the form never needs sideways scrolling.
+        columns = 1 if max(len(text) for text in texts.values()) > 30 else 2
         for index, need in enumerate(AccessNeed):
-            box = QCheckBox(need.offer_label if for_program else need.label)
-            box.setAccessibleName(("Offers: " if for_program else "Needs: ") + box.text())
-            grid.addWidget(box, index // 2, index % 2)
+            box = QCheckBox(texts[need])
+            box.setAccessibleName((tr("Offers: ") if for_program else tr("Needs: ")) + box.text())
+            grid.addWidget(box, index // columns, index % columns)
             self.boxes[need] = box
 
     def set_values(self, values: Iterable[AccessNeed]) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from servesync.core.errors import BusinessRuleError, ValidationError
+from servesync.core.i18n import tr
 from servesync.core.security import hash_password
 from servesync.core.validators import clean_text, validate_field, validate_password_strength
 from servesync.data import DataStore
@@ -34,11 +35,13 @@ class SetupService(Service):
 
     def create_first_admin(self, *, organization_name: str, username: str, password: str, confirm: str) -> Session:
         if not self.needs_setup():
-            raise BusinessRuleError("ServeSync is already set up. Sign in with an existing account.")
-        name = validate_field("organization_name", clean_text, organization_name, "Organization name", max_length=80)
+            raise BusinessRuleError(tr("ServeSync is already set up. Sign in with an existing account."))
+        name = validate_field(
+            "organization_name", clean_text, organization_name, tr("Organization name"), max_length=80
+        )
         validate_field("password", validate_password_strength, password, username.strip().lower())
         if password != confirm:
-            raise ValidationError.single("confirm_password", "The two passwords don't match.")
+            raise ValidationError.single("confirm_password", tr("The two passwords don't match."))
         with self._store.transaction():
             self._store.settings.set_organization_name(name)
             account = self._store.accounts.add(
@@ -53,5 +56,5 @@ class SetupService(Service):
 
     def load_demo_data(self) -> SeedSummary:
         if not self.needs_setup() or not self._store.is_empty():
-            raise BusinessRuleError("Demo data can only be loaded into a brand-new database.")
+            raise BusinessRuleError(tr("Demo data can only be loaded into a brand-new database."))
         return seed_demo_data(self._store, today=self._clock.now().date(), password_iterations=self._iterations)

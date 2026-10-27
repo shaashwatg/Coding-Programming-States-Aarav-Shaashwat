@@ -1,7 +1,8 @@
 """
 Organization settings and personal comfort preferences.
 
-Comfort settings (theme, text size, motion, spacing, layout, message timing)
+Comfort settings (theme, text size, motion, spacing, layout, message timing,
+language)
 are open to *every* signed-in user — nobody should need an administrator's
 permission to make the screen usable — and they follow the person's account
 from computer to computer. Organization details (name, mission, value of a
@@ -10,6 +11,9 @@ volunteer hour) are admin-only.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+from servesync.core.i18n import Language
 from servesync.models import Appearance, MessageDuration, Theme
 from servesync.services.base import Service
 from servesync.services.session import Permission, Session
@@ -32,6 +36,15 @@ class SettingsService(Service):
             return device
         return Appearance.from_settings(self._store.preferences.get_all(session.account_id), device)
 
+    def set_device_language(self, language: Language) -> Appearance:
+        """
+        Choose the language on the sign-in screen, before anyone signs in.
+        Saved as this computer's default; each account can still pick its own.
+        """
+        updated = replace(self._store.settings.device_appearance(), language=Language(language))
+        self._store.settings.set_device_appearance(updated)
+        return updated
+
     def volunteer_hour_value(self) -> float:
         return self._store.settings.volunteer_hour_value()
 
@@ -48,6 +61,7 @@ class SettingsService(Service):
         text_spacing: bool | None = None,
         simplified: bool | None = None,
         message_duration: MessageDuration | None = None,
+        language: Language | None = None,
     ) -> Appearance:
         """
         Change any of the signed-in person's comfort settings (others stay as they are).
@@ -63,6 +77,7 @@ class SettingsService(Service):
             text_spacing=current.text_spacing if text_spacing is None else text_spacing,
             simplified=current.simplified if simplified is None else simplified,
             message_duration=current.message_duration if message_duration is None else message_duration,
+            language=current.language if language is None else language,
         )
         with self._store.transaction():
             # Maintenance scripts run with a session that has no stored account;

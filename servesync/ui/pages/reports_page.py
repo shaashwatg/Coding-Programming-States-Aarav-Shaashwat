@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from servesync.core.errors import ValidationError
+from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import OpportunityCategory
 from servesync.services import Permission
 from servesync.services.reports import DatePreset, Report, ReportFilters, ReportKind, format_value
@@ -62,28 +63,28 @@ Row = dict[str, object]
 
 class ReportsPage(Page):
     key = "reports"
-    title = "Reports"
+    title = mark("Reports")
     icon_name = "chart-column"
 
     def __init__(self, ctx: AppContext) -> None:
         self.leader = ctx.session.can(Permission.VIEW_REPORTS)
         if not self.leader:
-            self.key, self.title, self.icon_name = "hours", "My hours", "clock"
+            self.key, self.title, self.icon_name = "hours", mark("My hours"), "clock"
         super().__init__(ctx, scrollable=True)
         self.report: Report | None = None
         self.hidden: dict[ReportKind, set[str]] = {}
         self.charts: list[ChartView] = []
 
         self.export_csv = make_button(
-            "Export CSV", tooltip="Save exactly what you see as a spreadsheet file", on_click=self._export_csv
+            tr("Export CSV"), tooltip=tr("Save exactly what you see as a spreadsheet file"), on_click=self._export_csv
         )
         self.export_pdf = make_button(
-            "Save PDF", kind="primary", tooltip="Save a printable copy", on_click=self._export_pdf
+            tr("Save PDF"), kind="primary", tooltip=tr("Save a printable copy"), on_click=self._export_pdf
         )
         self.columns_button = QToolButton()
-        self.columns_button.setText("Columns")
-        self.columns_button.setAccessibleName("Choose columns")
-        self.columns_button.setToolTip("Show or hide columns in the table and exports")
+        self.columns_button.setText(tr("Columns"))
+        self.columns_button.setAccessibleName(tr("Choose columns"))
+        self.columns_button.setToolTip(tr("Show or hide columns in the table and exports"))
         self.columns_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.columns_button.setMenu(QMenu(self.columns_button))
         actions: list[QWidget] = (
@@ -91,9 +92,9 @@ class ReportsPage(Page):
         )
         self.header = PageHeader(
             self.title,
-            "Pick a question and a period. Everything here can be sorted and exported exactly as shown."
+            tr("Pick a question and a period. Everything here can be sorted and exported exactly as shown.")
             if self.leader
-            else "Your verified service, ready to save as a PDF for school, scholarships, or employers.",
+            else tr("Your verified service, ready to save as a PDF for school, scholarships, or employers."),
             actions,
         )
         self.layout_.addWidget(self.header)
@@ -108,7 +109,7 @@ class ReportsPage(Page):
             self.kind_box.addItem(kind.label, kind.value)
         self.period_box = QComboBox()
         for preset in DatePreset:
-            self.period_box.addItem(preset.value, preset.name)
+            self.period_box.addItem(preset.label, preset.name)
         self.start = QDateEdit()
         self.end = QDateEdit()
         for edit in (self.start, self.end):
@@ -116,17 +117,17 @@ class ReportsPage(Page):
             edit.setDisplayFormat("MM/dd/yyyy")
         self.program_box = QComboBox()
         self.category_box: EnumComboBox[OpportunityCategory] = EnumComboBox(
-            OpportunityCategory, all_label="All categories"
+            OpportunityCategory, all_label=tr("All categories")
         )
         self.volunteer_box = QComboBox()
-        self.include_inactive = QCheckBox("Include archived volunteers")
-        fields: list[tuple[str, QWidget]] = [("Report", self.kind_box)] if self.leader else []
-        fields += [("Period", self.period_box), ("From", self.start), ("To", self.end)]
+        self.include_inactive = QCheckBox(tr("Include archived volunteers"))
+        fields: list[tuple[str, QWidget]] = [(tr("Report"), self.kind_box)] if self.leader else []
+        fields += [(tr("Period"), self.period_box), (tr("From"), self.start), (tr("To"), self.end)]
         if self.leader:
             fields += [
-                ("Program", self.program_box),
-                ("Category", self.category_box),
-                ("Volunteer", self.volunteer_box),
+                (tr("Program"), self.program_box),
+                (tr("Category"), self.category_box),
+                (tr("Volunteer"), self.volunteer_box),
             ]
         self.field_labels: dict[QWidget, QWidget] = {}
         per_row = 4  # wraps onto a second row so large text never squeezes a field
@@ -154,7 +155,7 @@ class ReportsPage(Page):
         self.figures_row = QHBoxLayout()
         self.figures_row.setSpacing(12)
         self.layout_.addLayout(self.figures_row)
-        self.insights = Panel("What stands out")
+        self.insights = Panel(tr("What stands out"))
         self.insight_list = QVBoxLayout()
         self.insight_list.setSpacing(6)
         self.insights.body.addLayout(self.insight_list)
@@ -253,7 +254,7 @@ class ReportsPage(Page):
             (
                 self.program_box,
                 [(o.title, o.opportunity_id) for o in services.opportunities.find_all(session)],
-                "All programs",
+                tr("All programs"),
             ),
             (self.volunteer_box, [(v.full_name, v.volunteer_id) for v in services.volunteers.search(session)], None),
         ):
@@ -302,7 +303,8 @@ class ReportsPage(Page):
         self.export_csv.setEnabled(not report.is_empty)
         self.export_pdf.setEnabled(True)
         self.ctx.announce(
-            f"{report.title}: {len(report.rows)} rows. " + (report.insights[0] if report.insights else "")
+            tr_n("{title}: {count} row.", "{title}: {count} rows.", len(report.rows), title=report.title)
+            + (" " + report.insights[0] if report.insights else "")
         )
 
     def _show_figures(self, report: Report) -> None:
@@ -344,7 +346,9 @@ class ReportsPage(Page):
             chart.set_series(series, animated=animate)
             chart.item_focused.connect(self.ctx.announce)
             panel.body.addWidget(chart)
-            panel.body.addWidget(make_label("Tip: select the chart and use the arrow keys to hear each value.", "hint"))
+            panel.body.addWidget(
+                make_label(tr("Tip: select the chart and use the arrow keys to hear each value."), "hint")
+            )
             self.chart_row.addWidget(panel, 1)
             self.charts.append(chart)
 
@@ -353,7 +357,7 @@ class ReportsPage(Page):
             clear_layout(self.table_holder)
             columns = [
                 Column[Row](
-                    c.label,
+                    c.title,
                     lambda row, c=c: format_value(c.kind, row.get(c.key)),  # type: ignore[misc]
                     sort=lambda row, c=c: row.get(c.key),  # type: ignore[misc]
                     align_right=c.kind.is_numeric,
@@ -363,8 +367,8 @@ class ReportsPage(Page):
             ]
             self.table = RecordTable(
                 columns,
-                empty_message="No records match these filters. Try a longer period or All programs.",
-                accessible_name=f"{report.title} table",
+                empty_message=tr("No records match these filters. Try a longer period or All programs."),
+                accessible_name=tr("{title} table", title=report.title),
             )
             self.table.setProperty("kind", report.kind.value)
             self.table.setMinimumHeight(320)
@@ -378,7 +382,7 @@ class ReportsPage(Page):
         menu.clear()
         hidden = self.hidden.setdefault(report.kind, {c.key for c in report.columns if not c.shown_by_default})
         for column in report.columns:
-            action = menu.addAction(column.label)
+            action = menu.addAction(column.title)
             action.setCheckable(True)
             action.setChecked(column.key not in hidden)
             action.toggled.connect(lambda on, key=column.key: self._toggle_column(key, on))
@@ -392,7 +396,10 @@ class ReportsPage(Page):
         else:
             hidden.add(key)
         self._apply_column_visibility(self.report)
-        self.ctx.announce(f"{self.report.column(key).label} column {'shown' if shown else 'hidden'}")
+        title = self.report.column(key).title
+        self.ctx.announce(
+            tr("{column} column shown", column=title) if shown else tr("{column} column hidden", column=title)
+        )
 
     def _apply_column_visibility(self, report: Report) -> None:
         if self.table is None:
@@ -413,7 +420,7 @@ class ReportsPage(Page):
         assert self.report is not None
         start = Path.home() / "Documents" / suggested_filename(self.report, extension)
         chosen, _ = QFileDialog.getSaveFileName(
-            self, f"Save {description}", str(start), f"{description} (*.{extension})"
+            self, tr("Save {description}", description=description), str(start), f"{description} (*.{extension})"
         )
         if not chosen:
             return None
@@ -424,18 +431,18 @@ class ReportsPage(Page):
     def _export_csv(self) -> None:
         if self.report is None:
             return
-        path = self._ask_path("csv", "CSV spreadsheet")
+        path = self._ask_path("csv", tr("CSV spreadsheet"))
         if path is not None:
             save_csv(self.report, path, self.visible_columns())
-            self.ctx.events.status_message.emit(f"Saved {path.name}.")
+            self.ctx.events.status_message.emit(tr("Saved {title}.", title=path.name))
 
     @guarded
     def _export_pdf(self) -> None:
         if self.report is None:
             return
-        path = self._ask_path("pdf", "PDF document")
+        path = self._ask_path("pdf", tr("PDF document"))
         if path is not None:
             with BusyCursor():
                 images = [chart.render_image() for chart in self.charts]
                 save_pdf(self.report, path, self.visible_columns() if self.leader else None, images)
-            self.ctx.events.status_message.emit(f"Saved {path.name}.")
+            self.ctx.events.status_message.emit(tr("Saved {title}.", title=path.name))

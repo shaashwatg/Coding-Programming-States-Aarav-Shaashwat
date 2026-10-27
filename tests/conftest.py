@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 import pytest
 
+from servesync.core.i18n import Language, set_language
 from servesync.data import DataStore
 from servesync.models import AvailabilitySlot, DayPart, OpportunityStatus, VolunteerStatus, Weekday
 from servesync.services import FixedClock, Services
@@ -22,6 +23,14 @@ from tests.factories import FAST_ITERATIONS, make_opportunity, make_shift, make_
 NOW = datetime(2026, 11, 2, 8, 0)
 #: Saturday of that week, 9:00 AM — the standard test shift.
 SATURDAY_9AM = datetime(2026, 11, 7, 9, 0)
+
+
+@pytest.fixture(autouse=True)
+def _english_by_default() -> Iterator[None]:
+    """The interface language is app-wide state; every test starts (and ends) in English."""
+    set_language(Language.ENGLISH)
+    yield
+    set_language(Language.ENGLISH)
 
 
 @pytest.fixture

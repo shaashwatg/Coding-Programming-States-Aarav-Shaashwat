@@ -1,6 +1,6 @@
 [project]
 name = "servesync"
-version = "1.0.0"
+version = "1.2.0"
 description = "ServeSync - volunteer management for nonprofits (FBLA Coding & Programming 2026-2027)"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -14,6 +14,7 @@ from datetime import datetime
 from types import MappingProxyType
 
 from servesync.core.errors import BusinessRuleError
+from servesync.core.i18n import tr
 from servesync.core.validators import calculate_age
 from servesync.models import AccessNeed, OpportunityStatus, ShiftOverview, Volunteer, VolunteerStatus, access_gaps
 
@@ -40,16 +41,20 @@ OPPORTUNITY_TRANSITIONS: Mapping[OpportunityStatus, frozenset[OpportunityStatus]
 
 def check_volunteer_transition(current: VolunteerStatus, new: VolunteerStatus) -> None:
     if current is new:
-        raise BusinessRuleError(f"This volunteer is already {new.label}.")
+        raise BusinessRuleError(tr("This volunteer is already {label}.", label=new.label))
     if new not in VOLUNTEER_TRANSITIONS[current]:
-        raise BusinessRuleError(f"A volunteer can't move from {current.label} to {new.label}.")
+        raise BusinessRuleError(
+            tr("A volunteer can't move from {label} to {label2}.", label=current.label, label2=new.label)
+        )
 
 
 def check_opportunity_transition(current: OpportunityStatus, new: OpportunityStatus) -> None:
     if current is new:
-        raise BusinessRuleError(f"This opportunity is already {new.label}.")
+        raise BusinessRuleError(tr("This opportunity is already {label}.", label=new.label))
     if new not in OPPORTUNITY_TRANSITIONS[current]:
-        raise BusinessRuleError(f"An opportunity can't move from {current.label} back to {new.label}.")
+        raise BusinessRuleError(
+            tr("An opportunity can't move from {label} back to {label2}.", label=current.label, label2=new.label)
+        )
 
 
 def signup_blockers(
@@ -70,24 +75,42 @@ def signup_blockers(
     reasons: list[str] = []
     shift = overview.shift
     if not volunteer.status.can_be_scheduled:
-        reasons.append(f"{volunteer.full_name} is {volunteer.status.label} and can't be scheduled until approved.")
+        reasons.append(
+            tr(
+                "{full_name} is {label} and can't be scheduled until approved.",
+                full_name=volunteer.full_name,
+                label=volunteer.status.label,
+            )
+        )
     if not overview.opportunity_status.accepts_signups:
         reasons.append(
-            f"'{overview.opportunity_title}' is {overview.opportunity_status.label} and not taking sign-ups."
+            tr(
+                "'{opportunity_title}' is {label} and not taking sign-ups.",
+                opportunity_title=overview.opportunity_title,
+                label=overview.opportunity_status.label,
+            )
         )
     if shift.starts_at <= now:
-        reasons.append("This shift has already started.")
+        reasons.append(tr("This shift has already started."))
     if already_signed_up:
-        reasons.append(f"{volunteer.full_name} is already signed up for this shift.")
+        reasons.append(tr("{full_name} is already signed up for this shift.", full_name=volunteer.full_name))
     elif overview.is_full:
-        reasons.append("This shift is full.")
+        reasons.append(tr("This shift is full."))
     age = calculate_age(volunteer.birth_date, shift.starts_at.date())
     if age < min_age:
         reasons.append(
-            f"'{overview.opportunity_title}' requires volunteers aged {min_age}+; {volunteer.given_name} will be {age}."
+            tr(
+                ("'{opportunity_title}' requires volunteers aged {min_age}+; {given_name} will be {age}."),
+                opportunity_title=overview.opportunity_title,
+                min_age=min_age,
+                given_name=volunteer.given_name,
+                age=age,
+            )
         )
     if has_conflict:
-        reasons.append(f"{volunteer.full_name} is already scheduled for another shift at that time.")
+        reasons.append(
+            tr("{full_name} is already scheduled for another shift at that time.", full_name=volunteer.full_name)
+        )
     return reasons
 
 
@@ -98,7 +121,10 @@ def describe_access_gaps(needs: frozenset[AccessNeed], offered: frozenset[Access
     These are *information*, never a reason to refuse a sign-up: the person
     knows their own needs best, and a coordinator can often arrange support.
     """
-    return [f"Needs {need.label.lower()}: '{program_title}' {need.gap_text}" for need in access_gaps(needs, offered)]
+    return [
+        tr("Needs {need}: '{program}' {gap}", need=need.label.lower(), program=program_title, gap=need.gap_text)
+        for need in access_gaps(needs, offered)
+    ]
 
 
 def describe_names(names: Sequence[str], limit: int = 3) -> str:
@@ -108,5 +134,5 @@ def describe_names(names: Sequence[str], limit: int = 3) -> str:
     if len(names) == 1:
         return names[0]
     if len(names) <= limit:
-        return f"{', '.join(names[:-1])} and {names[-1]}"
-    return f"{', '.join(names[:limit])} and {len(names) - limit} more"
+        return tr("{first} and {last}", first=", ".join(names[:-1]), last=names[-1])
+    return tr("{join} and {value} more", join=", ".join(names[:limit]), value=len(names) - limit)

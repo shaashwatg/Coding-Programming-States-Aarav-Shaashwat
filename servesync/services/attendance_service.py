@@ -14,6 +14,7 @@ import dataclasses
 import logging
 
 from servesync.core.errors import BusinessRuleError
+from servesync.core.i18n import tr
 from servesync.core.validators import calculate_age, parse_hours, validate_field
 from servesync.models import Assignment, AssignmentStatus, RosterEntry, Shift
 from servesync.services.base import Service
@@ -43,7 +44,7 @@ class AttendanceService(Service):
         session.require(Permission.RECORD_ATTENDANCE)
         signup = self._store.assignments.get(assignment_id)
         if signup.status is AssignmentStatus.CANCELLED:
-            raise BusinessRuleError("This sign-up was cancelled in advance, so it isn't a no-show.")
+            raise BusinessRuleError(tr("This sign-up was cancelled in advance, so it isn't a no-show."))
         self._started_shift(signup.shift_id)
         return self._store.assignments.update(
             dataclasses.replace(signup, status=AssignmentStatus.NO_SHOW, hours_served=None)
@@ -77,13 +78,27 @@ class AttendanceService(Service):
         volunteer = self._store.volunteers.get(volunteer_id)
         opportunity = self._store.opportunities.get(shift.opportunity_id)
         if not volunteer.status.can_be_scheduled:
-            raise BusinessRuleError(f"{volunteer.full_name} is {volunteer.status.label}; approve them first.")
+            raise BusinessRuleError(
+                tr(
+                    "{full_name} is {label}; approve them first.",
+                    full_name=volunteer.full_name,
+                    label=volunteer.status.label,
+                )
+            )
         if calculate_age(volunteer.birth_date, shift.starts_at.date()) < opportunity.min_age:
-            raise BusinessRuleError(f"'{opportunity.title}' requires volunteers aged {opportunity.min_age}+.")
+            raise BusinessRuleError(
+                tr(
+                    "'{title}' requires volunteers aged {min_age}+.",
+                    title=opportunity.title,
+                    min_age=opportunity.min_age,
+                )
+            )
         if self._store.assignments.conflicting_shifts(
             volunteer_id, shift.starts_at, shift.ends_at, exclude_shift_id=shift_id
         ):
-            raise BusinessRuleError(f"{volunteer.full_name} is recorded on another shift at that time.")
+            raise BusinessRuleError(
+                tr("{full_name} is recorded on another shift at that time.", full_name=volunteer.full_name)
+            )
         saved = self._store.assignments.add(
             Assignment(
                 shift_id=shift_id,
@@ -101,7 +116,7 @@ class AttendanceService(Service):
     def _started_shift(self, shift_id: int) -> Shift:
         shift = self._store.shifts.get(shift_id)
         if not shift.has_started(self._clock.now()):
-            raise BusinessRuleError("Attendance can be recorded once the shift has started.")
+            raise BusinessRuleError(tr("Attendance can be recorded once the shift has started."))
         return shift
 
     @staticmethod
@@ -109,4 +124,6 @@ class AttendanceService(Service):
         """Default to the full shift; never more than the shift actually lasted (semantic check)."""
         if hours is None or (isinstance(hours, str) and not hours.strip()):
             return shift.duration_hours
-        return float(validate_field("hours_served", parse_hours, hours, "Hours served", maximum=shift.duration_hours))
+        return float(
+            validate_field("hours_served", parse_hours, hours, tr("Hours served"), maximum=shift.duration_hours)
+        )

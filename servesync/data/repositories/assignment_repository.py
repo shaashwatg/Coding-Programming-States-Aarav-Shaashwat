@@ -14,6 +14,7 @@ from datetime import date, datetime
 from typing import Any
 
 from servesync.core.errors import DuplicateRecordError, RecordNotFoundError
+from servesync.core.i18n import mark, tr
 from servesync.data.converters import date_to_db, datetime_from_db, datetime_to_db
 from servesync.data.repositories.base import Repository
 from servesync.data.repositories.volunteer_repository import display_name_sql
@@ -31,7 +32,7 @@ from servesync.models import (
     VolunteerStatus,
 )
 
-_ENTITY = "Sign-up"
+_ENTITY = mark("Sign-up")
 
 _V_NAME = display_name_sql("v")
 
@@ -46,9 +47,9 @@ class AssignmentRepository(Repository):
         self._require_new(assignment.assignment_id, _ENTITY)
         with self._db.transaction():
             if not self._exists("shifts", "shift_id", assignment.shift_id):
-                raise RecordNotFoundError("Shift", assignment.shift_id)
+                raise RecordNotFoundError(tr("Shift"), assignment.shift_id)
             if not self._exists("volunteers", "volunteer_id", assignment.volunteer_id):
-                raise RecordNotFoundError("Volunteer", assignment.volunteer_id)
+                raise RecordNotFoundError(tr("Volunteer"), assignment.volunteer_id)
             try:
                 cursor = self._db.execute(
                     """
@@ -59,7 +60,7 @@ class AssignmentRepository(Repository):
                 )
             except DuplicateRecordError as exc:
                 raise DuplicateRecordError(
-                    "This volunteer is already signed up for this shift.", field="volunteer_id"
+                    tr("This volunteer is already signed up for this shift."), field="volunteer_id"
                 ) from exc
         return dataclasses.replace(assignment, assignment_id=int(cursor.lastrowid or 0))
 

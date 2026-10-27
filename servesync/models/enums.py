@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from enum import Enum, IntEnum
 
+from servesync.core.i18n import Language, current_language, mark, tr, weekday_name, weekday_plural
+
 # Labels that are not simply the title-cased member name.
 _LABEL_OVERRIDES: dict[str, str] = {
     "NO_SHOW": "No-Show",
@@ -21,11 +23,20 @@ _LABEL_OVERRIDES: dict[str, str] = {
 
 
 class DisplayEnum(str, Enum):
-    """A string-valued enum whose members carry a display ``label``."""
+    """
+    A string-valued enum whose members carry a display ``label``.
+
+    ``english_label`` is the message ID; ``label`` is it in the current
+    language, looked up each time it's shown so a language switch is instant.
+    """
+
+    @property
+    def english_label(self) -> str:
+        return _LABEL_OVERRIDES.get(self.value, self.name.replace("_", " ").title())
 
     @property
     def label(self) -> str:
-        return _LABEL_OVERRIDES.get(self.value, self.name.replace("_", " ").title())
+        return tr(self.english_label)
 
 
 class VolunteerStatus(DisplayEnum):
@@ -179,28 +190,32 @@ class AccessNeed(DisplayEnum):
     REMOTE = "REMOTE"
 
     @property
-    def label(self) -> str:
+    def english_label(self) -> str:
         return _ACCESS_LABELS[self.value][0]
 
     @property
     def offer_label(self) -> str:
         """Wording for a program that provides this support."""
-        return _ACCESS_LABELS[self.value][1]
+        return tr(_ACCESS_LABELS[self.value][1])
 
     @property
     def gap_text(self) -> str:
         """Wording for a program that does not provide it."""
-        return _ACCESS_LABELS[self.value][2]
+        return tr(_ACCESS_LABELS[self.value][2])
 
 
 #: (need label, program offer label, gap explanation)
 _ACCESS_LABELS: dict[str, tuple[str, str, str]] = {
-    "STEP_FREE": ("Step-free access", "Step-free access (no stairs)", "isn't listed as step-free"),
-    "SEATED": ("Seated tasks", "Seated tasks available", "doesn't list seated tasks"),
-    "TRANSIT": ("Near public transit", "Near public transit", "isn't listed as near public transit"),
-    "QUIET": ("Quiet, low-sensory setting", "Quiet, low-sensory space", "doesn't list a quiet space"),
-    "NO_COST": ("No out-of-pocket cost", "No cost to volunteer (supplies provided)", "may have out-of-pocket costs"),
-    "REMOTE": ("Remote, from home", "Can be done remotely", "happens in person"),
+    "STEP_FREE": (mark("Step-free access"), mark("Step-free access (no stairs)"), mark("isn't listed as step-free")),
+    "SEATED": (mark("Seated tasks"), mark("Seated tasks available"), mark("doesn't list seated tasks")),
+    "TRANSIT": (mark("Near public transit"), mark("Near public transit"), mark("isn't listed as near public transit")),
+    "QUIET": (mark("Quiet, low-sensory setting"), mark("Quiet, low-sensory space"), mark("doesn't list a quiet space")),
+    "NO_COST": (
+        mark("No out-of-pocket cost"),
+        mark("No cost to volunteer (supplies provided)"),
+        mark("may have out-of-pocket costs"),
+    ),
+    "REMOTE": (mark("Remote, from home"), mark("Can be done remotely"), mark("happens in person")),
 }
 
 
@@ -217,8 +232,15 @@ class Weekday(IntEnum):
 
     @property
     def label(self) -> str:
-        return self.name.title()
+        return weekday_name(int(self))
 
     @property
     def short_label(self) -> str:
-        return self.name[:3].title()
+        return weekday_name(int(self), short=True)
+
+
+def describe_slot(weekday: Weekday, part: DayPart) -> str:
+    """'Saturday mornings' / 'sábados por la mañana' — a regular time someone is free."""
+    if current_language() is Language.SPANISH:
+        return f"{weekday_plural(int(weekday))} por la {part.label.lower()}"
+    return f"{weekday.label} {part.label.lower()}s"

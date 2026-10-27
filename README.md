@@ -9,7 +9,8 @@ impact. Volunteers sign in to a self-service portal to find shifts, sign up, and
 
 > **Build status:** feature-complete and tested — data storage, business rules with Smart Match,
 > the desktop interface, customizable reports with CSV/PDF export, the offline *Ask ServeSync*
-> assistant, inclusive profiles and comfort settings, and a standalone app build.
+> assistant, inclusive profiles and comfort settings, a full **English / Español** interface, and a
+> standalone app build.
 
 ![ServeSync dashboard](docs/screenshots/dashboard.png)
 
@@ -39,7 +40,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 411 automated tests, including the interface
+python -m pytest          # 445 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -60,6 +61,23 @@ All demo accounts use the password **`ServeSync2026!`** (demo data only — chan
 | `jordan.rivera` | Volunteer (age 16)    | Minor safeguards and age-restricted shifts |
 | `priya.patel`   | Volunteer (adult)     | Self-service portal and service history    |
 
+### Spanish (Español)
+
+Sign in, then choose **Settings → Language / Idioma → Español** (or pick **Español** at the top of
+the sign-in screen). Everything switches at once. To see every screen in Spanish without signing
+in: `python tools/capture_screens.py screens-es --language es`.
+
+![ServeSync dashboard in Spanish](docs/screenshots/dashboard-es.png)
+
+How the translation works, for anyone adding a feature:
+
+* Code is written in English, and every message on screen is wrapped in `tr("...")` (or
+  `tr_n(singular, plural, count)` for plurals). The English text is the message ID.
+* Spanish lives in `servesync/locale/es.json`. Run `python tools/messages.py` to see whether any
+  message is missing a translation, and `python tools/messages.py --missing` to print them ready
+  to fill in. The tests fail if a message has no Spanish or a translation drops a `{placeholder}`.
+* Dates and times go through `format_day`, `format_clock` and friends in `servesync/core/i18n.py`.
+
 ### Developer commands
 
 | Command                           | What it does                                        |
@@ -71,6 +89,38 @@ All demo accounts use the password **`ServeSync2026!`** (demo data only — chan
 | `python devtools.py smartmatch`   | Demo Smart Match on the shift that most needs people |
 | `... smartmatch --volunteer priya.patel` | Shifts Smart Match recommends for one volunteer |
 | `--data-dir PATH` (before command)| Use a different data folder                         |
+
+---
+
+## Working together on GitHub
+
+The project is a normal Git repository, so it can be shared with a teammate on GitHub.
+
+**First time (the person who has the code):**
+
+1. Create an **empty** repository on github.com (no README, no .gitignore, no license; we already have them).
+2. In a terminal inside the `servesync` folder:
+   ```bash
+   git remote add origin https://github.com/YOUR-USERNAME/servesync.git
+   git push -u origin main
+   ```
+   Or, with **GitHub Desktop**: *File → Add Local Repository →* choose the `servesync` folder → **Publish repository**.
+3. On GitHub, open **Settings → Collaborators** and invite your partner.
+
+**Your partner:**
+
+```bash
+git clone https://github.com/YOUR-USERNAME/servesync.git
+cd servesync
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+python devtools.py reset --yes
+python -m pytest && python main.py
+```
+
+**Every day:** `git pull` before you start, then `git add -A && git commit -m "What changed"` and
+`git push` when you finish a piece. Run `python -m pytest` before pushing. The database, logs and
+build output are listed in `.gitignore`, so each person keeps their own demo data.
 
 ---
 
@@ -104,7 +154,10 @@ servesync/
 ├── core/
 │   ├── errors.py        Domain exception hierarchy with user-safe messages
 │   ├── validators.py    Syntactic + semantic input validation library
-│   └── security.py      PBKDF2-HMAC-SHA256 password hashing
+│   ├── security.py      PBKDF2-HMAC-SHA256 password hashing
+│   └── i18n.py          English/Spanish: tr(), plurals, language-aware dates and times
+├── locale/
+│   └── es.json          Spanish translation of every on-screen message
 ├── models/
 │   ├── enums.py         Statuses, roles, categories, day parts, themes
 │   ├── volunteer.py     Volunteer + AvailabilitySlot
@@ -150,8 +203,9 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   411 pytest tests (in-memory databases, fixed clock, offscreen UI)
-tools/capture_screens.py Renders every screen to PNG (design review, slides)
+tests/                   445 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
+tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
 servesync.spec           PyInstaller recipe for the standalone app (build_mac.command runs it)
 devtools.py              Command-line developer and demo tools
@@ -242,6 +296,12 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
   **service-hours record** PDF for school, scholarships, and job applications.
 * **Shared computers.** Each person's settings load at sign-in, so a front-desk laptop works for
   everyone.
+* **English and Spanish.** About 42 million people in the U.S. speak Spanish at home, and many
+  volunteers and families read it more comfortably. Every screen, message, report, PDF/CSV export,
+  help page, date ("sáb 7 nov, 9:00 a. m.") and *Ask ServeSync* answer is available in Spanish.
+  Choose **English | Español** on the sign-in screen or in *Settings*; the choice is saved per
+  account, switches instantly, and the switch is labeled in both languages so anyone can find it.
+  Names, program titles and other records people type stay exactly as entered.
 
 ### Reports (customizable output and analysis)
 
@@ -264,7 +324,9 @@ on the computer): questions are normalized and stemmed, dates ("this month", "in
 times ("weekday evenings"), people (typo-tolerant: "Pryia" → Priya) and programs are extracted,
 and the intent is scored from weighted cue words. Every answer comes from live records, says what
 it understood, offers a button to the right page, and suggests follow-ups. Volunteers can only ask
-about themselves. Typing a page name instead jumps straight there.
+about themselves. Typing a page name instead jumps straight there. It understands **Spanish** too —
+*¿Quién está libre el sábado por la mañana?*, *¿Cuántas horas tengo este mes?*, *¿Cómo exporto un
+informe?* — with or without accents, and answers in the interface language.
 
 ![High contrast at 150% text](docs/screenshots/high-contrast.png)
 
@@ -349,10 +411,10 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 411 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 445 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
-| `mypy` (strict mode)     | No type errors in all 88 files, interface and tests included |
+| `mypy` (strict mode)     | No type errors in all 90 files, interface and tests included |
 | Contrast                 | Every text color ≥ 7:1, every boundary ≥ 3:1, in all themes (`tests/test_theme.py`) |
 | Standalone build         | `ServeSync --check` passes on the built app with no Python installed |
 

@@ -5,13 +5,18 @@ ServeSync's assistant works fully **offline** (conference Wi-Fi is unreliable,
 and a nonprofit's volunteer data shouldn't leave the building). Instead of a
 cloud language model it uses classic, explainable techniques:
 
-1. **Normalize** — lower-case, expand contractions, drop punctuation.
+1. **Normalize** — lower-case, expand contractions, fold accents
+   ("sábado" -> "sabado"), drop punctuation.
 2. **Stem** — "volunteered", "volunteering", "volunteers" -> "volunteer".
 3. **Extract entities** — dates ("this month", "in October"), time slots
    ("Saturday morning"), people (with typo tolerance: "Pryia" -> Priya), and
    programs (by their distinctive words).
 4. **Classify intent** — each intent has weighted cue words; the best score
    wins, and entities break ties (a named person + "hours" = that person's hours).
+
+Questions are understood in **English or Spanish**, whichever language the
+interface shows: each cue list below has both, so "¿Cuántas horas tengo?"
+and "How many hours do I have?" reach the same answer.
 
 Every answer says what it understood ("I read this as: hours for Priya Patel,
 this month"), so a wrong guess is obvious and easy to rephrase.
@@ -21,11 +26,13 @@ from __future__ import annotations
 
 import difflib
 import re
+import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from enum import Enum
 
+from servesync.core.i18n import Language, current_language, month_name, tr, weekday_plural
 from servesync.models import DayPart, Weekday
 
 # ------------------------------------------------------------ normalizing
@@ -55,12 +62,21 @@ STOPWORDS = frozenset([
     "our", "please", "show", "tell", "than", "that", "the", "their", "them", "there", "these", "they", "this",
     "to", "us", "was", "we", "were", "what", "when", "where", "which", "who", "whom", "why", "will", "with",
     "would", "you", "your",
+    # Spanish
+    "al", "como", "con", "cual", "cuales", "de", "del", "el", "en", "es", "esta", "estan", "este", "esto",
+    "hay", "la", "las", "lo", "los", "mi", "mis", "muestrame", "o", "para", "pero", "por", "porfa", "que",
+    "quien", "quienes", "se", "son", "su", "sus", "tengo", "tiene", "tienen", "tu", "un", "una", "y", "yo",
 ])
 # fmt: on
 
 
+def fold_accents(text: str) -> str:
+    """'sábado' -> 'sabado', 'mañana' -> 'manana' (people often skip accents when typing)."""
+    return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
+
+
 def normalize(text: str) -> str:
-    lowered = text.lower().replace("’", "'")
+    lowered = fold_accents(text.lower().replace("’", "'"))
     for short, full in _CONTRACTIONS.items():
         lowered = lowered.replace(short, full)
     return " ".join(_WORD.findall(lowered))
@@ -92,7 +108,7 @@ def stems(text: str) -> list[str]:
 class Period:
     start: date
     end: date
-    label: str
+    label: str  # in the interface language, ready to drop into a sentence: "this month" / "este mes"
 
 
 _MONTHS = {
@@ -115,7 +131,30 @@ _MONTHS = {
         start=1,
     )
     for name in names
+} | {
+    name: index
+    for index, names in enumerate(
+        [
+            ("enero", "ene"),
+            ("febrero",),
+            ("marzo",),
+            ("abril", "abr"),
+            ("mayo",),
+            ("junio",),
+            ("julio",),
+            ("agosto", "ago"),
+            ("septiembre", "setiembre"),
+            ("octubre",),
+            ("noviembre",),
+            ("diciembre", "dic"),
+        ],
+        start=1,
+    )
+    for name in names
 }
+
+#: "mañana" alone means tomorrow, but "por la mañana" means in the morning.
+_SPANISH_MORNING = re.compile(r" (?:por|en|de) la manana ")
 
 
 def _month_end(year: int, month: int) -> date:
@@ -125,48 +164,78 @@ def _month_end(year: int, month: int) -> date:
 
 def find_period(text: str, today: date) -> Period | None:
     """A date range mentioned in the question, or None."""
-    t = f" {normalize(text)} "
+    t = _SPANISH_MORNING.sub(" ", f" {normalize(text)} ")
     monday = today - timedelta(days=today.weekday())
+    tomorrow = Period(today + timedelta(days=1), today + timedelta(days=1), tr("tomorrow"))
+    yesterday = Period(today - timedelta(days=1), today - timedelta(days=1), tr("yesterday"))
+    next_week = Period(monday + timedelta(days=7), monday + timedelta(days=13), tr("next week"))
+    last_week = Period(monday - timedelta(days=7), monday - timedelta(days=1), tr("last week"))
+    weekend = Period(monday + timedelta(days=5), monday + timedelta(days=6), tr("this weekend"))
+    this_week = Period(monday, monday + timedelta(days=6), tr("this week"))
+    this_month = Period(today.replace(day=1), _month_end(today.year, today.month), tr("this month"))
+    last_year = Period(date(today.year - 1, 1, 1), date(today.year - 1, 12, 31), tr("in {year}", year=today.year - 1))
+    this_year = Period(date(today.year, 1, 1), today, tr("this year"))
+    all_time = Period(date(2000, 1, 1), today, tr("all time"))
+    # Longer phrases first, so "next week" wins over "week" and "el mes pasado" over "mes".
     checks: list[tuple[str, Period]] = [
-        (" today ", Period(today, today, "today")),
-        (" tomorrow ", Period(today + timedelta(days=1), today + timedelta(days=1), "tomorrow")),
-        (" yesterday ", Period(today - timedelta(days=1), today - timedelta(days=1), "yesterday")),
-        (" next week ", Period(monday + timedelta(days=7), monday + timedelta(days=13), "next week")),
-        (" last week ", Period(monday - timedelta(days=7), monday - timedelta(days=1), "last week")),
-        (" this weekend ", Period(monday + timedelta(days=5), monday + timedelta(days=6), "this weekend")),
-        (" weekend ", Period(monday + timedelta(days=5), monday + timedelta(days=6), "this weekend")),
-        (" this week ", Period(monday, monday + timedelta(days=6), "this week")),
+        (" today ", Period(today, today, tr("today"))),
+        (" hoy ", Period(today, today, tr("today"))),
+        (" tomorrow ", tomorrow),
+        (" pasado manana ", Period(today + timedelta(days=2), today + timedelta(days=2), tr("the day after tomorrow"))),
+        (" manana ", tomorrow),
+        (" yesterday ", yesterday),
+        (" ayer ", yesterday),
+        (" next week ", next_week),
+        (" proxima semana ", next_week),
+        (" semana que viene ", next_week),
+        (" semana proxima ", next_week),
+        (" last week ", last_week),
+        (" semana pasada ", last_week),
+        (" this weekend ", weekend),
+        (" weekend ", weekend),
+        (" fin de semana ", weekend),
+        (" this week ", this_week),
+        (" esta semana ", this_week),
         (" last month ", _last_month(today)),
-        (" this month ", Period(today.replace(day=1), _month_end(today.year, today.month), "this month")),
+        (" mes pasado ", _last_month(today)),
+        (" this month ", this_month),
+        (" este mes ", this_month),
         (" school year ", _school_year(today)),
-        (" last year ", Period(date(today.year - 1, 1, 1), date(today.year - 1, 12, 31), f"in {today.year - 1}")),
-        (" this year ", Period(date(today.year, 1, 1), today, "this year")),
-        (" all time ", Period(date(2000, 1, 1), today, "all time")),
-        (" ever ", Period(date(2000, 1, 1), today, "all time")),
+        (" ano escolar ", _school_year(today)),
+        (" curso escolar ", _school_year(today)),
+        (" last year ", last_year),
+        (" ano pasado ", last_year),
+        (" this year ", this_year),
+        (" este ano ", this_year),
+        (" all time ", all_time),
+        (" ever ", all_time),
+        (" siempre ", all_time),
+        (" de todos los tiempos ", all_time),
     ]
     for phrase, period in checks:
         if phrase in t:
             return period
-    days = re.search(r" (?:last|past) (\d{1,3}) days ", t)
+    days = re.search(r" (?:(?:last|past) (\d{1,3}) days|(?:ultimos|pasados) (\d{1,3}) dias) ", t)
     if days:
-        count = max(1, min(int(days.group(1)), 1000))
-        return Period(today - timedelta(days=count - 1), today, f"the last {count} days")
+        count = max(1, min(int(days.group(1) or days.group(2)), 1000))
+        return Period(today - timedelta(days=count - 1), today, tr("the last {count} days", count=count))
     for word in t.split():
         month = _MONTHS.get(word)
         if month is not None and (word != "may" or re.search(r" (?:in|during|for) may ", t)):
             year = today.year if month <= today.month else today.year - 1
-            return Period(date(year, month, 1), min(_month_end(year, month), today), f"in {date(year, month, 1):%B %Y}")
+            label = tr("in {month} {year}", month=month_name(month), year=year)
+            return Period(date(year, month, 1), min(_month_end(year, month), today), label)
     return None
 
 
 def _last_month(today: date) -> Period:
     end = today.replace(day=1) - timedelta(days=1)
-    return Period(end.replace(day=1), end, "last month")
+    return Period(end.replace(day=1), end, tr("last month"))
 
 
 def _school_year(today: date) -> Period:
     year = today.year if today.month >= 8 else today.year - 1
-    return Period(date(year, 8, 1), today, "this school year")
+    return Period(date(year, 8, 1), today, tr("this school year"))
 
 
 # ------------------------------------------------------------------ slots
@@ -179,7 +248,12 @@ class Slot:
 
     @property
     def label(self) -> str:
-        """'Saturdays', 'Saturday mornings', 'weekday evenings', 'Monday or Friday afternoons'."""
+        """
+        'Saturdays', 'Saturday mornings', 'weekday evenings', 'Monday or Friday afternoons';
+        in Spanish 'los sábados', 'los sábados por la mañana', 'entre semana por la noche'.
+        """
+        if current_language() is Language.SPANISH:
+            return self._spanish_label()
         days = set(self.weekdays)
         if days == {d for d in Weekday if d < Weekday.SATURDAY}:
             day_text = "weekday"
@@ -193,6 +267,27 @@ class Slot:
             return f"{day_text} {self.day_part.label.lower()}s"
         return day_text if day_text == "any day" else f"{day_text}s"
 
+    def _spanish_label(self) -> str:
+        days = set(self.weekdays)
+        if days == {d for d in Weekday if d < Weekday.SATURDAY}:
+            day_text = "entre semana"
+        elif days == {Weekday.SATURDAY, Weekday.SUNDAY}:
+            day_text = "los fines de semana"
+        elif days:
+            day_text = "los " + " o ".join(weekday_plural(int(d)) for d in self.weekdays)
+        else:
+            day_text = "cualquier día"
+        part = (
+            {
+                DayPart.MORNING: "por la mañana",
+                DayPart.AFTERNOON: "por la tarde",
+                DayPart.EVENING: "por la noche",
+            }.get(self.day_part)
+            if self.day_part is not None
+            else None
+        )
+        return f"{day_text} {part}" if part else day_text
+
 
 _WEEKDAY_WORDS = {
     **{day.name.lower(): day for day in Weekday},
@@ -201,6 +296,16 @@ _WEEKDAY_WORDS = {
     "tues": Weekday.TUESDAY,
     "weds": Weekday.WEDNESDAY,
     "thurs": Weekday.THURSDAY,
+    # Spanish (accents already folded away by normalize)
+    "lunes": Weekday.MONDAY,
+    "martes": Weekday.TUESDAY,
+    "miercoles": Weekday.WEDNESDAY,
+    "jueves": Weekday.THURSDAY,
+    "viernes": Weekday.FRIDAY,
+    "sabado": Weekday.SATURDAY,
+    "sabados": Weekday.SATURDAY,
+    "domingo": Weekday.SUNDAY,
+    "domingos": Weekday.SUNDAY,
 }
 _PART_WORDS = {
     "morning": DayPart.MORNING,
@@ -212,12 +317,22 @@ _PART_WORDS = {
     "evenings": DayPart.EVENING,
     "night": DayPart.EVENING,
     "tonight": DayPart.EVENING,
+    "mananas": DayPart.MORNING,
+    "tarde": DayPart.AFTERNOON,
+    "tardes": DayPart.AFTERNOON,
+    "noche": DayPart.EVENING,
+    "noches": DayPart.EVENING,
 }
 
 
 def find_slot(text: str) -> Slot | None:
     """Weekday(s) and/or time of day mentioned ("Saturday morning", "weekends")."""
-    words = normalize(text).split()
+    padded = f" {normalize(text)} "
+    if _SPANISH_MORNING.search(padded):
+        padded = _SPANISH_MORNING.sub(" mornings ", padded)
+    padded = padded.replace(" fin de semana ", " weekend ").replace(" fines de semana ", " weekends ")
+    padded = padded.replace(" entre semana ", " weekdays ")
+    words = padded.split()
     days: list[Weekday] = []
     part: DayPart | None = None
     for word in words:
@@ -257,6 +372,8 @@ def person_keys(first: str, last: str, preferred: str = "") -> tuple[str, ...]:
 _GENERIC_PROGRAM_WORDS = frozenset([
     "day", "days", "weekend", "weekly", "program", "programs", "event", "events", "shift", "shifts",
     "volunteer", "volunteers", "support", "community", "the", "and", "of", "for", "at",
+    "programa", "programas", "evento", "eventos", "turno", "turnos", "voluntario", "voluntarios",
+    "comunidad", "del", "las", "los", "como", "esta", "esto", "este", "hay", "para", "que",
 ])
 # fmt: on
 
@@ -387,11 +504,123 @@ _CUE_WORDS: dict[Intent, dict[str, float]] = {
     Intent.THANKS: {"thank": 4, "thanks": 4, "thx": 4},
 }
 
+#: Spanish cue words (accents folded), merged into the English lists above.
+_SPANISH_CUE_WORDS: dict[Intent, dict[str, float]] = {
+    Intent.MY_HOURS: {"horas": 2, "servicio": 1, "certificado": 2, "constancia": 2, "carta": 2, "registro": 1},
+    Intent.MY_NEXT_SHIFT: {
+        "proximo": 2,
+        "proxima": 2,
+        "siguiente": 2,
+        "programado": 1,
+        "inscrito": 1,
+        "turno": 1,
+        "cuando": 1,
+    },
+    Intent.RECOMMEND_SHIFTS: {
+        "recomienda": 3,
+        "recomiendas": 3,
+        "recomendar": 3,
+        "sugiere": 3,
+        "sugerir": 3,
+        "buscar": 2,
+        "encontrar": 2,
+        "deberia": 1,
+        "abierto": 1,
+        "turno": 1,
+        "oportunidad": 1,
+        "unirme": 2,
+        "inscribirme": 2,
+        "ayudar": 0.5,
+        "algo": 1,
+    },
+    Intent.PERSON_HOURS: {"horas": 2, "servido": 1},
+    Intent.ORG_HOURS: {
+        "horas": 2,
+        "impacto": 2.5,
+        "valor": 1.5,
+        "servido": 1,
+        "organizacion": 1,
+        "nosotros": 1,
+        "todos": 0.5,
+    },
+    Intent.WHO_IS_FREE: {
+        "libre": 3,
+        "libres": 3,
+        "disponible": 3,
+        "disponibles": 3,
+        "disponibilidad": 3,
+        "quien": 1,
+        "quienes": 1,
+        "cubrir": 1.5,
+    },
+    Intent.SHIFTS_NEEDING_PEOPLE: {
+        "necesita": 2.5,
+        "necesitan": 2.5,
+        "falta": 2,
+        "faltan": 2,
+        "vacios": 2,
+        "vacantes": 3,
+        "cupos": 1.5,
+        "lugares": 1.5,
+        "llenar": 1.5,
+    },
+    Intent.TOP_VOLUNTEERS: {"mas": 2, "mejores": 1.5, "ranking": 3, "clasificacion": 2, "estrella": 1},
+    Intent.VOLUNTEER_COUNTS: {
+        "cuantos": 1.5,
+        "cuantas": 1.5,
+        "numero": 1.5,
+        "cantidad": 2,
+        "voluntarios": 1,
+        "activos": 1.5,
+    },
+    Intent.APPLICANTS: {
+        "solicitantes": 3,
+        "solicitudes": 3,
+        "aprobar": 2.5,
+        "aprobacion": 2.5,
+        "pendiente": 2,
+        "pendientes": 2,
+        "revisar": 2,
+        "esperando": 1.5,
+    },
+    Intent.PROGRAM_STATUS: {"va": 1.5, "estadisticas": 1.5, "informacion": 1.5, "sobre": 1, "marcha": 1.5},
+    Intent.TOP_PROGRAMS: {
+        "programa": 2,
+        "programas": 2,
+        "mas": 1.5,
+        "mejores": 1.5,
+        "impacto": 1,
+        "cual": 1,
+        "cuales": 1,
+    },
+    Intent.HOW_TO: {
+        "como": 1.5,
+        "donde": 1,
+        "cambiar": 1,
+        "agregar": 1,
+        "anadir": 1,
+        "crear": 1,
+        "hacer": 0.5,
+        "explica": 2,
+        "explicar": 2,
+        "ayuda": 1,
+        "significa": 1.5,
+        "funciona": 1,
+        "usar": 1,
+        "que": 0.5,
+    },
+    Intent.GREETING: {"hola": 3, "buenas": 3, "buenos": 2},
+    Intent.THANKS: {"gracias": 4},
+}
+for _intent, _words in _SPANISH_CUE_WORDS.items():
+    for _word, _weight in _words.items():
+        _CUE_WORDS[_intent].setdefault(_word, _weight)
+
 _CUES: dict[Intent, dict[str, float]] = {
     intent: {stem(word): weight for word, weight in cues.items()} for intent, cues in _CUE_WORDS.items()
 }
 
-_SELF_WORDS = frozenset({"i", "me", "my", "mine", "myself"})
+_SELF_WORDS = frozenset({"i", "me", "my", "mine", "myself", "yo", "mi", "mis", "mio", "tengo", "conmigo"})
 _LEADER_ONLY = frozenset(
     {
         Intent.PERSON_HOURS,
@@ -418,6 +647,16 @@ _HOW_TO_PHRASES = (
     " what is a ",
     " can i ",
     " how does ",
+    " como puedo ",
+    " como se ",
+    " como hago ",
+    " como funciona ",
+    " donde puedo ",
+    " donde esta ",
+    " que significa ",
+    " que es un ",
+    " que es una ",
+    " puedo ",
 )
 
 
@@ -483,9 +722,12 @@ def classify(
     else:
         scores[Intent.MY_HOURS] = 0
         scores[Intent.MY_NEXT_SHIFT] = 0
-    if " how many " in padded and stem("hours") in word_stems:
+    how_many = any(phrase in padded for phrase in (" how many ", " cuantos ", " cuantas "))
+    if how_many and (stem("hours") in word_stems or stem("horas") in word_stems):
         scores[Intent.VOLUNTEER_COUNTS] -= 2
-    if any(phrase in padded for phrase in _HOW_TO_PHRASES) and " how many " not in padded:
+    # Spanish puts the verb straight after "cómo": "¿Cómo exporto un informe?" (but "¿Cómo va...?" asks for status).
+    spanish_how_to = re.match(r" como (?!va |van |esta |estan |le |les |me |nos )", padded) is not None
+    if (spanish_how_to or any(phrase in padded for phrase in _HOW_TO_PHRASES)) and not how_many:
         scores[Intent.HOW_TO] += 4
     if not is_leader:  # volunteers' questions are about their own service
         for intent in _LEADER_ONLY:

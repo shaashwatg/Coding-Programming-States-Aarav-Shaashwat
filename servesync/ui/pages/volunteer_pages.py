@@ -18,6 +18,7 @@ from functools import partial
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
+from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AssignmentStatus, OpportunityCategory, ServiceRecord, ShiftOverview
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
@@ -47,12 +48,12 @@ from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, 
 
 class HomePage(Page):
     key = "home"
-    title = "Home"
+    title = mark("Home")
     icon_name = "house"
 
     def __init__(self, ctx: AppContext) -> None:
         super().__init__(ctx, scrollable=True)
-        self.header = PageHeader("Welcome", "Here's what's coming up and where you could help next.")
+        self.header = PageHeader(tr("Welcome"), tr("Here's what's coming up and where you could help next."))
         self.layout_.addWidget(self.header)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
@@ -63,25 +64,27 @@ class HomePage(Page):
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(18)
-        upcoming = Panel("Your upcoming shifts")
+        upcoming = Panel(tr("Your upcoming shifts"))
         self.upcoming: RecordTable[ServiceRecord] = RecordTable(
             [
-                Column("When", lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
-                Column("Program", lambda r: r.opportunity_title, stretch=True),
+                Column(tr("When"), lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
+                Column(tr("Program"), lambda r: r.opportunity_title, stretch=True),
             ],
-            empty_message="Nothing scheduled yet. Choose Find a shift (top right) to sign up.",
-            accessible_name="Your upcoming shifts",
+            empty_message=tr("Nothing scheduled yet. Choose Find a shift (top right) to sign up."),
+            accessible_name=tr("Your upcoming shifts"),
         )
         self.upcoming.setMinimumHeight(240)
         upcoming.body.addWidget(self.upcoming)
-        self.cancel_button = make_button("Cancel sign-up", on_click=self._cancel)
+        self.cancel_button = make_button(tr("Cancel sign-up"), on_click=self._cancel)
         upcoming.body.addWidget(self.cancel_button, 0, Qt.AlignmentFlag.AlignLeft)
         grid.addWidget(upcoming, 0, 0)
 
-        picks = Panel("Recommended for you")
+        picks = Panel(tr("Recommended for you"))
         picks.body.addWidget(
             make_label(
-                "Smart Match picks open shifts that fit your availability, skills, and experience.", "muted", wrap=True
+                tr("Smart Match picks open shifts that fit your availability, skills, and experience."),
+                "muted",
+                wrap=True,
             )
         )
         self.legend = FactorLegend()
@@ -98,9 +101,11 @@ class HomePage(Page):
 
         self.callout = Callout("hand-heart")
         self.callout.set_text(
-            "Know someone who'd love to help?",
-            "Invite a friend to volunteer with you. When they sign up, ask them to say you referred them; "
-            "referrals are how most of our team found us.",
+            tr("Know someone who'd love to help?"),
+            tr(
+                "Invite a friend to volunteer with you. When they sign up, ask them to "
+                "say you referred them; referrals are how most of our team found us."
+            ),
         )
         self.layout_.addWidget(self.callout)
         self.layout_.addStretch(1)
@@ -113,17 +118,17 @@ class HomePage(Page):
         simple = current_appearance().simplified
         self.callout.setVisible(not simple)
         self.legend.setVisible(not simple)
-        self.header.set_title(f"Welcome back, {summary.volunteer.given_name}")
+        self.header.set_title(tr("Welcome back, {given_name}", given_name=summary.volunteer.given_name))
         mission = services.settings.mission_statement()
-        self.mission.setText(f"Our mission: {mission}" if mission else "")
+        self.mission.setText(tr("Our mission: {mission}", mission=mission) if mission else "")
         self.mission.setVisible(bool(mission))
-        reliability = f"{stats.reliability:.0%}" if stats.reliability is not None else "New"
+        reliability = f"{stats.reliability:.0%}" if stats.reliability is not None else tr("New")
         self.strip.set_figures(
             [
-                (format_hours(stats.total_hours), "hours served", False),
-                (f"{stats.shifts_attended}", "shifts completed", False),
-                (reliability, "show-up rate", False),
-                (format_money(summary.community_value), "value of your time to the community", False),
+                (format_hours(stats.total_hours), tr("hours served"), False),
+                (f"{stats.shifts_attended}", tr("shifts completed"), False),
+                (reliability, tr("show-up rate"), False),
+                (format_money(summary.community_value), tr("value of your time to the community"), False),
             ]
         )
 
@@ -139,7 +144,7 @@ class HomePage(Page):
             self.banner.set_actions(
                 [
                     make_button(
-                        "See details",
+                        tr("See details"),
                         kind="primary",
                         on_click=lambda: self.ctx.go("calendar", day=overview.shift.starts_at.date()),
                     )
@@ -154,7 +159,9 @@ class HomePage(Page):
         if not matches:
             self.picks.addWidget(
                 make_label(
-                    "No open shifts fit right now. Check Find a shift for everything available.", "muted", wrap=True
+                    tr("No open shifts fit right now. Check Find a shift for everything available."),
+                    "muted",
+                    wrap=True,
                 )
             )
         for match in matches:
@@ -165,7 +172,7 @@ class HomePage(Page):
                     subtitle=format_when(shift.starts_at, shift.ends_at),
                     score=match.score,
                     factors=match.factors,
-                    action_text="Sign up",
+                    action_text=tr("Sign up"),
                     on_action=partial(self._sign_up, shift.shift_id or 0, match.overview.opportunity_title),
                 )
             )
@@ -173,27 +180,31 @@ class HomePage(Page):
     @guarded
     def _sign_up(self, shift_id: int, title: str) -> None:
         self.ctx.services.scheduling.sign_up(self.ctx.session, shift_id, self.ctx.session.volunteer_id or 0)
-        self.ctx.changed(f"You're signed up for {title}. Thank you!")
+        self.ctx.changed(tr("You're signed up for {title}. Thank you!", title=title))
 
     @guarded
     def _cancel(self) -> None:
         record = self.upcoming.selected()
         if record is None:
-            self.ctx.events.status_message.emit("Select a shift first.")
+            self.ctx.events.status_message.emit(tr("Select a shift first."))
             return
         if confirm(
             self,
-            "Cancel sign-up",
-            f"Cancel your spot at {record.opportunity_title} on {format_when(record.starts_at)}?",
-            "Cancel my spot",
+            tr("Cancel sign-up"),
+            tr(
+                "Cancel your spot at {opportunity_title} on {format_when}?",
+                opportunity_title=record.opportunity_title,
+                format_when=format_when(record.starts_at),
+            ),
+            tr("Cancel my spot"),
         ):
             self.ctx.services.scheduling.cancel(self.ctx.session, record.assignment.assignment_id or 0)
-            self.ctx.changed("Your sign-up was cancelled. Thanks for letting us know.")
+            self.ctx.changed(tr("Your sign-up was cancelled. Thanks for letting us know."))
 
 
 class FindShiftsPage(Page):
     key = "find"
-    title = "Find a shift"
+    title = mark("Find a shift")
     icon_name = "search"
 
     def __init__(self, ctx: AppContext) -> None:
@@ -203,30 +214,35 @@ class FindShiftsPage(Page):
         self._gaps: dict[int, tuple[str, ...]] = {}
         self.layout_.addWidget(
             PageHeader(
-                "Find a shift",
-                "Browse shifts for the next two months. Fit is your Smart Match score; click its header "
-                "to see your best matches first. Select a shift to see details and sign up.",
+                tr("Find a shift"),
+                tr(
+                    "Browse shifts for the next two months. Fit is your Smart Match score; "
+                    "click its header to see your best matches first. Select a shift to "
+                    "see details and sign up."
+                ),
             )
         )
         filters = QHBoxLayout()
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search by program or place")
-        self.search_box.setAccessibleName("Search shifts")
+        self.search_box.setPlaceholderText(tr("Search by program or place"))
+        self.search_box.setAccessibleName(tr("Search shifts"))
         self.search_box.setClearButtonEnabled(True)
         self.category: EnumComboBox[OpportunityCategory] = EnumComboBox(
-            OpportunityCategory, all_label="All kinds of work"
+            OpportunityCategory, all_label=tr("All kinds of work")
         )
-        self.category.setAccessibleName("Filter by category")
-        self.open_only = QCheckBox("Only shifts with open spots")
+        self.category.setAccessibleName(tr("Filter by category"))
+        self.open_only = QCheckBox(tr("Only shifts with open spots"))
         self.open_only.setChecked(True)
-        self.fits_me = QCheckBox("Only times I'm usually free")
-        self.fits_me.setToolTip("Uses the availability on your profile")
-        self.can_join = QCheckBox("Only shifts I can sign up for")
+        self.fits_me = QCheckBox(tr("Only times I'm usually free"))
+        self.fits_me.setToolTip(tr("Uses the availability on your profile"))
+        self.can_join = QCheckBox(tr("Only shifts I can sign up for"))
         self.can_join.setChecked(True)
-        self.can_join.setToolTip("Hides shifts you're too young for or that clash with your schedule")
-        self.fits_access = QCheckBox("Only shifts that fit my access needs")
+        self.can_join.setToolTip(tr("Hides shifts you're too young for or that clash with your schedule"))
+        self.fits_access = QCheckBox(tr("Only shifts that fit my access needs"))
         self.fits_access.setChecked(True)
-        self.fits_access.setToolTip("Uses the access needs on your profile. Turn off to see every shift, with notes.")
+        self.fits_access.setToolTip(
+            tr("Uses the access needs on your profile. Turn off to see every shift, with notes.")
+        )
         self.fits_access.toggled.connect(lambda _c: self._apply_filters())
         for widget in (self.search_box,):
             widget.textChanged.connect(lambda _t: self._apply_filters())
@@ -247,25 +263,29 @@ class FindShiftsPage(Page):
         self.table: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
-                    "When", lambda o: format_when(o.shift.starts_at, o.shift.ends_at), sort=lambda o: o.shift.starts_at
+                    tr("When"),
+                    lambda o: format_when(o.shift.starts_at, o.shift.ends_at),
+                    sort=lambda o: o.shift.starts_at,
                 ),
-                Column("Program", lambda o: o.opportunity_title, stretch=True),
-                Column("Spots open", lambda o: o.open_spots, align_right=True),
+                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True),
+                Column(tr("Spots open"), lambda o: o.open_spots, align_right=True),
                 Column(
-                    "Fit",
+                    tr("Fit"),
                     lambda o: self._fit.get(o.shift.shift_id or 0, ""),
                     sort=lambda o: self._fit.get(o.shift.shift_id or 0, -1),
-                    tooltip=lambda o: "Smart Match score out of 100 (click the header to sort by best fit)",
+                    tooltip=lambda o: tr("Smart Match score out of 100 (click the header to sort by best fit)"),
                     align_right=True,
                 ),
                 Column(
-                    "Access",
+                    tr("Access"),
                     lambda o: self._access_text(o),
-                    tooltip=lambda o: "; ".join(self._gaps.get(o.shift.shift_id or 0, ())) or "Fits your access needs",
+                    tooltip=lambda o: (
+                        "; ".join(self._gaps.get(o.shift.shift_id or 0, ())) or tr("Fits your access needs")
+                    ),
                 ),
             ],
-            empty_message="No shifts match these filters. Try turning a filter off.",
-            accessible_name="Open shifts",
+            empty_message=tr("No shifts match these filters. Try turning a filter off."),
+            accessible_name=tr("Open shifts"),
         )
         splitter.addWidget(self.table)
         self.info = ShiftInfoPanel(ctx)
@@ -295,7 +315,7 @@ class FindShiftsPage(Page):
         if not self._volunteer.access_needs:
             return ""
         gaps = self._gaps.get(overview.shift.shift_id or 0)
-        return "Check with coordinator" if gaps else "Fits your needs"
+        return tr("Check with coordinator") if gaps else tr("Fits your needs")
 
     def _apply_filters(self) -> None:
         text = (self.search_box.text() if self.search_box else "").strip().casefold()
@@ -318,24 +338,26 @@ class FindShiftsPage(Page):
         if self.table.selected() is None:
             self.table.select_first()
         self.info.show_shift(self.table.selected())
-        self.ctx.announce(f"{len(rows)} shift{'s' if len(rows) != 1 else ''} shown")
+        self.ctx.announce(tr_n("{count} shift shown", "{count} shifts shown", len(rows)))
 
 
 class ProfilePage(Page):
     key = "profile"
-    title = "My profile"
+    title = mark("My profile")
     icon_name = "user-round"
 
     def __init__(self, ctx: AppContext) -> None:
         super().__init__(ctx)
         self.layout_.addWidget(
             PageHeader(
-                "My profile",
-                "Keep your contact details and availability current so coordinators can reach you "
-                "and Smart Match can suggest shifts that fit.",
+                tr("My profile"),
+                tr(
+                    "Keep your contact details and availability current so coordinators "
+                    "can reach you and Smart Match can suggest shifts that fit."
+                ),
                 [
-                    make_button("Edit my profile", kind="primary", on_click=self._edit),
-                    make_button("Change password", on_click=self._password),
+                    make_button(tr("Edit my profile"), kind="primary", on_click=self._edit),
+                    make_button(tr("Change password"), on_click=self._password),
                 ],
             )
         )
@@ -343,16 +365,16 @@ class ProfilePage(Page):
         row.setSpacing(18)
         self.card = VolunteerProfileCard(show_notes=False)
         row.addWidget(self.card, 2)
-        history = Panel("My service history")
+        history = Panel(tr("My service history"))
         self.history: RecordTable[ServiceRecord] = RecordTable(
             [
-                Column("When", lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
-                Column("Program", lambda r: r.opportunity_title, stretch=True),
+                Column(tr("When"), lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
+                Column(tr("Program"), lambda r: r.opportunity_title, stretch=True),
                 Column(
-                    "Status", lambda r: r.assignment.status.label, color=lambda r: status_color(r.assignment.status)
+                    tr("Status"), lambda r: r.assignment.status.label, color=lambda r: status_color(r.assignment.status)
                 ),
                 Column(
-                    "Hours",
+                    tr("Hours"),
                     lambda r: (
                         format_hours(r.assignment.counted_hours)
                         if r.assignment.status is AssignmentStatus.ATTENDED
@@ -362,8 +384,8 @@ class ProfilePage(Page):
                     align_right=True,
                 ),
             ],
-            empty_message="Your completed shifts will be listed here.",
-            accessible_name="My service history",
+            empty_message=tr("Your completed shifts will be listed here."),
+            accessible_name=tr("My service history"),
             descending=True,
         )
         history.body.addWidget(self.history, 1)
@@ -382,9 +404,9 @@ class ProfilePage(Page):
     def _edit(self) -> None:
         volunteer = self.ctx.services.volunteers.get(self.ctx.session, self.ctx.session.volunteer_id or 0)
         if VolunteerDialog(self.ctx, volunteer, self).exec():
-            self.ctx.changed("Your profile was saved.")
+            self.ctx.changed(tr("Your profile was saved."))
 
     @guarded
     def _password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
-            self.ctx.events.status_message.emit("Password changed.")
+            self.ctx.events.status_message.emit(tr("Password changed."))

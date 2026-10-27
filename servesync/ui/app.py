@@ -19,12 +19,14 @@ import sys
 from pathlib import Path
 from types import TracebackType
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from servesync import __app_name__, __version__
 from servesync.config import AppPaths
 from servesync.core.errors import DataStoreError
+from servesync.core.i18n import Language, catalog, current_language, tr
 from servesync.data import DataStore
 from servesync.logging_setup import configure_logging
 from servesync.models import Theme
@@ -60,13 +62,25 @@ class ServeSyncApp:
         return self._sign_in()
 
     def _sign_in(self) -> bool:
-        login = LoginDialog(self._services)
-        if not login.exec() or login.session is None:
+        chosen: Language | None = None
+        while True:
+            login = LoginDialog(self._services)
+            result = login.exec()
+            if login.chosen_language is None:
+                break
+            # English/Español was picked: show the sign-in screen again in that language.
+            chosen = login.chosen_language
+            theme.apply_appearance(self._qt, self._services.settings.appearance())
+            if result != LoginDialog.LANGUAGE_CHANGED:
+                break
+        if not result or login.session is None:
             return False
+        if chosen is not None:  # the person just chose it, so it beats an older saved choice
+            self._services.settings.set_appearance(login.session, language=chosen)
         self._open_main(login.session)
         return True
 
-    def _open_main(self, session: Session) -> None:
+    def _open_main(self, session: Session, *, page: str = "") -> None:
         self._session = session
         theme.apply_appearance(self._qt, self._services.settings.appearance(session))
         events = AppEvents()
@@ -76,11 +90,37 @@ class ServeSyncApp:
         window.signed_out.connect(self._after_sign_out)
         window.setWindowIcon(self._qt.windowIcon())
         window.resize(1360, 860)
+        if page:
+            window.navigate(page)
         window.show()
         self._window = window
 
     def _apply_appearance(self) -> None:
+        before = current_language()
         theme.apply_appearance(self._qt, self._services.settings.appearance(self._session))
+        if current_language() is not before and self._window is not None:
+            # Every label was drawn in the old language; rebuild the window once the
+            # current click has finished, keeping the person on the same page.
+            QTimer.singleShot(0, self._rebuild_window)
+
+    def _rebuild_window(self) -> None:
+        old = self._window
+        if old is None or self._session is None:
+            return
+        page = getattr(old.stack.currentWidget(), "key", "")
+        geometry = old.saveGeometry()
+        maximized = old.isMaximized()
+        old.signed_out.disconnect()
+        self._open_main(self._session, page=page)
+        assert self._window is not None
+        self._window.restoreGeometry(geometry)
+        if maximized:
+            self._window.showMaximized()
+        old.hide()
+        old.deleteLater()
+        self._window.ctx.events.status_message.emit(
+            tr("Language changed to {language}.", language=current_language().label)
+        )
 
     def _follow_system(self) -> None:
         if theme.current_appearance().theme is Theme.SYSTEM:
@@ -108,9 +148,10 @@ def install_error_handler() -> None:
         logger.critical("Unhandled error", exc_info=(exc_type, exc, tb))
         QMessageBox.warning(
             None,
-            "Something went wrong",
-            "ServeSync hit an unexpected problem and recovered. Your data is safe.\n"
-            "Details were saved to the log file.",
+            tr("Something went wrong"),
+            tr("ServeSync hit an unexpected problem and recovered. Your data is safe.")
+            + "\n"
+            + tr("Details were saved to the log file."),
         )
 
     sys.excepthook = handle
@@ -127,19 +168,29 @@ def self_check(data_dir: Path | None = None) -> int:
     try:
         with DataStore.open(paths.database_file) as store:
             results.append(
-                ("Data file", True, f"{paths.database_file} (schema v{store.db.query_value('PRAGMA user_version')})")
+                (
+                    tr("Data file"),
+                    True,
+                    tr(
+                        "{database_file} (schema v{query_value})",
+                        database_file=paths.database_file,
+                        query_value=store.db.query_value("PRAGMA user_version"),
+                    ),
+                )
             )
     except DataStoreError as error:
-        results.append(("Data file", False, error.message))
+        results.append((tr("Data file"), False, error.message))
     body, heading = assets.load_fonts()
-    results.append(("Fonts", bool(body and heading), f"{body or 'missing'}, {heading or 'missing'}"))
+    results.append((tr("Fonts"), bool(body and heading), f"{body or 'missing'}, {heading or 'missing'}"))
     icons = list((assets.assets_dir() / "icons").glob("*.svg"))
-    results.append(("Icons", len(icons) >= 40, f"{len(icons)} found"))
+    results.append((tr("Icons"), len(icons) >= 40, f"{len(icons)} found"))
+    spanish = catalog(Language.SPANISH)
+    results.append((tr("Translations"), len(spanish) > 500, f"{len(spanish)} Spanish messages"))
     try:
         theme.build_stylesheet(theme.LIGHT, 13.0)
-        results.append(("Design system", True, "stylesheet builds"))
+        results.append((tr("Design system"), True, tr("stylesheet builds")))
     except Exception as error:
-        results.append(("Design system", False, str(error)))
+        results.append((tr("Design system"), False, str(error)))
     for name, ok, detail in results:
         print(f"[{'OK' if ok else 'FAIL'}] {name}: {detail}")
     ready = all(ok for _, ok, _ in results)
@@ -169,7 +220,11 @@ def run(argv: list[str] | None = None, *, data_dir: Path | None = None) -> int:
         store = DataStore.open(paths.database_file)
     except DataStoreError as error:
         theme.apply_theme(qt_app, Theme.LIGHT, 1.0)
-        QMessageBox.critical(None, f"{__app_name__} can't start", f"{error.message}\n\nData folder: {paths.data_dir}")
+        QMessageBox.critical(
+            None,
+            tr("{app} can't start", app=__app_name__),
+            tr("{message}\n\nData folder: {folder}", message=error.message, folder=paths.data_dir),
+        )
         return 1
 
     services = Services.create(store)

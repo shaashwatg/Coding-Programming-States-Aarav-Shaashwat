@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from servesync.core.errors import ServeSyncError, ValidationError
+from servesync.core.i18n import format_clock, format_day, format_weekday_day, tr
 
 logger = logging.getLogger(__name__)
 
@@ -222,16 +223,16 @@ def to_qtime(moment: time) -> QTime:
 
 def format_when(start: datetime, end: datetime | None = None) -> str:
     """'Sat, Nov 7, 9:00 AM – 12:00 PM' (12-hour clock, no leading zeros)."""
-    text = f"{start:%a, %b} {start.day}, {_clock(start)}"
+    text = f"{format_weekday_day(start.date())}, {_clock(start)}"
     return f"{text} \u2013 {_clock(end)}" if end else text
 
 
 def format_date(day: date) -> str:
-    return f"{day:%b} {day.day}, {day.year}"
+    return format_day(day)
 
 
 def _clock(moment: datetime) -> str:
-    return f"{moment.hour % 12 or 12}:{moment:%M} {'AM' if moment.hour < 12 else 'PM'}"
+    return format_clock(moment)
 
 
 def format_hours(hours: float) -> str:
@@ -245,14 +246,14 @@ def format_money(amount: float) -> str:
 # ------------------------------------------------------------ user messages
 
 
-def show_error(parent: QWidget | None, error: BaseException, title: str = "Can't do that yet") -> None:
+def show_error(parent: QWidget | None, error: BaseException, title: str = "") -> None:
     if isinstance(error, ValidationError):
         text = "\n".join(f"• {message}" for message in error.errors.values())
     elif isinstance(error, ServeSyncError):
         text = error.message
     else:
-        text = "Something unexpected went wrong. Your data is safe; details were saved to the log file."
-    QMessageBox.warning(parent, title, text)
+        text = tr("Something unexpected went wrong. Your data is safe; details were saved to the log file.")
+    QMessageBox.warning(parent, title or tr("Can't do that yet"), text)
 
 
 def inform(parent: QWidget | None, title: str, text: str) -> None:
@@ -266,7 +267,7 @@ def confirm(parent: QWidget | None, title: str, text: str, accept_text: str) -> 
     box.setWindowTitle(title)
     box.setText(text)
     yes = box.addButton(accept_text, QMessageBox.ButtonRole.AcceptRole)
-    no = box.addButton("Go back", QMessageBox.ButtonRole.RejectRole)
+    no = box.addButton(tr("Go back"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(no)
     box.setEscapeButton(no)
     box.exec()
@@ -290,7 +291,7 @@ def guarded(handler: Callable[P, R]) -> Callable[P, R | None]:
             show_error(parent, error)
         except Exception as error:  # last line of defense for the live demo
             logger.exception("Unexpected error in %s", handler.__qualname__)
-            show_error(parent, error, "Something went wrong")
+            show_error(parent, error, tr("Something went wrong"))
         finally:
             while QGuiApplication.overrideCursor() is not None:
                 QGuiApplication.restoreOverrideCursor()

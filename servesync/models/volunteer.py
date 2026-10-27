@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from servesync.config import ADULT_AGE, MINIMUM_VOLUNTEER_AGE
+from servesync.core.i18n import mark, tr
 from servesync.core.validators import (
     ErrorCollector,
     InvalidInputError,
@@ -59,12 +60,12 @@ class AvailabilitySlot:
         return cls(Weekday(moment.weekday()), DayPart.from_hour(moment.hour))
 
 
-def clean_access_needs(values: object, label: str = "Access needs") -> frozenset[AccessNeed]:
+def clean_access_needs(values: object, label: str = mark("Access needs")) -> frozenset[AccessNeed]:
     """A set of :class:`AccessNeed` members; codes such as "STEP_FREE" are accepted too."""
     if values is None:
         return frozenset()
     if isinstance(values, str) or not isinstance(values, Iterable):
-        raise InvalidInputError(f"{label} must be a list of choices.")
+        raise InvalidInputError(tr("{label} must be a list of choices.", label=tr(label)))
     return frozenset(parse_enum(value, AccessNeed, label) for value in values)
 
 
@@ -86,10 +87,10 @@ def _clean_availability(values: object) -> frozenset[AvailabilitySlot]:
     if values is None:
         return frozenset()
     if not isinstance(values, Iterable):
-        raise InvalidInputError("Availability must be a list of time slots.")
+        raise InvalidInputError(tr("Availability must be a list of time slots."))
     slots = frozenset(values)
     if not all(isinstance(slot, AvailabilitySlot) for slot in slots):
-        raise InvalidInputError("Availability contains an unrecognized time slot.")
+        raise InvalidInputError(tr("Availability contains an unrecognized time slot."))
     return slots
 
 
@@ -119,14 +120,14 @@ class Volunteer:
         errors = ErrorCollector()
 
         # --- Syntactic + per-field semantic checks --------------------------
-        self.first_name = errors.check("first_name", clean_name, self.first_name, "First name")
-        self.last_name = errors.check("last_name", clean_name, self.last_name, "Last name")
+        self.first_name = errors.check("first_name", clean_name, self.first_name, tr("First name"))
+        self.last_name = errors.check("last_name", clean_name, self.last_name, tr("Last name"))
         self.email = errors.check("email", clean_email, self.email)
         self.phone = errors.check("phone", clean_phone, self.phone)
-        self.joined_on = errors.check("joined_on", parse_date, self.joined_on, "Join date")
-        self.status = errors.check("status", parse_enum, self.status, VolunteerStatus, "Volunteer status")
+        self.joined_on = errors.check("joined_on", parse_date, self.joined_on, tr("Join date"))
+        self.status = errors.check("status", parse_enum, self.status, VolunteerStatus, tr("Volunteer status"))
         self.recruitment_source = errors.check(
-            "recruitment_source", parse_enum, self.recruitment_source, RecruitmentSource, "Recruitment source"
+            "recruitment_source", parse_enum, self.recruitment_source, RecruitmentSource, tr("Recruitment source")
         )
         self.skills = errors.check("skills", clean_skill_set, self.skills)
         self.availability = errors.check("availability", _clean_availability, self.availability)
@@ -134,7 +135,7 @@ class Volunteer:
             "emergency_contact_name",
             clean_text,
             self.emergency_contact_name,
-            "Emergency contact name",
+            tr("Emergency contact name"),
             max_length=80,
             required=False,
         )
@@ -142,23 +143,23 @@ class Volunteer:
             "emergency_contact_phone",
             clean_phone,
             self.emergency_contact_phone,
-            "Emergency contact phone",
+            tr("Emergency contact phone"),
             required=False,
         )
         self.notes = errors.check(
-            "notes", clean_text, self.notes, "Notes", max_length=NOTES_MAX_LENGTH, required=False, multiline=True
+            "notes", clean_text, self.notes, tr("Notes"), max_length=NOTES_MAX_LENGTH, required=False, multiline=True
         )
         self.preferred_name = errors.check(
-            "preferred_name", clean_optional_name, self.preferred_name, "Name they go by"
+            "preferred_name", clean_optional_name, self.preferred_name, tr("Name they go by")
         )
         self.pronouns = errors.check("pronouns", clean_pronouns, self.pronouns)
         self.access_needs = errors.check("access_needs", clean_access_needs, self.access_needs)
-        self.volunteer_id = errors.check("volunteer_id", validate_optional_id, self.volunteer_id, "Volunteer ID")
+        self.volunteer_id = errors.check("volunteer_id", validate_optional_id, self.volunteer_id, tr("Volunteer ID"))
 
         # --- Cross-field semantic checks (need other fields to be valid) ----
         if isinstance(self.joined_on, date):
             if self.joined_on > date.today():
-                errors.add("joined_on", "Join date cannot be in the future.")
+                errors.add("joined_on", tr("Join date cannot be in the future."))
             self.birth_date = errors.check(
                 "birth_date",
                 validate_birth_date,
@@ -170,13 +171,13 @@ class Volunteer:
         has_contact_name = bool(self.emergency_contact_name)
         has_contact_phone = bool(self.emergency_contact_phone)
         if has_contact_name and not has_contact_phone:
-            errors.add("emergency_contact_phone", "Add a phone number for the emergency contact.")
+            errors.add("emergency_contact_phone", tr("Add a phone number for the emergency contact."))
         if has_contact_phone and not has_contact_name:
-            errors.add("emergency_contact_name", "Add a name for the emergency contact.")
+            errors.add("emergency_contact_name", tr("Add a name for the emergency contact."))
         if has_contact_phone and self.emergency_contact_phone == self.phone:
             errors.add(
                 "emergency_contact_phone",
-                "Emergency contact phone must be different from the volunteer's own phone.",
+                tr("Emergency contact phone must be different from the volunteer's own phone."),
             )
 
         joined_as_minor = (
@@ -187,7 +188,10 @@ class Volunteer:
         if joined_as_minor and not (has_contact_name and has_contact_phone):
             errors.add(
                 "emergency_contact_name",
-                f"Volunteers under {ADULT_AGE} need a parent or guardian listed as their emergency contact.",
+                tr(
+                    ("Volunteers under {ADULT_AGE} need a parent or guardian listed as their emergency contact."),
+                    ADULT_AGE=ADULT_AGE,
+                ),
             )
 
         errors.raise_if_any()

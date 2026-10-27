@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
 
+from servesync.core.i18n import format_day, mark, tr
 from servesync.core.validators import ErrorCollector, parse_date
 from servesync.models import OpportunityCategory
 
@@ -32,12 +33,12 @@ class ReportKind(Enum):
 
     @property
     def label(self) -> str:
-        return _KIND_TEXT[self][0]
+        return tr(_KIND_TEXT[self][0])
 
     @property
     def question(self) -> str:
         """The question this report answers (shown under the report picker)."""
-        return _KIND_TEXT[self][1]
+        return tr(_KIND_TEXT[self][1])
 
     @property
     def for_leaders(self) -> bool:
@@ -46,24 +47,24 @@ class ReportKind(Enum):
 
 _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
     ReportKind.VOLUNTEER_HOURS: (
-        "Volunteer hours",
-        "Who served, how much, and who might need a check-in?",
+        mark("Volunteer hours"),
+        mark("Who served, how much, and who might need a check-in?"),
     ),
     ReportKind.PROGRAM_IMPACT: (
-        "Program impact",
-        "Which programs fill their shifts and deliver the most hours?",
+        mark("Program impact"),
+        mark("Which programs fill their shifts and deliver the most hours?"),
     ),
     ReportKind.SHIFT_ATTENDANCE: (
-        "Shift attendance",
-        "Which shifts were full or short, and which still need attendance recorded?",
+        mark("Shift attendance"),
+        mark("Which shifts were full or short, and which still need attendance recorded?"),
     ),
     ReportKind.RECRUITMENT: (
-        "Recruitment channels",
-        "Where do new volunteers come from, and which channels bring people who stay?",
+        mark("Recruitment channels"),
+        mark("Where do new volunteers come from, and which channels bring people who stay?"),
     ),
     ReportKind.SERVICE_RECORD: (
-        "Service hours record",
-        "A verified list of one volunteer's service, for school, scholarships, or employers.",
+        mark("Service hours record"),
+        mark("A verified list of one volunteer's service, for school, scholarships, or employers."),
     ),
 }
 
@@ -78,6 +79,10 @@ class DatePreset(Enum):
     SCHOOL_YEAR = "This school year (Aug-Jul)"
     THIS_YEAR = "This calendar year"
     CUSTOM = "Custom dates"
+
+    @property
+    def label(self) -> str:
+        return tr(self.value)
 
     def resolve(self, today: date) -> tuple[date, date]:
         """Inclusive (start, end) for this preset. CUSTOM returns the last 30 days as a starting point."""
@@ -124,17 +129,21 @@ def format_value(kind: ValueKind, value: object) -> str:
     if kind is ValueKind.MONEY and isinstance(value, (int, float)):
         return f"${value:,.0f}" if abs(value) >= 1000 else f"${value:,.2f}"
     if kind is ValueKind.DATE and isinstance(value, (date, datetime)):
-        return f"{value:%b} {value.day}, {value.year}"
+        return format_day(value)
     return str(value)
 
 
 @dataclass(frozen=True, slots=True)
 class ReportColumn:
     key: str
-    label: str
+    label: str  # English; shown through ``title`` in the current language
     kind: ValueKind = ValueKind.TEXT
     #: Hidden columns can be switched on in the report's column chooser.
     shown_by_default: bool = True
+
+    @property
+    def title(self) -> str:
+        return tr(self.label)
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,13 +165,13 @@ class ReportFilters:
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
-        start = errors.check("start", parse_date, self.start, "Start date")
-        end = errors.check("end", parse_date, self.end, "End date")
+        start = errors.check("start", parse_date, self.start, tr("Start date"))
+        end = errors.check("end", parse_date, self.end, tr("End date"))
         if isinstance(start, date) and isinstance(end, date):
             if start > end:
-                errors.add("end", "End date must be on or after the start date.")
+                errors.add("end", tr("End date must be on or after the start date."))
             elif (end - start).days > MAX_RANGE_DAYS:
-                errors.add("end", "Choose a range of five years or less.")
+                errors.add("end", tr("Choose a range of five years or less."))
         errors.raise_if_any()
         object.__setattr__(self, "start", start)
         object.__setattr__(self, "end", end)

@@ -32,6 +32,7 @@ from PySide6.QtCore import QEvent, QObject, QPoint, QTimer, Signal
 from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
 
+from servesync.core.i18n import tr
 from servesync.ui.motion import DURATION_BASE, animate
 from servesync.ui.theme import current_appearance
 
@@ -99,7 +100,7 @@ class Toast(QFrame):
     def __init__(self, message: str, parent: QWidget) -> None:
         super().__init__(parent)
         self.setObjectName("Toast")
-        self.setAccessibleName("Message")
+        self.setAccessibleName(tr("Message"))
         self.setAccessibleDescription(message)
         row = QHBoxLayout(self)
         row.setContentsMargins(16, 10, 10, 10)
@@ -108,8 +109,8 @@ class Toast(QFrame):
         self.label.setWordWrap(True)
         self.label.setMaximumWidth(420)
         row.addWidget(self.label, 1)
-        close = QPushButton("Close")
-        close.setAccessibleName("Close message")
+        close = QPushButton(tr("Close"))
+        close.setAccessibleName(tr("Close message"))
         close.clicked.connect(self.dismiss)
         row.addWidget(close)
         self._timer = QTimer(self)

@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import QLineEdit, QScrollArea, QVBoxLayout, QWidget
 
+from servesync.core.i18n import tr
 from servesync.ui.context import AppContext
 from servesync.ui.widgets.common import guarded
 
@@ -26,6 +27,7 @@ class Page(QWidget):
     def __init__(self, ctx: AppContext, *, scrollable: bool = False) -> None:
         super().__init__()
         self.ctx = ctx
+        self.title = tr(self.title)  # the class (or subclass) sets the English message ID
         self._dirty = True
         self.search_box: QLineEdit | None = None
         self.setAccessibleName(self.title)

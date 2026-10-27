@@ -38,6 +38,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
+from servesync.core.i18n import tr
 from servesync.services.reports import ChartSeries, ValueKind, format_value
 from servesync.ui.motion import DURATION_SLOW, animate
 from servesync.ui.theme import LIGHT, Palette, current_palette
@@ -77,7 +78,7 @@ class ChartView(QWidget):
         self._current = -1
         self.setAccessibleName(series.title)
         self.setAccessibleDescription(describe_series(series))
-        self.setToolTip(f"{series.title}. Use the arrow keys to read each value.")
+        self.setToolTip(tr("{title}. Use the arrow keys to read each value.", title=series.title))
         self.updateGeometry()
         if animated:
             animate(self, "progress", 1.0, start=0.0, duration=DURATION_SLOW)
@@ -144,8 +145,12 @@ class ChartView(QWidget):
     def describe_item(self, index: int) -> str:
         assert self._series is not None
         series = self._series
-        return (
-            f"{series.labels[index]}: {_value_text(series, series.values[index])}, {index + 1} of {len(series.values)}"
+        return tr(
+            "{label}: {value}, {position} of {total}",
+            label=series.labels[index],
+            value=_value_text(series, series.values[index]),
+            position=index + 1,
+            total=len(series.values),
         )
 
     def focusInEvent(self, event: QFocusEvent) -> None:  # noqa: N802 - Qt API
@@ -207,18 +212,31 @@ class ChartView(QWidget):
 def describe_series(series: ChartSeries) -> str:
     """A one-sentence text alternative for the whole chart."""
     if series.is_empty:
-        return f"{series.title}: no data for this period."
+        return tr("{title}: no data for this period.", title=series.title)
     pairs = list(zip(series.labels, series.values, strict=True))
     high = max(pairs, key=lambda pair: pair[1])
     low = min(pairs, key=lambda pair: pair[1])
     if series.style == "line":
-        return (
-            f"{series.title}, {len(pairs)} periods from {pairs[0][0]} to {pairs[-1][0]}. "
-            f"Highest {high[0]} ({_value_text(series, high[1])}); lowest {low[0]} ({_value_text(series, low[1])})."
+        return tr(
+            "{title}, {count} periods from {first} to {last}. "
+            "Highest {high} ({high_value}); lowest {low} ({low_value}).",
+            title=series.title,
+            count=len(pairs),
+            first=pairs[0][0],
+            last=pairs[-1][0],
+            high=high[0],
+            high_value=_value_text(series, high[1]),
+            low=low[0],
+            low_value=_value_text(series, low[1]),
         )
-    return (
-        f"{series.title}, {len(pairs)} items. Highest: {high[0]} ({_value_text(series, high[1])}). "
-        f"Lowest: {low[0]} ({_value_text(series, low[1])})."
+    return tr(
+        "{title}, {count} items. Highest: {high} ({high_value}). Lowest: {low} ({low_value}).",
+        title=series.title,
+        count=len(pairs),
+        high=high[0],
+        high_value=_value_text(series, high[1]),
+        low=low[0],
+        low_value=_value_text(series, low[1]),
     )
 
 
@@ -243,7 +261,7 @@ def paint_series(
         painter.drawRoundedRect(area.adjusted(1, 1, -1, -1), 8, 8)
     if series is None or series.is_empty:
         painter.setPen(QColor(palette.text_muted))
-        painter.drawText(area, Qt.AlignmentFlag.AlignCenter, "No data for this period")
+        painter.drawText(area, Qt.AlignmentFlag.AlignCenter, tr("No data for this period"))
         return []
     if series.style == "line":
         return _paint_line(painter, area, series, palette, progress, highlight)

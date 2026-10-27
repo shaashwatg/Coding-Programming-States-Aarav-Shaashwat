@@ -8,13 +8,14 @@ from collections.abc import Sequence
 from typing import Any
 
 from servesync.core.errors import RecordInUseError, RecordNotFoundError
+from servesync.core.i18n import mark, tr
 from servesync.data.converters import chunked, contains_pattern, placeholders
 from servesync.data.database import Database
 from servesync.data.repositories.base import Repository
 from servesync.data.repositories.skill_repository import SkillRepository
 from servesync.models import AccessNeed, Opportunity, OpportunityCategory, OpportunityStatus
 
-_ENTITY = "Opportunity"
+_ENTITY = mark("Opportunity")
 
 _SELECT_OPPORTUNITY = """
     SELECT opportunity_id, title, description, category, location, coordinator_name, min_age, status,
@@ -88,8 +89,10 @@ class OpportunityRepository(Repository):
             cursor = self._db.execute("DELETE FROM opportunities WHERE opportunity_id = ?", (opportunity_id,))
         except RecordInUseError as exc:
             raise RecordInUseError(
-                "Volunteers have signed up for this opportunity, so its history is kept. "
-                "Set its status to Closed instead."
+                tr(
+                    "Volunteers have signed up for this opportunity, so its history is "
+                    "kept. Set its status to Closed instead."
+                )
             ) from exc
         if cursor.rowcount == 0:
             raise RecordNotFoundError(_ENTITY, opportunity_id)

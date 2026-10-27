@@ -18,6 +18,7 @@ import logging
 from datetime import datetime, timedelta
 
 from servesync.core.errors import BusinessRuleError, RecordNotFoundError, ValidationError
+from servesync.core.i18n import tr, tr_n
 from servesync.core.validators import calculate_age, parse_int, validate_field
 from servesync.models import (
     AssignmentStatus,
@@ -42,7 +43,7 @@ class OpportunityService(Service):
     def create(self, session: Session, opportunity: Opportunity) -> Opportunity:
         session.require(Permission.MANAGE_OPPORTUNITIES)
         if opportunity.opportunity_id is not None:
-            raise BusinessRuleError("This opportunity already exists.")
+            raise BusinessRuleError(tr("This opportunity already exists."))
         saved = self._store.opportunities.add(opportunity)
         logger.info("Opportunity #%s created by account #%s", saved.opportunity_id, session.account_id)
         return saved
@@ -51,7 +52,7 @@ class OpportunityService(Service):
         """Save edits. Status changes go through :meth:`change_status` so lifecycle rules apply."""
         session.require(Permission.MANAGE_OPPORTUNITIES)
         if opportunity.opportunity_id is None:
-            raise BusinessRuleError("Create the opportunity before editing it.")
+            raise BusinessRuleError(tr("Create the opportunity before editing it."))
         with self._store.transaction():
             existing = self._store.opportunities.get(opportunity.opportunity_id)
             if opportunity.min_age > existing.min_age:
@@ -82,7 +83,7 @@ class OpportunityService(Service):
         opportunity = self._store.opportunities.get(opportunity_id)
         if not session.can(Permission.MANAGE_OPPORTUNITIES) and opportunity.status is not OpportunityStatus.OPEN:
             # Volunteers only ever see published programs; drafts look like they don't exist.
-            raise RecordNotFoundError("Opportunity", opportunity_id)
+            raise RecordNotFoundError(tr("Opportunity"), opportunity_id)
         return opportunity
 
     def find_all(
@@ -121,7 +122,7 @@ class OpportunityService(Service):
     def add_shift(self, session: Session, shift: Shift) -> Shift:
         session.require(Permission.MANAGE_OPPORTUNITIES)
         if shift.shift_id is not None:
-            raise BusinessRuleError("This shift already exists.")
+            raise BusinessRuleError(tr("This shift already exists."))
         self._check_new_shift(shift)
         saved = self._store.shifts.add(shift)
         logger.info("Shift #%s added to opportunity #%s", saved.shift_id, shift.opportunity_id)
@@ -135,7 +136,7 @@ class OpportunityService(Service):
         """
         session.require(Permission.MANAGE_OPPORTUNITIES)
         count = validate_field(
-            "occurrences", parse_int, occurrences, "Number of weeks", minimum=1, maximum=MAX_WEEKLY_OCCURRENCES
+            "occurrences", parse_int, occurrences, tr("Number of weeks"), minimum=1, maximum=MAX_WEEKLY_OCCURRENCES
         )
         self._check_new_shift(first)
         created: list[Shift] = []
@@ -159,22 +160,29 @@ class OpportunityService(Service):
     def update_shift(self, session: Session, shift: Shift) -> Shift:
         session.require(Permission.MANAGE_OPPORTUNITIES)
         if shift.shift_id is None:
-            raise BusinessRuleError("Add the shift before editing it.")
+            raise BusinessRuleError(tr("Add the shift before editing it."))
         now = self._clock.now()
         with self._store.transaction():
             existing = self._store.shifts.get(shift.shift_id)
             if existing.has_started(now):
-                raise BusinessRuleError("This shift has already started, so its details are now part of the record.")
+                raise BusinessRuleError(
+                    tr("This shift has already started, so its details are now part of the record.")
+                )
             if shift.opportunity_id != existing.opportunity_id:
                 raise BusinessRuleError(
-                    "A shift can't be moved to a different opportunity. Create a new shift instead."
+                    tr("A shift can't be moved to a different opportunity. Create a new shift instead.")
                 )
             if shift.starts_at <= now:
-                raise ValidationError.single("starts_at", "The new start time must be in the future.")
+                raise ValidationError.single("starts_at", tr("The new start time must be in the future."))
             filled = self._store.shifts.count_filled(shift.shift_id)
             if shift.capacity < filled:
                 raise ValidationError.single(
-                    "capacity", f"{filled} volunteers are already signed up, so capacity can't be lower than {filled}."
+                    "capacity",
+                    tr(
+                        ("{filled} volunteers are already signed up, so capacity can't be lower than {filled2}."),
+                        filled=filled,
+                        filled2=filled,
+                    ),
                 )
             if (shift.starts_at, shift.ends_at) != (existing.starts_at, existing.ends_at):
                 self._check_reschedule(shift.shift_id, shift)
@@ -213,13 +221,13 @@ class OpportunityService(Service):
             not session.can(Permission.MANAGE_OPPORTUNITIES)
             and overview.opportunity_status is not OpportunityStatus.OPEN
         ):
-            raise RecordNotFoundError("Shift", shift_id)
+            raise RecordNotFoundError(tr("Shift"), shift_id)
         return overview
 
     def upcoming_schedule(
         self, session: Session, *, days: int = 14, only_with_openings: bool = False
     ) -> list[ShiftOverview]:
-        days = validate_field("days", parse_int, days, "Days", minimum=1, maximum=366)
+        days = validate_field("days", parse_int, days, tr("Days"), minimum=1, maximum=366)
         now = self._clock.now()
         return self.schedule(
             session, starts_after=now, starts_before=now + timedelta(days=days), only_with_openings=only_with_openings
@@ -230,9 +238,9 @@ class OpportunityService(Service):
     def _check_new_shift(self, shift: Shift) -> None:
         opportunity = self._store.opportunities.get(shift.opportunity_id)
         if opportunity.status is OpportunityStatus.CLOSED:
-            raise BusinessRuleError(f"'{opportunity.title}' is closed. Reopen it before adding shifts.")
+            raise BusinessRuleError(tr("'{title}' is closed. Reopen it before adding shifts.", title=opportunity.title))
         if shift.starts_at <= self._clock.now():
-            raise ValidationError.single("starts_at", "New shifts must start in the future.")
+            raise ValidationError.single("starts_at", tr("New shifts must start in the future."))
 
     def _check_reschedule(self, shift_id: int, shift: Shift) -> None:
         """Moving a shift must not double-book or under-age anyone already on it."""
@@ -252,12 +260,21 @@ class OpportunityService(Service):
                 too_young.append(entry.volunteer_name)
         if clashes:
             raise BusinessRuleError(
-                f"Moving this shift would double-book {describe_names(clashes)}. "
-                "Cancel their sign-ups first or choose another time."
+                tr(
+                    (
+                        "Moving this shift would double-book {describe_names}. Cancel their "
+                        "sign-ups first or choose another time."
+                    ),
+                    describe_names=describe_names(clashes),
+                )
             )
         if too_young:
             raise BusinessRuleError(
-                f"On the new date {describe_names(too_young)} would be under the minimum age of {opportunity.min_age}."
+                tr(
+                    ("On the new date {describe_names} would be under the minimum age of {min_age}."),
+                    describe_names=describe_names(too_young),
+                    min_age=opportunity.min_age,
+                )
             )
 
     def _check_age_increase(self, opportunity_id: int, new_min_age: int) -> None:
@@ -276,6 +293,11 @@ class OpportunityService(Service):
         if too_young:
             raise ValidationError.single(
                 "min_age",
-                f"{describe_names(too_young)} {'is' if len(too_young) == 1 else 'are'} already scheduled and "
-                f"would be under {new_min_age}. Cancel those sign-ups first.",
+                tr_n(
+                    "{names} is already scheduled and would be under {new_min_age}. Cancel that sign-up first.",
+                    "{names} are already scheduled and would be under {new_min_age}. Cancel those sign-ups first.",
+                    len(too_young),
+                    names=describe_names(too_young),
+                    new_min_age=new_min_age,
+                ),
             )

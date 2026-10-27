@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.i18n import tr, tr_for, tr_n
 from servesync.models import AssignmentStatus, OpportunityStatus, RosterEntry, Shift, VolunteerStatus
 from servesync.services import Permission
 from servesync.ui.context import AppContext
@@ -60,22 +61,24 @@ class HoursDialog(QDialog):
 
     def __init__(self, name: str, shift: Shift, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Record hours")
+        self.setWindowTitle(tr("Record hours"))
         column = QVBoxLayout(self)
         column.setContentsMargins(20, 18, 20, 18)
-        column.addWidget(make_label(f"How many hours did {name} serve?", "section", wrap=True))
-        column.addWidget(make_label(f"The shift lasted {format_hours(shift.duration_hours)}.", "muted"))
+        column.addWidget(make_label(tr("How many hours did {name} serve?", name=name), "section", wrap=True))
+        column.addWidget(
+            make_label(tr("The shift lasted {format_hours}.", format_hours=format_hours(shift.duration_hours)), "muted")
+        )
         self.hours = QDoubleSpinBox()
         self.hours.setRange(0.25, shift.duration_hours)
         self.hours.setSingleStep(0.25)
         self.hours.setDecimals(2)
-        self.hours.setSuffix(" hours")
+        self.hours.setSuffix(tr(" hours"))
         self.hours.setValue(shift.duration_hours)
-        self.hours.setAccessibleName("Hours served")
+        self.hours.setAccessibleName(tr("Hours served"))
         column.addWidget(self.hours)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        ok.setText("Mark attended")
+        ok.setText(tr("Mark attended"))
         ok.setProperty("kind", "primary")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -91,7 +94,7 @@ class VolunteerPickerDialog(QDialog):
         self._shift_id = shift_id
         self._walk_in = walk_in
         self.volunteer_id: int | None = None
-        self.setWindowTitle("Record a walk-in" if walk_in else "Sign up a volunteer")
+        self.setWindowTitle(tr("Record a walk-in") if walk_in else tr("Sign up a volunteer"))
         self.resize(560, 560)
 
         column = QVBoxLayout(self)
@@ -100,20 +103,22 @@ class VolunteerPickerDialog(QDialog):
         column.addWidget(make_label(self.windowTitle(), "title"))
         column.addWidget(
             make_label(
-                "Choose someone who served without signing up first."
+                tr("Choose someone who served without signing up first.")
                 if walk_in
-                else "Search for an active volunteer. ServeSync checks age, schedule clashes, and space as you pick.",
+                else tr(
+                    "Search for an active volunteer. ServeSync checks age, schedule clashes, and space as you pick."
+                ),
                 "subtitle",
                 wrap=True,
             )
         )
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Type a name")
-        self.search.setAccessibleName("Search volunteers")
+        self.search.setPlaceholderText(tr("Type a name"))
+        self.search.setAccessibleName(tr("Search volunteers"))
         self.search.textChanged.connect(self._fill)
         column.addWidget(self.search)
         self.list = QListWidget()
-        self.list.setAccessibleName("Active volunteers")
+        self.list.setAccessibleName(tr("Active volunteers"))
         self.list.currentItemChanged.connect(lambda *_: self._explain())
         self.list.itemDoubleClicked.connect(lambda *_: self._choose())
         column.addWidget(self.list, 1)
@@ -121,7 +126,7 @@ class VolunteerPickerDialog(QDialog):
         column.addWidget(self.verdict)
 
         buttons = QDialogButtonBox()
-        self.choose_button = QPushButton("Record walk-in" if walk_in else "Sign up")
+        self.choose_button = QPushButton(tr("Record walk-in") if walk_in else tr_for("leader", "Sign up"))
         self.choose_button.setProperty("kind", "primary")
         self.choose_button.setEnabled(False)
         buttons.addButton(self.choose_button, QDialogButtonBox.ButtonRole.AcceptRole)
@@ -158,10 +163,10 @@ class VolunteerPickerDialog(QDialog):
         reasons = self._ctx.services.scheduling.why_not_eligible(self._ctx.session, self._shift_id, volunteer_id)
         if reasons:
             self.verdict.setProperty("role", "concern")
-            self.verdict.setText("Can't sign up: " + " ".join(reasons))
+            self.verdict.setText(tr("Can't sign up: ") + " ".join(reasons))
         else:
             self.verdict.setProperty("role", "ok")
-            self.verdict.setText("✓ Eligible for this shift.")
+            self.verdict.setText(tr("✓ Eligible for this shift."))
         self.verdict.style().unpolish(self.verdict)
         self.verdict.style().polish(self.verdict)
         self.choose_button.setEnabled(not reasons)
@@ -180,7 +185,7 @@ class ShiftDetailDialog(QDialog):
         super().__init__(parent)
         self._ctx = ctx
         self._shift_id = shift_id
-        self.setWindowTitle("Shift")
+        self.setWindowTitle(tr("Shift"))
         self.resize(940, 700)
 
         column = QVBoxLayout(self)
@@ -193,7 +198,7 @@ class ShiftDetailDialog(QDialog):
         column.addWidget(self.when)
         fill_row = QHBoxLayout()
         self.fill = QProgressBar()
-        self.fill.setAccessibleName("Spots filled")
+        self.fill.setAccessibleName(tr("Spots filled"))
         self.fill.setMaximumWidth(320)
         self.fill.setTextVisible(False)
         fill_row.addWidget(self.fill)
@@ -210,45 +215,45 @@ class ShiftDetailDialog(QDialog):
         self.roster: RecordTable[RosterEntry] = RecordTable(
             [
                 Column(
-                    "Volunteer",
+                    tr("Volunteer"),
                     lambda e: e.volunteer_name,
                     sort=lambda e: f"{e.volunteer_name.split()[-1]} {e.volunteer_name}".casefold(),
                     stretch=True,
                 ),
                 Column(
-                    "Status",
+                    tr("Status"),
                     lambda e: e.assignment.status.label,
                     color=lambda e: status_color(e.assignment.status),
                 ),
                 Column(
-                    "Hours",
+                    tr("Hours"),
                     lambda e: format_hours(e.assignment.hours_served) if e.assignment.hours_served else "",
                     sort=lambda e: e.assignment.counted_hours,
                     align_right=True,
                 ),
-                Column("Phone", lambda e: e.display_phone),
-                Column("Email", lambda e: e.volunteer_email),
+                Column(tr("Phone"), lambda e: e.display_phone),
+                Column(tr("Email"), lambda e: e.volunteer_email),
             ],
-            empty_message="Nobody has signed up yet. Use Smart Match or Sign up a volunteer to fill this shift.",
-            accessible_name="Roster",
+            empty_message=tr("Nobody has signed up yet. Use Smart Match or Sign up a volunteer to fill this shift."),
+            accessible_name=tr("Roster"),
         )
         self.roster.selection_changed.connect(lambda _record: self._update_buttons())
         roster_layout.addWidget(self.roster, 1)
 
         actions = QHBoxLayout()
-        self.sign_up_button = make_button("Sign up a volunteer...", kind="primary", on_click=self._sign_up)
-        self.cancel_button = make_button("Cancel sign-up", on_click=self._cancel)
-        self.attended_button = make_button("Mark attended...", on_click=self._attended)
-        self.no_show_button = make_button("Mark no-show", on_click=self._no_show)
-        self.everyone_button = make_button("Check in everyone", on_click=self._check_in_everyone)
-        self.walk_in_button = make_button("Record walk-in...", on_click=self._walk_in)
+        self.sign_up_button = make_button(tr("Sign up a volunteer..."), kind="primary", on_click=self._sign_up)
+        self.cancel_button = make_button(tr("Cancel sign-up"), on_click=self._cancel)
+        self.attended_button = make_button(tr("Mark attended..."), on_click=self._attended)
+        self.no_show_button = make_button(tr("Mark no-show"), on_click=self._no_show)
+        self.everyone_button = make_button(tr("Check in everyone"), on_click=self._check_in_everyone)
+        self.walk_in_button = make_button(tr("Record walk-in..."), on_click=self._walk_in)
         for button in (self.sign_up_button, self.cancel_button):
             actions.addWidget(button)
         actions.addStretch(1)
         for button in (self.attended_button, self.no_show_button, self.everyone_button, self.walk_in_button):
             actions.addWidget(button)
         roster_layout.addLayout(actions)
-        self.tabs.addTab(roster_page, "Roster and attendance")
+        self.tabs.addTab(roster_page, tr("Roster and attendance"))
 
         # Smart Match tab ----------------------------------------------------
         match_page = QWidget()
@@ -256,9 +261,12 @@ class ShiftDetailDialog(QDialog):
         match_layout.setContentsMargins(12, 12, 12, 12)
         match_layout.addWidget(
             make_label(
-                "Smart Match ranks every eligible volunteer from 0 to 100. Each bar shows where the points came from; "
-                "point at a bar to see the numbers. Volunteers who are too young, double-booked, or not yet approved "
-                "are never shown.",
+                tr(
+                    "Smart Match ranks every eligible volunteer from 0 to 100. Each bar "
+                    "shows where the points came from; point at a bar to see the numbers. "
+                    "Volunteers who are too young, double-booked, or not yet approved are "
+                    "never shown."
+                ),
                 "subtitle",
                 wrap=True,
             )
@@ -273,7 +281,7 @@ class ShiftDetailDialog(QDialog):
         self.match_list.setSpacing(10)
         scroll.setWidget(holder)
         match_layout.addWidget(scroll, 1)
-        self.tabs.addTab(match_page, "Smart Match")
+        self.tabs.addTab(match_page, tr("Smart Match"))
 
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close.rejected.connect(self.reject)
@@ -293,18 +301,20 @@ class ShiftDetailDialog(QDialog):
         self._started = shift.has_started(now)
         self.title.setText(overview.opportunity_title)
         self.setWindowTitle(f"{overview.opportunity_title} - {format_when(shift.starts_at)}")
-        notes = f"  Note: {shift.notes}" if shift.notes else ""
-        self.when.setText(f"{format_when(shift.starts_at, shift.ends_at)} at {overview.location}.{notes}")
+        notes = tr("  Note: {notes}", notes=shift.notes) if shift.notes else ""
+        self.when.setText(
+            tr("{when} at {place}.", when=format_when(shift.starts_at, shift.ends_at), place=overview.location) + notes
+        )
         self.fill.setRange(0, shift.capacity)
         self.fill.setValue(min(overview.filled, shift.capacity))
-        filled = f"{overview.filled} of {shift.capacity} filled. "
+        filled = tr("{filled} of {capacity} filled. ", filled=overview.filled, capacity=shift.capacity)
         self.fill.setAccessibleDescription(filled)
         if shift.ends_at <= now:
-            self.state.setText(filled + "This shift is over. Record who attended and how long they served.")
+            self.state.setText(filled + tr("This shift is over. Record who attended and how long they served."))
         elif self._started:
-            self.state.setText(filled + "This shift is under way. You can record attendance now.")
+            self.state.setText(filled + tr("This shift is under way. You can record attendance now."))
         else:
-            self.state.setText(filled + f"{overview.open_spots} spot{'s' if overview.open_spots != 1 else ''} open.")
+            self.state.setText(filled + tr_n("{count} spot open.", "{count} spots open.", overview.open_spots))
         self.roster.set_records(
             services.attendance.roster(session, self._shift_id, include_cancelled=True),
             keep_selection=lambda e: e.assignment.assignment_id,
@@ -316,30 +326,30 @@ class ShiftDetailDialog(QDialog):
         clear_layout(self.match_list)
         overview = self._overview
         if self._started:
-            self.match_message.setText("Smart Match is for upcoming shifts. This one has already started.")
+            self.match_message.setText(tr("Smart Match is for upcoming shifts. This one has already started."))
             return
         if overview.opportunity_status is not OpportunityStatus.OPEN:
-            self.match_message.setText("Publish this program (set it to Open) to use Smart Match.")
+            self.match_message.setText(tr("Publish this program (set it to Open) to use Smart Match."))
             return
         if overview.is_full:
-            self.match_message.setText("This shift is full. Nice work!")
+            self.match_message.setText(tr("This shift is full. Nice work!"))
             return
         matches = self._ctx.services.matching.recommend_volunteers(self._ctx.session, self._shift_id, limit=8)
         self.match_message.setText(
-            f"Top {len(matches)} of the eligible volunteers."
+            tr("Top {len} of the eligible volunteers.", len=len(matches))
             if matches
-            else "No eligible volunteers are free at this time."
+            else tr("No eligible volunteers are free at this time.")
         )
         for match in matches:
             volunteer = match.volunteer
-            subtitle = ", ".join(volunteer.sorted_skills()[:4]) or "No skills listed yet"
+            subtitle = ", ".join(volunteer.sorted_skills()[:4]) or tr("No skills listed yet")
             self.match_list.addWidget(
                 MatchCard(
                     title=volunteer.full_name,
                     subtitle=subtitle,
                     score=match.score,
                     factors=match.factors,
-                    action_text="Sign up",
+                    action_text=tr_for("leader", "Sign up"),
                     on_action=partial(self._sign_up_id, volunteer.volunteer_id or 0),
                     access_notes=match.access_gaps,
                 )
@@ -350,24 +360,26 @@ class ShiftDetailDialog(QDialog):
         entry = self.roster.selected()
         status = entry.assignment.status if entry else None
         before, after = not self._started, self._started
-        waiting = "Available once the shift starts."
-        self._enable(self.sign_up_button, before, "Sign-ups close when the shift starts. Use Record walk-in instead.")
+        waiting = tr("Available once the shift starts.")
+        self._enable(
+            self.sign_up_button, before, tr("Sign-ups close when the shift starts. Use Record walk-in instead.")
+        )
         self._enable(
             self.cancel_button,
             before and status is AssignmentStatus.SCHEDULED,
-            "Select a scheduled volunteer before the shift starts.",
+            tr("Select a scheduled volunteer before the shift starts."),
         )
         self._enable(
-            self.attended_button, after and entry is not None, waiting if before else "Select a volunteer first."
+            self.attended_button, after and entry is not None, waiting if before else tr("Select a volunteer first.")
         )
         self._enable(
             self.no_show_button,
             after and status in (AssignmentStatus.SCHEDULED, AssignmentStatus.ATTENDED),
-            waiting if before else "Select a scheduled volunteer first.",
+            waiting if before else tr("Select a scheduled volunteer first."),
         )
         anyone_waiting = any(e.assignment.status is AssignmentStatus.SCHEDULED for e in self.roster.records())
         self._enable(
-            self.everyone_button, after and anyone_waiting, waiting if before else "Everyone is already checked in."
+            self.everyone_button, after and anyone_waiting, waiting if before else tr("Everyone is already checked in.")
         )
         self._enable(self.walk_in_button, after, waiting)
 
@@ -392,20 +404,23 @@ class ShiftDetailDialog(QDialog):
     def _sign_up_id(self, volunteer_id: int) -> None:
         self._ctx.services.scheduling.sign_up(self._ctx.session, self._shift_id, volunteer_id)
         name = self._ctx.services.volunteers.get(self._ctx.session, volunteer_id).full_name
-        self._done(f"Signed up {name}.")
+        self._done(tr("Signed up {name}.", name=name))
 
     @guarded
     def _cancel(self) -> None:
         entry = self.roster.selected()
         if entry is None or not confirm(
             self,
-            "Cancel sign-up",
-            f"Cancel {entry.volunteer_name}'s sign-up? Their spot will open for others.",
-            "Cancel sign-up",
+            tr("Cancel sign-up"),
+            tr(
+                "Cancel {volunteer_name}'s sign-up? Their spot will open for others.",
+                volunteer_name=entry.volunteer_name,
+            ),
+            tr("Cancel sign-up"),
         ):
             return
         self._ctx.services.scheduling.cancel(self._ctx.session, entry.assignment.assignment_id or 0)
-        self._done(f"Cancelled {entry.volunteer_name}'s sign-up.")
+        self._done(tr("Cancelled {volunteer_name}'s sign-up.", volunteer_name=entry.volunteer_name))
 
     @guarded
     def _attended(self) -> None:
@@ -417,7 +432,13 @@ class ShiftDetailDialog(QDialog):
             self._ctx.services.attendance.record_attendance(
                 self._ctx.session, entry.assignment.assignment_id or 0, dialog.hours.value()
             )
-            self._done(f"Recorded {format_hours(dialog.hours.value())} for {entry.volunteer_name}.")
+            self._done(
+                tr(
+                    "Recorded {format_hours} for {volunteer_name}.",
+                    format_hours=format_hours(dialog.hours.value()),
+                    volunteer_name=entry.volunteer_name,
+                )
+            )
 
     @guarded
     def _no_show(self) -> None:
@@ -425,12 +446,18 @@ class ShiftDetailDialog(QDialog):
         if entry is None:
             return
         self._ctx.services.attendance.mark_no_show(self._ctx.session, entry.assignment.assignment_id or 0)
-        self._done(f"Marked {entry.volunteer_name} as a no-show.")
+        self._done(tr("Marked {volunteer_name} as a no-show.", volunteer_name=entry.volunteer_name))
 
     @guarded
     def _check_in_everyone(self) -> None:
         count = self._ctx.services.attendance.check_in_everyone(self._ctx.session, self._shift_id)
-        self._done(f"Checked in {count} volunteer{'s' if count != 1 else ''} for the full shift.")
+        self._done(
+            tr_n(
+                "Checked in {count} volunteer for the full shift.",
+                "Checked in {count} volunteers for the full shift.",
+                count,
+            )
+        )
 
     @guarded
     def _walk_in(self) -> None:
@@ -443,7 +470,7 @@ class ShiftDetailDialog(QDialog):
             self._ctx.services.attendance.record_walk_in(
                 self._ctx.session, self._shift_id, picker.volunteer_id, dialog.hours.value()
             )
-            self._done(f"Recorded a walk-in for {name}.")
+            self._done(tr("Recorded a walk-in for {name}.", name=name))
 
 
 def open_shift(ctx: AppContext, shift_id: int, parent: QWidget | None, *, smart_match: bool = False) -> None:

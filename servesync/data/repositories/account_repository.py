@@ -8,11 +8,12 @@ from datetime import datetime
 from typing import Any
 
 from servesync.core.errors import DuplicateRecordError, RecordNotFoundError, ValidationError
+from servesync.core.i18n import mark, tr
 from servesync.data.converters import optional_datetime_from_db, optional_datetime_to_db
 from servesync.data.repositories.base import Repository
 from servesync.models import UserAccount, UserRole
 
-_ENTITY = "Account"
+_ENTITY = mark("Account")
 
 _SELECT_ACCOUNT = """
     SELECT account_id, username, password_hash, role, volunteer_id, is_active,
@@ -30,7 +31,7 @@ class AccountRepository(Repository):
             if account.volunteer_id is not None and not self._exists(
                 "volunteers", "volunteer_id", account.volunteer_id
             ):
-                raise RecordNotFoundError("Volunteer", account.volunteer_id)
+                raise RecordNotFoundError(tr("Volunteer"), account.volunteer_id)
             try:
                 cursor = self._db.execute(
                     """
@@ -43,8 +44,8 @@ class AccountRepository(Repository):
                 )
             except DuplicateRecordError as exc:
                 if exc.field == "volunteer_id":
-                    raise ValidationError.single("volunteer_id", "This volunteer already has an account.") from exc
-                raise ValidationError.single("username", "That username is already taken.") from exc
+                    raise ValidationError.single("volunteer_id", tr("This volunteer already has an account.")) from exc
+                raise ValidationError.single("username", tr("That username is already taken.")) from exc
         return dataclasses.replace(account, account_id=int(cursor.lastrowid or 0))
 
     def update_password_hash(self, account_id: int, password_hash: str) -> None:

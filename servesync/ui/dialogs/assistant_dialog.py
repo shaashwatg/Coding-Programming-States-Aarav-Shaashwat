@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.i18n import tr
 from servesync.services.assistant import Answer, rank_commands
 from servesync.ui import assets
 from servesync.ui.context import AppContext
@@ -64,8 +65,8 @@ class AssistantDialog(QDialog):
         super().__init__(parent)
         self.ctx = ctx
         self.commands = {command.label: command for command in commands}
-        self.setWindowTitle("Ask ServeSync")
-        self.setAccessibleName("Ask ServeSync")
+        self.setWindowTitle(tr("Ask ServeSync"))
+        self.setAccessibleName(tr("Ask ServeSync"))
         self.resize(760, 640)
 
         column = QVBoxLayout(self)
@@ -75,16 +76,18 @@ class AssistantDialog(QDialog):
         spark = make_label()
         spark.setPixmap(assets.pixmap("sparkles", current_palette().primary, 22))
         title_row.addWidget(spark)
-        title_row.addWidget(make_label("Ask ServeSync", "section"))
+        title_row.addWidget(make_label(tr("Ask ServeSync"), "section"))
         title_row.addStretch(1)
-        title_row.addWidget(make_label("Esc to close", "kbd"))
+        title_row.addWidget(make_label(tr("Esc to close"), "kbd"))
         column.addLayout(title_row)
 
         self.input = QLineEdit()
         self.input.setObjectName("AskInput")
-        self.input.setPlaceholderText("Ask a question, or type a page name to go there")
-        self.input.setAccessibleName("Ask a question or type a page name")
-        self.input.setAccessibleDescription("Press Enter to ask. Use the up and down arrows to choose a page instead.")
+        self.input.setPlaceholderText(tr("Ask a question, or type a page name to go there"))
+        self.input.setAccessibleName(tr("Ask a question or type a page name"))
+        self.input.setAccessibleDescription(
+            tr("Press Enter to ask. Use the up and down arrows to choose a page instead.")
+        )
         self.input.setClearButtonEnabled(True)
         self.input.textChanged.connect(self._update_matches)
         self.input.returnPressed.connect(self._run_current)
@@ -92,7 +95,7 @@ class AssistantDialog(QDialog):
         column.addWidget(self.input)
 
         self.matches = QListWidget()
-        self.matches.setAccessibleName("Suggestions")
+        self.matches.setAccessibleName(tr("Suggestions"))
         self.matches.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # the text box keeps focus; arrows move the highlight
         self.matches.itemClicked.connect(lambda item: self._run(item))
         self.matches.setMaximumHeight(200)
@@ -113,10 +116,10 @@ class AssistantDialog(QDialog):
         self.suggestion_row = QVBoxLayout()
         self.suggestion_row.setSpacing(6)
         column.addLayout(self.suggestion_row)
-        self._show_suggestions(ctx.services.assistant.suggestions(ctx.session), "Try asking")
+        self._show_suggestions(ctx.services.assistant.suggestions(ctx.session), tr("Try asking"))
         column.addWidget(
             make_label(
-                "Answers come only from the records on this computer. Nothing is sent over the internet.",
+                tr("Answers come only from the records on this computer. Nothing is sent over the internet."),
                 "hint",
                 wrap=True,
             )
@@ -132,7 +135,7 @@ class AssistantDialog(QDialog):
         if not query:
             self.matches.hide()
             return
-        ask = QListWidgetItem(f"Ask: “{query}”")
+        ask = QListWidgetItem(tr("Ask: “{query}”", query=query))
         ask.setData(Qt.ItemDataRole.UserRole, ASK_ROW)
         ask.setIcon(assets.icon("corner-down-left", current_palette().text_muted, 16))
         self.matches.addItem(ask)
@@ -187,7 +190,7 @@ class AssistantDialog(QDialog):
         self._add_answer(answer)
         self.input.clear()
         self.matches.hide()
-        self._show_suggestions(answer.follow_ups, "Follow up")
+        self._show_suggestions(answer.follow_ups, tr("Follow up"))
         self.ctx.announce(answer.text.replace("•", ""))
         QTimer.singleShot(0, self._scroll_to_end)
         return answer
@@ -198,11 +201,13 @@ class AssistantDialog(QDialog):
         body = QVBoxLayout(bubble)
         body.setContentsMargins(14, 10, 14, 10)
         body.setSpacing(6)
-        speaker = make_label("You" if who == "user" else "ServeSync", "hint")
+        speaker = make_label(tr("You") if who == "user" else "ServeSync", "hint")
         body.addWidget(speaker)
         message = make_label(text, None, wrap=True, selectable=True)
         message.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # Tab reaches each message for screen readers
-        message.setAccessibleName(f"{'You' if who == 'user' else 'ServeSync'} said: {text}")
+        message.setAccessibleName(
+            tr("You said: {text}", text=text) if who == "user" else tr("ServeSync said: {text}", text=text)
+        )
         body.addWidget(message)
         row = QHBoxLayout()
         if who == "user":
@@ -233,7 +238,9 @@ class AssistantDialog(QDialog):
             buttons.addStretch(1)
             layout.addLayout(buttons)
         if answer.understood:
-            layout.addWidget(make_label(f"I read this as: {answer.understood}", "hint", wrap=True))
+            layout.addWidget(
+                make_label(tr("I read this as: {understood}", understood=answer.understood), "hint", wrap=True)
+            )
 
     def _open(self, page: str, options: dict[str, object]) -> None:
         self.accept()

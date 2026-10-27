@@ -1,7 +1,7 @@
 """
 Render every major screen to PNG files (for design review, the README, and slides).
 
-    python tools/capture_screens.py OUTPUT_FOLDER [--theme LIGHT|DARK|HIGH_CONTRAST] [--scale 1.0]
+    python tools/capture_screens.py OUTPUT_FOLDER [--theme LIGHT|DARK|HIGH_CONTRAST] [--scale 1.0] [--language es]
 
 Runs against a throwaway copy of the demo data, so it never touches real records.
 """
@@ -19,9 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from PySide6.QtWidgets import QApplication, QWidget
 
+from servesync.core.i18n import Language, tr
 from servesync.data import DataStore
 from servesync.data.seed import DEMO_PASSWORD, seed_demo_data
-from servesync.models import Theme
+from servesync.models import Appearance, Theme
 from servesync.services import Services
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
@@ -58,6 +59,7 @@ def main() -> int:
     parser.add_argument("output", type=Path)
     parser.add_argument("--theme", default="LIGHT")
     parser.add_argument("--scale", type=float, default=1.0)
+    parser.add_argument("--language", default="en", choices=[language.value for language in Language])
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -68,8 +70,12 @@ def main() -> int:
         store = DataStore.open(Path(temp) / "servesync.db")
         seed_demo_data(store, password_iterations=1_000)
         services = Services.create(store, password_iterations=1_000)
-        theme.apply_theme(app, Theme(args.theme), args.scale)
+        language = Language(args.language)
+        theme.apply_appearance(app, Appearance(theme=Theme(args.theme), font_scale=args.scale, language=language))
         suffix = "" if args.theme == "LIGHT" and args.scale == 1.0 else f"-{args.theme.lower()}-{args.scale:g}"
+        if language is not Language.ENGLISH:
+            suffix += f"-{language.value}"
+        spanish = language is Language.SPANISH
 
         save(app, LoginDialog(services), args.output, f"01-sign-in{suffix}", (900, 560))
 
@@ -112,14 +118,18 @@ def main() -> int:
             program = services.opportunities.find_all(ctx.session)[0]
             save(app, OpportunityDialog(ctx, program), args.output, f"02-9d-program{suffix}", (760, 900))
             ask = AssistantDialog(ctx, window.commands())
-            ask.ask("Which shifts need volunteers this week?")
-            ask.ask("How many hours has Priya served?")
+            ask.ask(
+                "¿Qué turnos necesitan voluntarios esta semana?"
+                if spanish
+                else "Which shifts need volunteers this week?"
+            )
+            ask.ask("¿Cuántas horas ha servido Priya?" if spanish else "How many hours has Priya served?")
             save(app, ask, args.output, f"02-9e-ask{suffix}", (780, 720))
             window.navigate("reports")
             reports = window.pages["reports"]
             reports.kind_box.setCurrentIndex(1)  # type: ignore[attr-defined]  # Program impact
             save(app, window, args.output, f"02-9f-report-program{suffix}")
-            window.ctx.events.status_message.emit("Saved servesync-program-impact.pdf.")
+            window.ctx.events.status_message.emit(tr("Saved {title}.", title="servesync-program-impact.pdf"))
             save(app, window, args.output, f"02-9g-toast{suffix}")
 
         capture_role("coordinator", "02-leader", leader_extras)

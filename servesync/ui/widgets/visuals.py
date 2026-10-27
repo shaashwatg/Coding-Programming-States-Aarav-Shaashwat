@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.i18n import format_day_short, mark, tr, tr_n
 from servesync.models import ActivityItem, ActivityKind, OpportunityCategory, ShiftOverview
 from servesync.services import ScoreFactor
 from servesync.ui import assets
@@ -56,9 +57,12 @@ class ScoreAnatomyBar(QWidget):
         self.update()
 
     def _describe(self) -> None:
-        lines = [f"{f.name}: {f.points:.0f} of {f.max_points:.0f}" for f in self._factors]
+        lines = [
+            tr("{name}: {points:.0f} of {max_points:.0f}", name=f.name, points=f.points, max_points=f.max_points)
+            for f in self._factors
+        ]
         self.setToolTip("\n".join(lines))
-        self.setAccessibleName("Score breakdown")
+        self.setAccessibleName(tr("Score breakdown"))
         self.setAccessibleDescription("; ".join(lines))
 
     def sizeHint(self) -> QSize:  # noqa: N802 - Qt API
@@ -90,7 +94,7 @@ class ScoreAnatomyBar(QWidget):
 class FactorLegend(QWidget):
     """Small key explaining the five colors of the score bar."""
 
-    NAMES = ("Availability", "Skills", "Reliability", "Experience", "Fair share")
+    NAMES = (mark("Availability"), mark("Skills"), mark("Reliability"), mark("Experience"), mark("Fair share"))
 
     def __init__(self) -> None:
         super().__init__()
@@ -102,7 +106,7 @@ class FactorLegend(QWidget):
             swatch.setFixedSize(12, 12)
             swatch.setStyleSheet(f"background: {color}; border-radius: 3px;")
             row.addWidget(swatch)
-            row.addWidget(make_label(name, "hint"))
+            row.addWidget(make_label(tr(name), "hint"))
         row.addStretch(1)
 
 
@@ -134,8 +138,8 @@ class MatchCard(QFrame):
             names.addWidget(make_label(subtitle, "muted"))
         top.addLayout(names, 1)
         score_label = make_label(f"{score}", "score")
-        score_label.setAccessibleName(f"Match score {score} out of 100")
-        score_label.setToolTip("Match score out of 100")
+        score_label.setAccessibleName(tr("Match score {score} out of 100", score=score))
+        score_label.setToolTip(tr("Match score out of 100"))
         top.addWidget(score_label, 0, Qt.AlignmentFlag.AlignTop)
         action = make_button(action_text, kind="primary", on_click=on_action)
         action.setAccessibleName(f"{action_text}: {title}")
@@ -150,11 +154,11 @@ class MatchCard(QFrame):
             line = make_label(
                 f"{prefix}  {factor.explanation}", "concern" if factor.is_concern else "strength", wrap=True
             )
-            line.setAccessibleName(("Concern: " if factor.is_concern else "Strength: ") + factor.explanation)
+            line.setAccessibleName((tr("Concern: ") if factor.is_concern else tr("Strength: ")) + factor.explanation)
             layout.addWidget(line)
         for note in access_notes:
-            line = make_label(f"!  {note} — check before confirming", "concern", wrap=True)
-            line.setAccessibleName(f"Access note: {note}")
+            line = make_label(tr("!  {note} — check before confirming", note=note), "concern", wrap=True)
+            line.setAccessibleName(tr("Access note: {note}", note=note))
             layout.addWidget(line)
 
 
@@ -203,7 +207,7 @@ class ProgramArt(QLabel):
             painter.drawPixmap(
                 QRectF(-x, -y, scaled.width() / ratio, scaled.height() / ratio), scaled, QRectF(scaled.rect())
             )
-            self.setAccessibleName(f"Photo of {title}")
+            self.setAccessibleName(tr("Photo of {title}", title=title))
         else:
             painter.fillRect(frame, QColor(palette.banner))
             glyph = assets.pixmap(assets.CATEGORY_ICONS[category], palette.primary, 64)
@@ -217,7 +221,7 @@ class ProgramArt(QLabel):
             painter.drawText(
                 QRectF(0, frame.bottom() - 36, frame.width(), 26), Qt.AlignmentFlag.AlignCenter, category.label
             )
-            self.setAccessibleName(f"{category.label} artwork for {title}")
+            self.setAccessibleName(tr("{label} artwork for {title}", label=category.label, title=title))
 
 
 class FeaturedBanner(QFrame):
@@ -233,7 +237,7 @@ class FeaturedBanner(QFrame):
         row.addWidget(self.art)
         text = QVBoxLayout()
         text.setSpacing(4)
-        self.eyebrow = make_label("Happening next", "eyebrow")
+        self.eyebrow = make_label(tr("Happening next"), "eyebrow")
         self.title = make_label("", "display", wrap=True)
         self.when = make_label("", "subtitle", wrap=True)
         self.description = make_label("", wrap=True)
@@ -254,11 +258,23 @@ class FeaturedBanner(QFrame):
         self.title.setText(overview.opportunity_title)
         spots = overview.open_spots
         self.when.setText(
-            f"{format_when(shift.starts_at, shift.ends_at)} at {overview.location}. "
-            f"{spots} of {shift.capacity} spot{'s' if shift.capacity != 1 else ''} still open."
+            tr_n(
+                "{format_when} at {location}. {spots} of {count} spot still open.",
+                "{format_when} at {location}. {spots} of {count} spots still open.",
+                shift.capacity,
+                format_when=format_when(shift.starts_at, shift.ends_at),
+                location=overview.location,
+                spots=spots,
+            )
         )
         self.description.setText(description)
-        self.setAccessibleName(f"Happening next: {overview.opportunity_title}, {self.when.text()}")
+        self.setAccessibleName(
+            tr(
+                "Happening next: {opportunity_title}, {text}",
+                opportunity_title=overview.opportunity_title,
+                text=self.when.text(),
+            )
+        )
 
     def set_actions(self, buttons: Iterable[QPushButton]) -> None:
         for old in self._buttons:
@@ -309,24 +325,34 @@ _ACTIVITY_ICONS = {
 
 def describe_activity(item: ActivityItem) -> str:
     if item.kind is ActivityKind.SIGNED_UP and item.shift_starts_at:
-        return f"{item.volunteer_name} signed up for {item.opportunity_title} on {format_when(item.shift_starts_at)}"
+        return tr(
+            "{volunteer_name} signed up for {opportunity_title} on {format_when}",
+            volunteer_name=item.volunteer_name,
+            opportunity_title=item.opportunity_title,
+            format_when=format_when(item.shift_starts_at),
+        )
     if item.kind is ActivityKind.SERVED:
-        return f"{item.volunteer_name} served {format_hours(item.hours or 0)} at {item.opportunity_title}"
-    return f"{item.volunteer_name} applied to volunteer"
+        return tr(
+            "{volunteer_name} served {format_hours} at {opportunity_title}",
+            volunteer_name=item.volunteer_name,
+            format_hours=format_hours(item.hours or 0),
+            opportunity_title=item.opportunity_title,
+        )
+    return tr("{volunteer_name} applied to volunteer", volunteer_name=item.volunteer_name)
 
 
 def relative_time(moment: datetime, now: datetime) -> str:
     delta = now - moment
     minutes = int(delta.total_seconds() // 60)
     if minutes < 60:
-        return "just now" if minutes < 2 else f"{minutes} minutes ago"
+        return tr("just now") if minutes < 2 else tr("{minutes} minutes ago", minutes=minutes)
     hours = minutes // 60
     if hours < 24:
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        return tr_n("{count} hour ago", "{count} hours ago", hours)
     days = hours // 24
     if days < 7:
-        return "yesterday" if days == 1 else f"{days} days ago"
-    return f"{moment:%b} {moment.day}"
+        return "yesterday" if days == 1 else tr("{days} days ago", days=days)
+    return format_day_short(moment.date())
 
 
 class ActivityFeed(QListWidget):
@@ -334,7 +360,7 @@ class ActivityFeed(QListWidget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setAccessibleName("Recent activity")
+        self.setAccessibleName(tr("Recent activity"))
         self.setWordWrap(True)
         self.setSpacing(2)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -343,7 +369,7 @@ class ActivityFeed(QListWidget):
         self.clear()
         color = current_palette().info
         if not items:
-            self.addItem(QListWidgetItem("Nothing yet. Sign-ups and attendance will appear here."))
+            self.addItem(QListWidgetItem(tr("Nothing yet. Sign-ups and attendance will appear here.")))
             return
         for item in items:
             text = f"{describe_activity(item)}\n{relative_time(item.occurred_at, now)}"
@@ -362,7 +388,7 @@ class ShiftCalendar(QCalendarWidget):
         super().__init__()
         self.setGridVisible(False)
         self.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-        self.setAccessibleName("Shift calendar")
+        self.setAccessibleName(tr("Shift calendar"))
         self._days: dict[date, tuple[int, int]] = {}  # day -> (shift count, open spots)
         self._today = date.today()
         self.restyle()

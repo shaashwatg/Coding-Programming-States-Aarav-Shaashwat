@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from servesync.config import MAX_SHIFT_CAPACITY, MINIMUM_VOLUNTEER_AGE
 from servesync.core.errors import ValidationError
+from servesync.core.i18n import tr
 from servesync.models import Opportunity, OpportunityCategory, OpportunityStatus, Shift
 from servesync.ui.context import AppContext
 from servesync.ui.photos import prepare_photo
@@ -40,10 +41,10 @@ class OpportunityDialog(FormDialog):
     def __init__(self, ctx: AppContext, opportunity: Opportunity | None = None, parent: QWidget | None = None) -> None:
         creating = opportunity is None
         super().__init__(
-            "New program" if creating else "Edit program",
-            "Describe the work so volunteers know what to expect. Fields marked * are required.",
+            tr("New program") if creating else tr("Edit program"),
+            tr("Describe the work so volunteers know what to expect. Fields marked * are required."),
             parent,
-            save_text="Create program" if creating else "Save changes",
+            save_text=tr("Create program") if creating else tr("Save changes"),
         )
         self._ctx = ctx
         self._original = opportunity
@@ -53,65 +54,71 @@ class OpportunityDialog(FormDialog):
 
         self.title_edit = QLineEdit()
         self.title_edit.setMaxLength(80)
-        self.add_field("title", "Title *", self.title_edit)
+        self.add_field("title", tr("Title *"), self.title_edit)
         self.category: EnumComboBox[OpportunityCategory] = EnumComboBox(OpportunityCategory)
-        self.add_field("category", "Category *", self.category)
+        self.add_field("category", tr("Category *"), self.category)
         self.description = QPlainTextEdit()
         self.description.setFixedHeight(90)
-        self.add_field("description", "What volunteers will do *", self.description, "Two or three short sentences.")
+        self.add_field(
+            "description", tr("What volunteers will do *"), self.description, tr("Two or three short sentences.")
+        )
         self.location = QLineEdit()
         self.location.setMaxLength(120)
-        self.add_field("location", "Location *", self.location)
+        self.add_field("location", tr("Location *"), self.location)
         self.coordinator = QLineEdit()
         self.coordinator.setMaxLength(80)
-        self.add_field("coordinator_name", "Coordinator *", self.coordinator)
+        self.add_field("coordinator_name", tr("Coordinator *"), self.coordinator)
         self.min_age = QSpinBox()
         self.min_age.setRange(MINIMUM_VOLUNTEER_AGE, 99)
-        self.min_age.setSuffix(" years")
-        self.add_field("min_age", "Minimum age", self.min_age, "Raise it for work like driving or construction.")
+        self.min_age.setSuffix(tr(" years"))
+        self.add_field(
+            "min_age", tr("Minimum age"), self.min_age, tr("Raise it for work like driving or construction.")
+        )
         self.skills = SkillPicker(ctx.services.volunteers.skill_names())
         self.add_field(
-            "required_skills", "Helpful skills", self.skills, "Smart Match favors volunteers who have these."
+            "required_skills", tr("Helpful skills"), self.skills, tr("Smart Match favors volunteers who have these.")
         )
         self.access = AccessPicker(for_program=True)
         self.add_field(
             "access_features",
-            "Access and support",
+            tr("Access and support"),
             self.access,
-            "Tick what this program offers. Volunteers who need these see it first.",
+            tr("Tick what this program offers. Volunteers who need these see it first."),
         )
 
-        self.add_section("Photo and story")
+        self.add_section(tr("Photo and story"))
         photo_box = QWidget()
         photo_row = QHBoxLayout(photo_box)
         photo_row.setContentsMargins(0, 0, 0, 0)
         self.art = ProgramArt(200, 128)
         photo_row.addWidget(self.art)
         buttons = QVBoxLayout()
-        buttons.addWidget(make_button("Choose photo...", on_click=self._choose_photo))
-        self.remove_photo_button = make_button("Remove photo", on_click=self._remove_photo)
+        buttons.addWidget(make_button(tr("Choose photo..."), on_click=self._choose_photo))
+        self.remove_photo_button = make_button(tr("Remove photo"), on_click=self._remove_photo)
         buttons.addWidget(self.remove_photo_button)
         buttons.addStretch(1)
         photo_row.addLayout(buttons)
         photo_row.addStretch(1)
         self.add_field(
             "photo",
-            "Program photo",
+            tr("Program photo"),
             photo_box,
-            "Use your own photo of this program. ServeSync resizes it to under 300 kB automatically.",
+            tr("Use your own photo of this program. ServeSync resizes it to under 300 kB automatically."),
         )
         self.story = QLineEdit()
         self.story.setPlaceholderText("https://")
         self.story.setMaxLength(300)
         self.add_field(
             "story_video_url",
-            "Story video link",
+            tr("Story video link"),
             self.story,
-            "Optional. Opens in the browser only when someone chooses to watch it; nothing plays automatically.",
+            tr("Optional. Opens in the browser only when someone chooses to watch it; nothing plays automatically."),
         )
-        self.publish = QCheckBox("Open for sign-ups right away")
+        self.publish = QCheckBox(tr("Open for sign-ups right away"))
         if creating:
-            self.add_field("status", "Publish", self.publish, "Leave unchecked to keep it as a draft while you plan.")
+            self.add_field(
+                "status", tr("Publish"), self.publish, tr("Leave unchecked to keep it as a draft while you plan.")
+            )
 
         if opportunity is not None:
             self.title_edit.setText(opportunity.title)
@@ -131,12 +138,12 @@ class OpportunityDialog(FormDialog):
 
     def _refresh_art(self) -> None:
         category = self.category.value() or OpportunityCategory.ADMINISTRATIVE
-        self.art.show_program(category, self._photo, self.title_edit.text() or "this program")
+        self.art.show_program(category, self._photo, self.title_edit.text() or tr("this program"))
         self.remove_photo_button.setEnabled(self._photo is not None)
 
     def _choose_photo(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Choose a program photo", "", "Pictures (*.jpg *.jpeg *.png *.heic *.webp)"
+            self, tr("Choose a program photo"), "", tr("Pictures") + " (*.jpg *.jpeg *.png *.heic *.webp)"
         )
         if not path:
             return
@@ -194,10 +201,10 @@ class ShiftDialog(FormDialog):
     ) -> None:
         creating = shift is None
         super().__init__(
-            "Add shifts" if creating else "Edit shift",
-            f"For {opportunity.title}. Shifts must start in the future and last up to 12 hours.",
+            tr("Add shifts") if creating else tr("Edit shift"),
+            tr("For {title}. Shifts must start in the future and last up to 12 hours.", title=opportunity.title),
             parent,
-            save_text="Add shifts" if creating else "Save changes",
+            save_text=tr("Add shifts") if creating else tr("Save changes"),
         )
         self._ctx = ctx
         self._opportunity = opportunity
@@ -210,28 +217,30 @@ class ShiftDialog(FormDialog):
         self.day.setDisplayFormat("ddd MM/dd/yyyy")
         self.day.setMinimumDate(QDate.currentDate())
         self.day.setDate(tomorrow)
-        self.add_field("day", "Date", self.day)
+        self.add_field("day", tr("Date"), self.day)
         self.start = QTimeEdit(QTime(9, 0))
         self.start.setDisplayFormat("h:mm AP")
-        self.add_field("starts_at", "Starts", self.start)
+        self.add_field("starts_at", tr("Starts"), self.start)
         self.end = QTimeEdit(QTime(12, 0))
         self.end.setDisplayFormat("h:mm AP")
-        self.add_field("ends_at", "Ends", self.end)
+        self.add_field("ends_at", tr("Ends"), self.end)
         self.capacity = QSpinBox()
         self.capacity.setRange(1, MAX_SHIFT_CAPACITY)
         self.capacity.setValue(6)
-        self.capacity.setSuffix(" volunteers")
-        self.add_field("capacity", "Volunteers needed", self.capacity)
+        self.capacity.setSuffix(tr(" volunteers"))
+        self.add_field("capacity", tr("Volunteers needed"), self.capacity)
         self.notes = QLineEdit()
         self.notes.setMaxLength(300)
-        self.notes.setPlaceholderText("for example, wear closed-toe shoes")
-        self.add_field("notes", "Notes for volunteers", self.notes)
+        self.notes.setPlaceholderText(tr("for example, wear closed-toe shoes"))
+        self.add_field("notes", tr("Notes for volunteers"), self.notes)
         self.repeat = QSpinBox()
         self.repeat.setRange(1, 52)
         self.repeat.setValue(1)
-        self.repeat.setSuffix(" week(s)")
+        self.repeat.setSuffix(tr(" week(s)"))
         if shift is None:
-            self.add_field("occurrences", "Repeat weekly for", self.repeat, "1 means just this date. Up to 52 weeks.")
+            self.add_field(
+                "occurrences", tr("Repeat weekly for"), self.repeat, tr("1 means just this date. Up to 52 weeks.")
+            )
         else:
             self.day.setDate(to_qdate(shift.starts_at.date()))
             self.start.setTime(to_qtime(shift.starts_at.time()))

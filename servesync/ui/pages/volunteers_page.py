@@ -13,6 +13,7 @@ from typing import Any
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
+from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AccessNeed, AssignmentStatus, Volunteer, VolunteerParticipation, VolunteerStatus
 from servesync.services import Permission
 from servesync.ui.context import AppContext
@@ -41,17 +42,25 @@ def status_color(status: VolunteerStatus) -> str | None:
 
 def describe_availability(volunteer: Volunteer) -> str:
     slots = volunteer.sorted_availability()
-    return ", ".join(slot.label for slot in slots) if slots else "Not listed yet"
+    return ", ".join(slot.label for slot in slots) if slots else tr("Not listed yet")
 
 
 def describe_participation(stats: VolunteerParticipation | None) -> str:
     if stats is None or (stats.shifts_attended == 0 and stats.no_shows == 0 and stats.upcoming_shifts == 0):
-        return "No shifts yet."
+        return tr("No shifts yet.")
     reliability = (
-        f"showed up {stats.reliability:.0%} of the time" if stats.reliability is not None else "no completed shifts yet"
+        tr("showed up {reliability:.0%} of the time", reliability=stats.reliability)
+        if stats.reliability is not None
+        else tr("no completed shifts yet")
     )
-    shifts = f"{stats.shifts_attended} shift{'s' if stats.shifts_attended != 1 else ''}"
-    return f"{format_hours(stats.total_hours)} over {shifts}, {reliability}, {stats.upcoming_shifts} upcoming."
+    return tr_n(
+        "{hours} over {count} shift, {reliability}, {upcoming} upcoming.",
+        "{hours} over {count} shifts, {reliability}, {upcoming} upcoming.",
+        stats.shifts_attended,
+        hours=format_hours(stats.total_hours),
+        reliability=reliability,
+        upcoming=stats.upcoming_shifts,
+    )
 
 
 class VolunteerProfileCard(Panel):
@@ -69,39 +78,45 @@ class VolunteerProfileCard(Panel):
     def show_volunteer(self, volunteer: Volunteer, stats: VolunteerParticipation | None) -> None:
         self.name.setText(volunteer.name_with_pronouns)
         age = volunteer.age()
-        minor = " (minor; guardian contact on file)" if volunteer.is_minor() else ""
+        minor = tr(" (minor; guardian contact on file)") if volunteer.is_minor() else ""
         self.status.setText(
-            f"{volunteer.status.label} volunteer since {format_date(volunteer.joined_on)}. Age {age}{minor}."
+            tr(
+                "{label} volunteer since {format_date}. Age {age}{minor}.",
+                label=volunteer.status.label,
+                format_date=format_date(volunteer.joined_on),
+                age=age,
+                minor=minor,
+            )
         )
         emergency = (
             f"{volunteer.emergency_contact_name}, {volunteer.display_emergency_phone}"
             if volunteer.emergency_contact_name
-            else "None listed"
+            else tr("None listed")
         )
         lines = [
-            f"• Email: {volunteer.email}",
-            f"• Phone: {volunteer.display_phone}",
-            f"• Emergency contact: {emergency}",
-            f"• Skills: {', '.join(volunteer.sorted_skills()) or 'None listed yet'}",
-            f"• Usually free: {describe_availability(volunteer)}",
-            f"• Service: {describe_participation(stats)}",
+            tr("• Email: {email}", email=volunteer.email),
+            tr("• Phone: {phone}", phone=volunteer.display_phone),
+            tr("• Emergency contact: {emergency}", emergency=emergency),
+            tr("• Skills: {skills}", skills=", ".join(volunteer.sorted_skills()) or tr("None listed yet")),
+            tr("• Usually free: {describe_availability}", describe_availability=describe_availability(volunteer)),
+            tr("• Service: {service}", service=describe_participation(stats)),
         ]
         if volunteer.preferred_name:
-            lines.insert(0, f"• Legal name (for safety records): {volunteer.legal_name}")
+            lines.insert(0, tr("• Legal name (for safety records): {legal_name}", legal_name=volunteer.legal_name))
         if volunteer.access_needs:
             needs = ", ".join(need.label for need in AccessNeed if need in volunteer.access_needs)
-            lines.append(f"• What helps: {needs}")
+            lines.append(tr("• What helps: {needs}", needs=needs))
         if self._show_notes:
-            lines.append(f"• Heard about us: {volunteer.recruitment_source.label}")
+            lines.append(tr("• Heard about us: {label}", label=volunteer.recruitment_source.label))
             if volunteer.notes:
-                lines.append(f"• Notes: {volunteer.notes}")
+                lines.append(tr("• Notes: {notes}", notes=volunteer.notes))
         self.lines.setText("\n".join(lines))
-        self.setAccessibleName(f"Profile of {volunteer.full_name}")
+        self.setAccessibleName(tr("Profile of {full_name}", full_name=volunteer.full_name))
 
 
 class VolunteersPage(Page):
     key = "volunteers"
-    title = "Volunteers"
+    title = mark("Volunteers")
     icon_name = "users"
 
     def __init__(self, ctx: AppContext) -> None:
@@ -109,24 +124,26 @@ class VolunteersPage(Page):
         self._stats: dict[int, VolunteerParticipation] = {}
         self.layout_.addWidget(
             PageHeader(
-                "Volunteers",
-                "Search everyone, approve applicants, and keep contact details current. "
-                "Double-click a person to edit their profile.",
+                tr("Volunteers"),
+                tr(
+                    "Search everyone, approve applicants, and keep contact details "
+                    "current. Double-click a person to edit their profile."
+                ),
             )
         )
         filters = QHBoxLayout()
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search by name, email, or phone")
-        self.search_box.setAccessibleName("Search volunteers")
+        self.search_box.setPlaceholderText(tr("Search by name, email, or phone"))
+        self.search_box.setAccessibleName(tr("Search volunteers"))
         self.search_box.setClearButtonEnabled(True)
         self.search_box.textChanged.connect(lambda _text: self.reload())
         self.status_filter: EnumComboBox[VolunteerStatus] = EnumComboBox(
-            VolunteerStatus, all_label="Everyone", label=lambda status: f"{status.label}s"
+            VolunteerStatus, all_label=tr("Everyone"), label=lambda status: f"{status.label}s"
         )
-        self.status_filter.setAccessibleName("Filter by status")
+        self.status_filter.setAccessibleName(tr("Filter by status"))
         self.status_filter.currentIndexChanged.connect(lambda _index: self.reload())
         self.skill_filter = QComboBox()
-        self.skill_filter.setAccessibleName("Filter by skill")
+        self.skill_filter.setAccessibleName(tr("Filter by skill"))
         self.skill_filter.currentIndexChanged.connect(lambda _index: self.reload())
         filters.addWidget(self.search_box, 2)
         filters.addWidget(self.status_filter, 1)
@@ -136,18 +153,18 @@ class VolunteersPage(Page):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.table: RecordTable[Volunteer] = RecordTable(
             [
-                Column("Name", lambda v: f"{v.last_name}, {v.given_name}", stretch=True),
-                Column("Status", lambda v: v.status.label, color=lambda v: status_color(v.status)),
-                Column("Phone", lambda v: v.display_phone),
+                Column(tr("Name"), lambda v: f"{v.last_name}, {v.given_name}", stretch=True),
+                Column(tr("Status"), lambda v: v.status.label, color=lambda v: status_color(v.status)),
+                Column(tr("Phone"), lambda v: v.display_phone),
                 Column(
-                    "Hours",
+                    tr("Hours"),
                     lambda v: format_hours(self._hours(v)),
                     sort=lambda v: self._hours(v),
                     align_right=True,
                 ),
             ],
-            empty_message="No volunteers match. Try clearing the search or filters.",
-            accessible_name="Volunteer list",
+            empty_message=tr("No volunteers match. Try clearing the search or filters."),
+            accessible_name=tr("Volunteer list"),
         )
         self.table.selection_changed.connect(lambda _v: self._show_selected())
         self.table.activated.connect(lambda _v: self._edit())
@@ -159,17 +176,17 @@ class VolunteersPage(Page):
         self.card = VolunteerProfileCard(show_notes=True)
         right_column.addWidget(self.card)
         actions = QHBoxLayout()
-        self.edit_button = make_button("Edit profile", on_click=self._edit)
+        self.edit_button = make_button(tr("Edit profile"), on_click=self._edit)
         self.approve_button = make_button(
-            "Approve", kind="primary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
+            tr("Approve"), kind="primary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
         )
-        self.archive_button = make_button("Archive", on_click=lambda: self._change(VolunteerStatus.INACTIVE))
-        self.delete_button = make_button("Delete", kind="danger", on_click=self._delete)
+        self.archive_button = make_button(tr("Archive"), on_click=lambda: self._change(VolunteerStatus.INACTIVE))
+        self.delete_button = make_button(tr("Delete"), kind="danger", on_click=self._delete)
         for button in (self.edit_button, self.approve_button, self.archive_button, self.delete_button):
             actions.addWidget(button)
         actions.addStretch(1)
         right_column.addLayout(actions)
-        self.history = Panel("Recent service")
+        self.history = Panel(tr("Recent service"))
         self.history_text = make_label("", wrap=True)
         self.history.body.addWidget(self.history_text)
         right_column.addWidget(self.history)
@@ -194,7 +211,7 @@ class VolunteersPage(Page):
         current_skill = self.skill_filter.currentData()
         self.skill_filter.blockSignals(True)
         self.skill_filter.clear()
-        self.skill_filter.addItem("Any skill", None)
+        self.skill_filter.addItem(tr("Any skill"), None)
         for name in services.volunteers.skill_names():
             self.skill_filter.addItem(name, name)
         self.skill_filter.setCurrentIndex(max(self.skill_filter.findData(current_skill), 0))
@@ -226,9 +243,9 @@ class VolunteersPage(Page):
         self.card.show_volunteer(volunteer, stats)
         status = volunteer.status
         self.approve_button.setVisible(status is not VolunteerStatus.ACTIVE)
-        self.approve_button.setText("Approve" if status is VolunteerStatus.APPLICANT else "Reactivate")
+        self.approve_button.setText(tr("Approve") if status is VolunteerStatus.APPLICANT else tr("Reactivate"))
         self.archive_button.setVisible(status is not VolunteerStatus.INACTIVE)
-        self.archive_button.setText("Decline" if status is VolunteerStatus.APPLICANT else "Archive")
+        self.archive_button.setText(tr("Decline") if status is VolunteerStatus.APPLICANT else tr("Archive"))
         can_delete = self.ctx.session.can(Permission.DELETE_RECORDS) and (stats is None or stats.total_hours == 0)
         self.delete_button.setVisible(can_delete)
         records = self.ctx.services.volunteers.history(self.ctx.session, volunteer.volunteer_id or 0)[:5]
@@ -245,7 +262,9 @@ class VolunteersPage(Page):
                 )
             )
         else:
-            self.history_text.setText("No shifts yet. Use Smart Match from any shift to find them a good first fit.")
+            self.history_text.setText(
+                tr("No shifts yet. Use Smart Match from any shift to find them a good first fit.")
+            )
 
     @guarded
     def _edit(self) -> None:
@@ -254,39 +273,55 @@ class VolunteersPage(Page):
             return
         dialog = VolunteerDialog(self.ctx, volunteer, self)
         if dialog.exec() and dialog.saved is not None:
-            self.ctx.changed(f"Saved {dialog.saved.full_name}'s profile.")
+            self.ctx.changed(tr("Saved {full_name}'s profile.", full_name=dialog.saved.full_name))
 
     @guarded
     def _change(self, status: VolunteerStatus) -> None:
         volunteer = self.table.selected()
         if volunteer is None:
             return
-        verb = {
-            VolunteerStatus.ACTIVE: "approve" if volunteer.status is VolunteerStatus.APPLICANT else "reactivate"
-        }.get(status, "archive")
+        if status is VolunteerStatus.ACTIVE and volunteer.status is VolunteerStatus.APPLICANT:
+            title, question, button = tr("Approve volunteer"), tr("Approve {name}?"), tr("Approve")
+        elif status is VolunteerStatus.ACTIVE:
+            title, question, button = tr("Reactivate volunteer"), tr("Reactivate {name}?"), tr("Reactivate")
+        else:
+            title, question, button = tr("Archive volunteer"), tr("Archive {name}?"), tr("Archive")
         detail = (
-            " Their upcoming sign-ups will be cancelled so others can take those spots. Their history is kept."
+            tr(" Their upcoming sign-ups will be cancelled so others can take those spots. Their history is kept.")
             if status is VolunteerStatus.INACTIVE and volunteer.status is VolunteerStatus.ACTIVE
             else ""
         )
-        if not confirm(
-            self, f"{verb.title()} volunteer", f"{verb.title()} {volunteer.full_name}?{detail}", verb.title()
-        ):
+        if not confirm(self, title, question.format(name=volunteer.full_name) + detail, button):
             return
         result = self.ctx.services.volunteers.change_status(self.ctx.session, volunteer.volunteer_id or 0, status)
-        extra = f" Cancelled {result.cancelled_signups} upcoming sign-up(s)." if result.cancelled_signups else ""
-        self.ctx.changed(f"{volunteer.full_name} is now {status.label}.{extra}")
+        extra = (
+            tr_n(
+                " Cancelled {count} upcoming sign-up.",
+                " Cancelled {count} upcoming sign-ups.",
+                result.cancelled_signups,
+            )
+            if result.cancelled_signups
+            else ""
+        )
+        self.ctx.changed(
+            tr("{full_name} is now {label}.{extra}", full_name=volunteer.full_name, label=status.label, extra=extra)
+        )
 
     @guarded
     def _delete(self) -> None:
         volunteer = self.table.selected()
         if volunteer is None or not confirm(
             self,
-            "Delete volunteer",
-            f"Permanently delete {volunteer.full_name}? This can't be undone. "
-            "(People with service history can only be archived.)",
-            "Delete permanently",
+            tr("Delete volunteer"),
+            tr(
+                (
+                    "Permanently delete {full_name}? This can't be undone. (People with "
+                    "service history can only be archived.)"
+                ),
+                full_name=volunteer.full_name,
+            ),
+            tr("Delete permanently"),
         ):
             return
         self.ctx.services.volunteers.delete(self.ctx.session, volunteer.volunteer_id or 0)
-        self.ctx.changed(f"Deleted {volunteer.full_name}.")
+        self.ctx.changed(tr("Deleted {name}.", name=volunteer.full_name))

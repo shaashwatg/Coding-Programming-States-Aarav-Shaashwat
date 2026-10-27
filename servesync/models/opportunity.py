@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from servesync.config import MAX_SHIFT_CAPACITY, MAX_SHIFT_HOURS, MINIMUM_VOLUNTEER_AGE
+from servesync.core.i18n import tr
 from servesync.core.validators import (
     ErrorCollector,
     clean_text,
@@ -46,32 +47,36 @@ class Opportunity:
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
-        self.title = errors.check("title", clean_text, self.title, "Title", max_length=80)
+        self.title = errors.check("title", clean_text, self.title, tr("Title"), max_length=80)
         if isinstance(self.title, str) and 0 < len(self.title) < 3:
-            errors.add("title", "Title must be at least 3 characters.")
+            errors.add("title", tr("Title must be at least 3 characters."))
         self.description = errors.check(
-            "description", clean_text, self.description, "Description", max_length=1000, multiline=True
+            "description", clean_text, self.description, tr("Description"), max_length=1000, multiline=True
         )
         if isinstance(self.description, str) and 0 < len(self.description) < 10:
-            errors.add("description", "Description should be at least 10 characters so volunteers know what to expect.")
-        self.category = errors.check("category", parse_enum, self.category, OpportunityCategory, "Category")
-        self.location = errors.check("location", clean_text, self.location, "Location", max_length=120)
+            errors.add(
+                "description", tr("Description should be at least 10 characters so volunteers know what to expect.")
+            )
+        self.category = errors.check("category", parse_enum, self.category, OpportunityCategory, tr("Category"))
+        self.location = errors.check("location", clean_text, self.location, tr("Location"), max_length=120)
         self.coordinator_name = errors.check(
-            "coordinator_name", clean_text, self.coordinator_name, "Coordinator name", max_length=80
+            "coordinator_name", clean_text, self.coordinator_name, tr("Coordinator name"), max_length=80
         )
         # Semantic: an opportunity may raise the organization's minimum age
         # (e.g. 18+ for driving) but never lower it.
         self.min_age = errors.check(
-            "min_age", parse_int, self.min_age, "Minimum age", minimum=MINIMUM_VOLUNTEER_AGE, maximum=99
+            "min_age", parse_int, self.min_age, tr("Minimum age"), minimum=MINIMUM_VOLUNTEER_AGE, maximum=99
         )
-        self.status = errors.check("status", parse_enum, self.status, OpportunityStatus, "Opportunity status")
-        self.required_skills = errors.check("required_skills", clean_skill_set, self.required_skills, "Required skills")
-        self.story_video_url = errors.check("story_video_url", clean_url, self.story_video_url, "Story video link")
+        self.status = errors.check("status", parse_enum, self.status, OpportunityStatus, tr("Opportunity status"))
+        self.required_skills = errors.check(
+            "required_skills", clean_skill_set, self.required_skills, tr("Required skills")
+        )
+        self.story_video_url = errors.check("story_video_url", clean_url, self.story_video_url, tr("Story video link"))
         self.access_features = errors.check(
-            "access_features", clean_access_needs, self.access_features, "Access features"
+            "access_features", clean_access_needs, self.access_features, tr("Access features")
         )
         self.opportunity_id = errors.check(
-            "opportunity_id", validate_optional_id, self.opportunity_id, "Opportunity ID"
+            "opportunity_id", validate_optional_id, self.opportunity_id, tr("Opportunity ID")
         )
         errors.raise_if_any()
 
@@ -89,28 +94,36 @@ class Shift:
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
-        self.opportunity_id = errors.check("opportunity_id", validate_reference_id, self.opportunity_id, "Opportunity")
-        self.starts_at = errors.check("starts_at", parse_datetime, self.starts_at, "Start time")
-        self.ends_at = errors.check("ends_at", parse_datetime, self.ends_at, "End time")
+        self.opportunity_id = errors.check(
+            "opportunity_id", validate_reference_id, self.opportunity_id, tr("Opportunity")
+        )
+        self.starts_at = errors.check("starts_at", parse_datetime, self.starts_at, tr("Start time"))
+        self.ends_at = errors.check("ends_at", parse_datetime, self.ends_at, tr("End time"))
         self.capacity = errors.check(
-            "capacity", parse_int, self.capacity, "Volunteers needed", minimum=1, maximum=MAX_SHIFT_CAPACITY
+            "capacity", parse_int, self.capacity, tr("Volunteers needed"), minimum=1, maximum=MAX_SHIFT_CAPACITY
         )
         self.notes = errors.check(
-            "notes", clean_text, self.notes, "Shift notes", max_length=300, required=False, multiline=True
+            "notes", clean_text, self.notes, tr("Shift notes"), max_length=300, required=False, multiline=True
         )
-        self.shift_id = errors.check("shift_id", validate_optional_id, self.shift_id, "Shift ID")
+        self.shift_id = errors.check("shift_id", validate_optional_id, self.shift_id, tr("Shift ID"))
 
         # Cross-field semantic checks.
         if isinstance(self.starts_at, datetime) and isinstance(self.ends_at, datetime):
             length = self.ends_at - self.starts_at
             if length <= timedelta(0):
-                errors.add("ends_at", "End time must be after the start time.")
+                errors.add("ends_at", tr("End time must be after the start time."))
             elif length < timedelta(minutes=MIN_SHIFT_MINUTES):
-                errors.add("ends_at", f"A shift must last at least {MIN_SHIFT_MINUTES} minutes.")
+                errors.add(
+                    "ends_at",
+                    tr("A shift must last at least {MIN_SHIFT_MINUTES} minutes.", MIN_SHIFT_MINUTES=MIN_SHIFT_MINUTES),
+                )
             elif length > timedelta(hours=MAX_SHIFT_HOURS):
                 errors.add(
                     "ends_at",
-                    f"A shift cannot be longer than {MAX_SHIFT_HOURS} hours — check AM/PM on the end time.",
+                    tr(
+                        ("A shift cannot be longer than {MAX_SHIFT_HOURS} hours — check AM/PM on the end time."),
+                        MAX_SHIFT_HOURS=MAX_SHIFT_HOURS,
+                    ),
                 )
         errors.raise_if_any()
 

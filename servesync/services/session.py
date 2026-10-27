@@ -21,6 +21,7 @@ from enum import Enum, auto
 from types import MappingProxyType
 
 from servesync.core.errors import PermissionDeniedError
+from servesync.core.i18n import mark, tr
 from servesync.models import UserRole
 
 
@@ -37,14 +38,14 @@ class Permission(Enum):
 
 _ACTION_TEXT: Mapping[Permission, str] = MappingProxyType(
     {
-        Permission.MANAGE_VOLUNTEERS: "manage volunteer records",
-        Permission.MANAGE_OPPORTUNITIES: "manage opportunities and shifts",
-        Permission.MANAGE_SCHEDULE: "schedule other volunteers",
-        Permission.RECORD_ATTENDANCE: "record attendance",
-        Permission.VIEW_REPORTS: "view organization reports",
-        Permission.MANAGE_ACCOUNTS: "manage sign-in accounts",
-        Permission.MANAGE_SETTINGS: "change organization settings",
-        Permission.DELETE_RECORDS: "permanently delete records",
+        Permission.MANAGE_VOLUNTEERS: mark("manage volunteer records"),
+        Permission.MANAGE_OPPORTUNITIES: mark("manage opportunities and shifts"),
+        Permission.MANAGE_SCHEDULE: mark("schedule other volunteers"),
+        Permission.RECORD_ATTENDANCE: mark("record attendance"),
+        Permission.VIEW_REPORTS: mark("view organization reports"),
+        Permission.MANAGE_ACCOUNTS: mark("manage sign-in accounts"),
+        Permission.MANAGE_SETTINGS: mark("change organization settings"),
+        Permission.DELETE_RECORDS: mark("permanently delete records"),
     }
 )
 
@@ -86,7 +87,13 @@ class Session:
 
     def require(self, permission: Permission) -> None:
         if not self.can(permission):
-            raise PermissionDeniedError(f"Your role ({self.role.label}) is not allowed to {_ACTION_TEXT[permission]}.")
+            raise PermissionDeniedError(
+                tr(
+                    "Your role ({label}) is not allowed to {item}.",
+                    label=self.role.label,
+                    item=tr(_ACTION_TEXT[permission]),
+                )
+            )
 
     def is_self(self, volunteer_id: int) -> bool:
         return self.volunteer_id is not None and self.volunteer_id == volunteer_id

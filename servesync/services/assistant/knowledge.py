@@ -13,8 +13,9 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from servesync.core.i18n import Language, current_language
 from servesync.services.assistant.language import STOPWORDS, stems
 
 
@@ -203,6 +204,191 @@ ARTICLES: tuple[HelpArticle, ...] = (
 )
 
 
+#: Spanish versions, in the same order as ARTICLES (pages and audiences are shared).
+_SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
+    (
+        "Agregar un voluntario nuevo",
+        "registrar persona nueva inscribir reclutar alta crear voluntario agregar",
+        (
+            "Elija Agregar voluntario arriba a la derecha (o presione Ctrl+N).",
+            "Llene el formulario; todo lo que haya que corregir se explica junto al campo.",
+            "Las personas nuevas empiezan como Solicitantes hasta que usted las aprueba.",
+        ),
+        "Abrir Voluntarios",
+    ),
+    (
+        "Aprobar a un solicitante",
+        "aprobar solicitante aceptar activar orientacion pendiente revisar solicitud",
+        (
+            "Abra Voluntarios y filtre el Estado por Solicitante.",
+            "Seleccione a la persona y elija Aprobar.",
+            "Los voluntarios aprobados se pueden programar de inmediato.",
+        ),
+        "Abrir Voluntarios",
+    ),
+    (
+        "Crear un programa y sus turnos",
+        "programa oportunidad evento proyecto crear nuevo agregar turno turnos horario repetir semanal cada semana",
+        (
+            "Abra Programas y elija Nuevo programa.",
+            "Con el programa seleccionado, elija Agregar turnos; marque Repetir cada semana para el trabajo "
+            "recurrente.",
+            "Los programas empiezan como borradores. Elija Publicar para que los voluntarios los vean.",
+        ),
+        "Abrir Programas",
+    ),
+    (
+        "Inscribir a alguien en un turno",
+        "asignar programar reservar lista agregar persona turno inscribir voluntario",
+        (
+            "Abra el turno desde la página Calendario o Programas.",
+            "En la pestaña Lista elija Agregar voluntario, o use la pestaña Smart Match para ver sugerencias "
+            "ordenadas.",
+        ),
+        "Abrir Calendario",
+    ),
+    (
+        "Registrar asistencia y horas",
+        "asistencia registrar entrada horas servidas no se presento presente ausente",
+        (
+            "Abra el turno cuando haya empezado.",
+            "En la pestaña Lista marque a cada persona como Asistió (con sus horas) o No se presentó.",
+            "Las horas cuentan para los informes y los historiales de servicio en cuanto se guardan.",
+        ),
+        "Abrir Calendario",
+    ),
+    (
+        "Cómo funciona Smart Match",
+        "smart match puntuacion recomendar clasificacion puntos por que explicar algoritmo factores",
+        (
+            "Smart Match puntúa de 0 a 100 a cada persona elegible con cinco factores: disponibilidad (30), "
+            "habilidades (30), confiabilidad (20), experiencia (10) y reparto justo (10).",
+            "Nunca se sugiere a nadie demasiado joven, sin aprobar, ya inscrito o con otro turno a la misma hora.",
+            "Las personas cuyas necesidades de acceso un programa no ofrece aparecen al final, con la razón; "
+            "nunca se ocultan.",
+        ),
+        "",
+    ),
+    (
+        "Crear y exportar un informe",
+        "informe reporte exportar csv pdf excel hoja de calculo imprimir analisis datos grafico descargar",
+        (
+            "Abra Informes y elija una pregunta, un período y, si quiere, un programa.",
+            "Elija Columnas para mostrar u ocultar detalles, y haga clic en un encabezado para ordenar.",
+            "Exportar CSV sirve para hojas de cálculo y Guardar PDF para una copia impresa; ambos contienen "
+            "exactamente lo que ve.",
+        ),
+        "Abrir Informes",
+    ),
+    (
+        "Obtener un historial de horas de servicio",
+        "historial horas servicio constancia carta certificado escuela beca verificacion comprobante "
+        "servicio comunitario pdf",
+        (
+            "Voluntarios: abran Mis horas y elijan Guardar PDF.",
+            "Líderes: abran Informes, elijan Historial de horas de servicio y seleccionen al voluntario.",
+            "El historial enumera cada turno, el programa y las horas, con una línea para la firma de un coordinador.",
+        ),
+        "",
+    ),
+    (
+        "Buscar un turno e inscribirse",
+        "buscar turno inscribirme unirme explorar abierto oportunidad voluntariado",
+        (
+            "Elija Buscar un turno arriba a la derecha.",
+            "Los turnos que se ajustan a su disponibilidad, habilidades y necesidades de acceso aparecen primero, "
+            "con una puntuación de ajuste.",
+            "Seleccione un turno y elija Inscribirme. Si no puede, ServeSync le explica por qué.",
+        ),
+        "",
+    ),
+    (
+        "Cancelar una inscripción",
+        "cancelar dejar retirar quitar no puedo ir enfermo inscripcion",
+        (
+            "En Inicio, seleccione el próximo turno y elija Cancelar inscripción (en cualquier momento antes de "
+            "que empiece).",
+            "Su lugar queda libre para otra persona y el registro se guarda tal cual, como cancelado.",
+        ),
+        "",
+    ),
+    (
+        "Hacer la pantalla más fácil de usar",
+        "accesibilidad tamano texto letra grande fuente modo oscuro alto contraste tema movimiento animacion "
+        "espaciado dislexia diseno simplificado baja vision daltonismo lector de pantalla mensajes idioma "
+        "espanol ingles",
+        (
+            "Abra Configuración y luego Comodidad y accesibilidad.",
+            "Elija un tema (incluidos Alto contraste e Igual que mi computadora), texto hasta 200 %, más espacio "
+            "entre letras, menos movimiento, un diseño simplificado, cuánto tiempo se muestran los mensajes y "
+            "el idioma.",
+            "Sus preferencias le siguen a cualquier computadora.",
+        ),
+        "",
+    ),
+    (
+        "Atajos de teclado",
+        "teclado atajo teclas raton navegar tab sin raton",
+        (
+            "Ctrl+1 a Ctrl+6 abren cada página; Ctrl+K abre Pregúntale a ServeSync; Ctrl+N es la acción principal.",
+            "Ctrl+F va a la búsqueda; F1 abre la ayuda; Tab pasa de un control a otro; Esc cierra una ventana.",
+            "En una Mac, use Comando donde vea Ctrl.",
+        ),
+        "",
+    ),
+    (
+        "Necesidades de acceso y adaptaciones",
+        "acceso necesidad adaptacion silla de ruedas sin escalones discapacidad transporte autobus sentado "
+        "tranquilo sensorial a distancia costo dinero no puedo pagar",
+        (
+            "Los voluntarios pueden indicar sus necesidades de acceso en Mi perfil (sin escalones, tareas sentado, "
+            "transporte, espacio tranquilo, sin costo o a distancia).",
+            "Los programas indican lo que ofrecen en el formulario del programa.",
+            "ServeSync nunca bloquea a nadie por una necesidad de acceso; muestra lo que falta para que la "
+            "persona decida o pregunte.",
+        ),
+        "",
+    ),
+    (
+        "Nombres y pronombres",
+        "nombre preferido apodo pronombres ella el elle nombre elegido genero",
+        (
+            "El perfil de cada voluntario tiene los campos opcionales 'Nombre que usa' y 'Pronombres'.",
+            "El nombre que usa aparece en todas partes; el nombre legal solo aparece en los registros de "
+            "seguridad y en los historiales de horas de servicio.",
+            "Los pronombres solo se muestran si la persona los comparte; ServeSync nunca los adivina.",
+        ),
+        "",
+    ),
+    (
+        "Voluntarios jóvenes",
+        "menor adolescente edad joven menos de 18 nino estudiante padre madre tutor juventud",
+        (
+            "Los voluntarios deben tener al menos 14 años. Quien tenga menos de 18 necesita a su padre, madre o "
+            "tutor como contacto de emergencia.",
+            "Un programa puede fijar una edad mínima mayor; nunca se asigna a voluntarios más jóvenes.",
+        ),
+        "",
+    ),
+    (
+        "¿Mis datos están seguros?",
+        "datos privacidad seguro seguridad copia de respaldo contrasena sin conexion internet nube",
+        (
+            "Todo se queda en esta computadora, en un solo archivo; nada se envía por internet.",
+            "Las contraseñas se guardan como hashes PBKDF2 con sal (600 000 rondas), y 5 intentos fallidos "
+            "bloquean una cuenta durante 15 minutos.",
+            "Para hacer una copia de respaldo, copie la carpeta de datos de ServeSync que aparece en Configuración.",
+        ),
+        "",
+    ),
+)
+
+ARTICLES_ES: tuple[HelpArticle, ...] = tuple(
+    replace(english, title=title, keywords=keywords, steps=steps, action_label=action)
+    for english, (title, keywords, steps, action) in zip(ARTICLES, _SPANISH, strict=True)
+)
+
+
 @dataclass(frozen=True, slots=True)
 class _Indexed:
     article: HelpArticle
@@ -225,17 +411,18 @@ def _index(articles: Sequence[HelpArticle]) -> tuple[list[_Indexed], dict[str, f
     return indexed, idf
 
 
-_INDEX, _IDF = _index(ARTICLES)
+_INDEXES = {Language.ENGLISH: _index(ARTICLES), Language.SPANISH: _index(ARTICLES_ES)}
 
 
 def search_help(question: str, *, is_leader: bool, limit: int = 3) -> list[tuple[float, HelpArticle]]:
-    """Articles that best answer the question, highest relevance first."""
+    """Articles that best answer the question, highest relevance first (in the interface language)."""
     terms = [term for term in stems(question) if term not in STOPWORDS]
+    index, idf = _INDEXES[current_language()]
     results = []
-    for entry in _INDEX:
+    for entry in index:
         if entry.article.leaders_only and not is_leader:
             continue
-        score = sum(_IDF.get(term, 0.0) * min(entry.terms.get(term, 0), 3) for term in set(terms))
+        score = sum(idf.get(term, 0.0) * min(entry.terms.get(term, 0), 3) for term in set(terms))
         if score > 0:
             results.append((round(score, 3), entry.article))
     results.sort(key=lambda pair: (-pair[0], pair[1].title))

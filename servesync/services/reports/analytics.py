@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from servesync.core.i18n import format_clock, format_day_short, format_month_year, mark, tr, tr_n, weekday_plural
 from servesync.models import (
     AssignmentStatus,
     Opportunity,
@@ -154,11 +155,11 @@ def hours_trend(facts: Iterable[ServiceFact], filters: ReportFilters) -> ChartSe
     values: list[float] = []
     cursor = _bucket(filters.start, weekly)
     while cursor <= filters.end:
-        labels.append(f"{cursor:%b} {cursor.day}" if weekly else f"{cursor:%b %Y}")
+        labels.append(format_day_short(cursor) if weekly else format_month_year(cursor))
         values.append(round(buckets.get(cursor, 0.0), 2))
         cursor = cursor + timedelta(days=7) if weekly else _next_month(cursor)
     return ChartSeries(
-        "Hours per week" if weekly else "Hours per month", tuple(labels), tuple(values), ValueKind.HOURS, "line"
+        tr("Hours per week") if weekly else tr("Hours per month"), tuple(labels), tuple(values), ValueKind.HOURS, "line"
     )
 
 
@@ -178,10 +179,6 @@ def top_bars(
     return ChartSeries(title, tuple(p[0] for p in ordered), tuple(round(p[1], 2) for p in ordered), kind)
 
 
-def _plural(count: int, word: str, plural: str | None = None) -> str:
-    return f"{count} {word if count == 1 else (plural or word + 's')}"
-
-
 def _hours(value: float) -> str:
     return f"{format_value(ValueKind.HOURS, value)} h"
 
@@ -199,9 +196,9 @@ def _report(
 ) -> Report:
     scope: list[str] = list(context)
     if filters.opportunity_id is not None and filters.opportunity_id in inputs.opportunities:
-        scope.append(f"Program: {inputs.opportunities[filters.opportunity_id].title}")
+        scope.append(tr("Program: {title}", title=inputs.opportunities[filters.opportunity_id].title))
     if filters.category is not None:
-        scope.append(f"Category: {filters.category.label}")
+        scope.append(tr("Category: {label}", label=filters.category.label))
     return Report(
         kind=kind,
         title=kind.label,
@@ -220,17 +217,17 @@ def _report(
 # --------------------------------------------------------- volunteer hours
 
 VOLUNTEER_COLUMNS = (
-    ReportColumn("name", "Volunteer"),
-    ReportColumn("status", "Status"),
-    ReportColumn("hours", "Hours", ValueKind.HOURS),
-    ReportColumn("shifts", "Shifts served", ValueKind.COUNT),
-    ReportColumn("no_shows", "No-shows", ValueKind.COUNT),
-    ReportColumn("cancelled", "Cancelled", ValueKind.COUNT, shown_by_default=False),
-    ReportColumn("reliability", "Show-up rate", ValueKind.PERCENT),
-    ReportColumn("programs", "Programs", ValueKind.COUNT, shown_by_default=False),
-    ReportColumn("value", "Community value", ValueKind.MONEY),
-    ReportColumn("last_served", "Last served", ValueKind.DATE),
-    ReportColumn("email", "Email", shown_by_default=False),
+    ReportColumn("name", mark("Volunteer")),
+    ReportColumn("status", mark("Status")),
+    ReportColumn("hours", mark("Hours"), ValueKind.HOURS),
+    ReportColumn("shifts", mark("Shifts served"), ValueKind.COUNT),
+    ReportColumn("no_shows", mark("No-shows"), ValueKind.COUNT),
+    ReportColumn("cancelled", mark("Cancelled"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("reliability", mark("Show-up rate"), ValueKind.PERCENT),
+    ReportColumn("programs", mark("Programs"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("value", mark("Community value"), ValueKind.MONEY),
+    ReportColumn("last_served", mark("Last served"), ValueKind.DATE),
+    ReportColumn("email", mark("Email"), shown_by_default=False),
 )
 
 
@@ -291,31 +288,52 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     total_hours = sum(row.hours for row in rows)
     served = [row for row in rows if row.hours > 0]
     figures = (
-        Figure("Hours served", _hours(total_hours)),
+        Figure(tr("Hours served"), _hours(total_hours)),
         Figure(
-            "Community value",
+            tr("Community value"),
             format_value(ValueKind.MONEY, total_hours * inputs.hour_value),
-            f"at ${inputs.hour_value:.2f} per hour",
+            tr("at ${hour_value:.2f} per hour", hour_value=inputs.hour_value),
         ),
-        Figure("Volunteers who served", str(len(served)), f"of {len(rows)} listed"),
-        Figure("Average per volunteer", _hours(total_hours / len(served)) if served else "\u2013", "who served"),
+        Figure(tr("Volunteers who served"), str(len(served)), tr("of {len} listed", len=len(rows))),
+        Figure(
+            tr("Average per volunteer"), _hours(total_hours / len(served)) if served else "\u2013", tr("who served")
+        ),
     )
 
     insights: list[str] = []
     if served:
-        insights.append(f"{served[0].name} served the most: {_hours(served[0].hours)}.")
+        insights.append(tr("{name} served the most: {hours}.", name=served[0].name, hours=_hours(served[0].hours)))
     if len(served) >= 5:
         top_count = math.ceil(len(served) * 0.2)
         share = percent(sum(row.hours for row in served[:top_count]), total_hours) or 0.0
-        insights.append(
-            f"The top {_plural(top_count, 'volunteer')} (20%) gave {share:.0f}% of all hours"
-            + (" — consider spreading shifts around to prevent burnout." if share >= 50 else ".")
-        )
+        if share >= 50:
+            insights.append(
+                tr_n(
+                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "shifts around to prevent burnout.",
+                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "shifts around to prevent burnout.",
+                    top_count,
+                    share=share,
+                )
+            )
+        else:
+            insights.append(
+                tr_n(
+                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours.",
+                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours.",
+                    top_count,
+                    share=share,
+                )
+            )
     idle = [row for row in rows if row.is_active and row.hours == 0]
     if idle and not scoped:
         insights.append(
-            f"{_plural(len(idle), 'active volunteer')} didn't serve in this period — "
-            "a friendly check-in could bring them back."
+            tr_n(
+                "{count} active volunteer didn't serve in this period — a friendly check-in could bring them back.",
+                "{count} active volunteers didn't serve in this period — a friendly check-in could bring them back.",
+                len(idle),
+            )
         )
     shaky = [
         row
@@ -326,12 +344,18 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     ]
     if shaky:
         insights.append(
-            f"{_plural(len(shaky), 'volunteer')} kept fewer than {LOW_RELIABILITY_PERCENT:.0f}% of their "
-            "commitments — ask whether their schedule has changed."
+            tr_n(
+                "{count} volunteer kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "schedule has changed.",
+                "{count} volunteers kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "schedule has changed.",
+                len(shaky),
+                limit=LOW_RELIABILITY_PERCENT,
+            )
         )
 
     charts = (
-        top_bars("Most hours", ((row.name, row.hours) for row in served), ValueKind.HOURS),
+        top_bars(tr("Most hours"), ((row.name, row.hours) for row in served), ValueKind.HOURS),
         hours_trend(facts, filters),
     )
     return _report(ReportKind.VOLUNTEER_HOURS, inputs, filters, VOLUNTEER_COLUMNS, rows, figures, insights, charts)
@@ -340,18 +364,18 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
 # ---------------------------------------------------------- program impact
 
 PROGRAM_COLUMNS = (
-    ReportColumn("program", "Program"),
-    ReportColumn("category", "Category", shown_by_default=False),
-    ReportColumn("shifts", "Shifts", ValueKind.COUNT),
-    ReportColumn("spots", "Spots offered", ValueKind.COUNT),
-    ReportColumn("signed_up", "Signed up", ValueKind.COUNT),
-    ReportColumn("fill_rate", "Fill rate", ValueKind.PERCENT),
-    ReportColumn("attended", "Attended", ValueKind.COUNT, shown_by_default=False),
-    ReportColumn("no_shows", "No-shows", ValueKind.COUNT, shown_by_default=False),
-    ReportColumn("show_up_rate", "Show-up rate", ValueKind.PERCENT),
-    ReportColumn("hours", "Hours", ValueKind.HOURS),
-    ReportColumn("volunteers", "Volunteers", ValueKind.COUNT),
-    ReportColumn("value", "Community value", ValueKind.MONEY),
+    ReportColumn("program", mark("Program")),
+    ReportColumn("category", mark("Category"), shown_by_default=False),
+    ReportColumn("shifts", mark("Shifts"), ValueKind.COUNT),
+    ReportColumn("spots", mark("Spots offered"), ValueKind.COUNT),
+    ReportColumn("signed_up", mark("Signed up"), ValueKind.COUNT),
+    ReportColumn("fill_rate", mark("Fill rate"), ValueKind.PERCENT),
+    ReportColumn("attended", mark("Attended"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("no_shows", mark("No-shows"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("show_up_rate", mark("Show-up rate"), ValueKind.PERCENT),
+    ReportColumn("hours", mark("Hours"), ValueKind.HOURS),
+    ReportColumn("volunteers", mark("Volunteers"), ValueKind.COUNT),
+    ReportColumn("value", mark("Community value"), ValueKind.MONEY),
 )
 
 
@@ -408,40 +432,53 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
     total_spots = sum(row.spots for row in rows)
     total_signed = sum(row.signed_up for row in rows)
     figures = (
-        Figure("Programs", str(len(rows))),
-        Figure("Hours served", _hours(total_hours)),
+        Figure(tr("Programs"), str(len(rows))),
+        Figure(tr("Hours served"), _hours(total_hours)),
         Figure(
-            "Overall fill rate",
+            tr("Overall fill rate"),
             format_value(ValueKind.PERCENT, percent(total_signed, total_spots)),
-            f"{total_signed} of {total_spots} spots",
+            tr("{total_signed} of {total_spots} spots", total_signed=total_signed, total_spots=total_spots),
         ),
-        Figure("Community value", format_value(ValueKind.MONEY, total_hours * inputs.hour_value)),
+        Figure(tr("Community value"), format_value(ValueKind.MONEY, total_hours * inputs.hour_value)),
     )
 
     insights: list[str] = []
     if rows and total_hours:
         top = rows[0]
         insights.append(
-            f"'{top.program}' delivered the most service: {_hours(top.hours)} "
-            f"({percent(top.hours, total_hours) or 0:.0f}% of the total)."
+            tr(
+                ("'{program}' delivered the most service: {hours} ({value:.0f}% of the total)."),
+                program=top.program,
+                hours=_hours(top.hours),
+                value=percent(top.hours, total_hours) or 0,
+            )
         )
     rated = [row for row in rows if row.fill_rate is not None and row.shifts >= 2]
     if len(rated) >= 2:
         weakest = min(rated, key=lambda row: row.fill_rate or 0.0)
         if (weakest.fill_rate or 0.0) < 75:
             insights.append(
-                f"'{weakest.program}' fills only {weakest.fill_rate:.0f}% of its spots — "
-                "try Smart Match on its next shifts, or offer fewer spots."
+                tr(
+                    (
+                        "'{program}' fills only {fill_rate:.0f}% of its spots — try Smart "
+                        "Match on its next shifts, or offer fewer spots."
+                    ),
+                    program=weakest.program,
+                    fill_rate=weakest.fill_rate,
+                )
             )
     flaky = [row for row in rows if row.show_up_rate is not None and 100 - row.show_up_rate > HIGH_NO_SHOW_PERCENT]
     for row in flaky[:2]:
         insights.append(
-            f"'{row.program}' has a {100 - (row.show_up_rate or 0):.0f}% no-show rate — "
-            "a reminder the day before usually helps."
+            tr(
+                ("'{program}' has a {value:.0f}% no-show rate — a reminder the day before usually helps."),
+                program=row.program,
+                value=100 - (row.show_up_rate or 0),
+            )
         )
 
     charts = (
-        top_bars("Hours by program", ((row.program, row.hours) for row in rows), ValueKind.HOURS),
+        top_bars(tr("Hours by program"), ((row.program, row.hours) for row in rows), ValueKind.HOURS),
         hours_trend(facts, filters),
     )
     return _report(ReportKind.PROGRAM_IMPACT, inputs, filters, PROGRAM_COLUMNS, rows, figures, insights, charts)
@@ -450,16 +487,16 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
 # -------------------------------------------------------- shift attendance
 
 SHIFT_COLUMNS = (
-    ReportColumn("date", "Date", ValueKind.DATE),
-    ReportColumn("time", "Time"),
-    ReportColumn("program", "Program"),
-    ReportColumn("capacity", "Spots", ValueKind.COUNT),
-    ReportColumn("signed_up", "Signed up", ValueKind.COUNT),
-    ReportColumn("fill_rate", "Fill rate", ValueKind.PERCENT),
-    ReportColumn("attended", "Attended", ValueKind.COUNT),
-    ReportColumn("no_shows", "No-shows", ValueKind.COUNT),
-    ReportColumn("unrecorded", "Not recorded", ValueKind.COUNT),
-    ReportColumn("hours", "Hours", ValueKind.HOURS, shown_by_default=False),
+    ReportColumn("date", mark("Date"), ValueKind.DATE),
+    ReportColumn("time", mark("Time")),
+    ReportColumn("program", mark("Program")),
+    ReportColumn("capacity", mark("Spots"), ValueKind.COUNT),
+    ReportColumn("signed_up", mark("Signed up"), ValueKind.COUNT),
+    ReportColumn("fill_rate", mark("Fill rate"), ValueKind.PERCENT),
+    ReportColumn("attended", mark("Attended"), ValueKind.COUNT),
+    ReportColumn("no_shows", mark("No-shows"), ValueKind.COUNT),
+    ReportColumn("unrecorded", mark("Not recorded"), ValueKind.COUNT),
+    ReportColumn("hours", mark("Hours"), ValueKind.HOURS, shown_by_default=False),
 )
 
 
@@ -478,7 +515,7 @@ class _ShiftRow:
 
 
 def _clock(moment: datetime) -> str:
-    return f"{moment.hour % 12 or 12}:{moment:%M} {'AM' if moment.hour < 12 else 'PM'}"
+    return format_clock(moment)
 
 
 def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
@@ -518,36 +555,53 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
     no_shows = sum(row.no_shows for row in rows)
     to_record = sum(1 for row in rows if row.unrecorded)
     figures = (
-        Figure("Shifts", str(len(rows))),
-        Figure("Fill rate", format_value(ValueKind.PERCENT, percent(signed, spots)), f"{signed} of {spots} spots"),
-        Figure("Show-up rate", format_value(ValueKind.PERCENT, percent(attended, attended + no_shows))),
-        Figure("Attendance to record", str(to_record), "shifts that already started"),
+        Figure(tr("Shifts"), str(len(rows))),
+        Figure(
+            tr("Fill rate"),
+            format_value(ValueKind.PERCENT, percent(signed, spots)),
+            tr("{signed} of {spots} spots", signed=signed, spots=spots),
+        ),
+        Figure(tr("Show-up rate"), format_value(ValueKind.PERCENT, percent(attended, attended + no_shows))),
+        Figure(tr("Attendance to record"), str(to_record), tr("shifts that already started")),
     )
 
     weekday_fill = {day: percent(signed_by_day[day], spots_by_day[day]) or 0.0 for day in Weekday if spots_by_day[day]}
     insights: list[str] = []
     if to_record:
-        one = to_record == 1
         insights.append(
-            f"{_plural(to_record, 'shift')} already started but still {'has' if one else 'have'} attendance "
-            f"to record — open {'it' if one else 'them'} from the Calendar so the hours count."
+            tr_n(
+                "{count} shift already started but still has attendance to record — open it from the "
+                "Calendar so the hours count.",
+                "{count} shifts already started but still have attendance to record — open them from the "
+                "Calendar so the hours count.",
+                to_record,
+            )
         )
     if len(weekday_fill) >= 2:
         best = max(weekday_fill, key=lambda day: (weekday_fill[day], -int(day)))
         worst = min(weekday_fill, key=lambda day: (weekday_fill[day], int(day)))
         if weekday_fill[best] > weekday_fill[worst]:
             insights.append(
-                f"{best.label}s fill best ({weekday_fill[best]:.0f}%) and {worst.label}s least "
-                f"({weekday_fill[worst]:.0f}%) — plan big events for {best.label}s."
+                tr(
+                    "{best} fill best ({best_rate:.0f}%) and {worst} least ({worst_rate:.0f}%) — "
+                    "plan big events for {best}.",
+                    best=weekday_plural(best),
+                    best_rate=weekday_fill[best],
+                    worst=weekday_plural(worst),
+                    worst_rate=weekday_fill[worst],
+                )
             )
     if upcoming_thin:
-        one = upcoming_thin == 1
         insights.append(
-            f"{_plural(upcoming_thin, 'upcoming shift')} in this range {'is' if one else 'are'} less than half full."
+            tr_n(
+                "{count} upcoming shift in this range is less than half full.",
+                "{count} upcoming shifts in this range are less than half full.",
+                upcoming_thin,
+            )
         )
 
     weekday_chart = ChartSeries(
-        "Fill rate by day of week",
+        tr("Fill rate by day of week"),
         tuple(day.short_label for day in weekday_fill),
         tuple(weekday_fill.values()),
         ValueKind.PERCENT,
@@ -560,14 +614,14 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
 # ---------------------------------------------------------------- recruitment
 
 RECRUITMENT_COLUMNS = (
-    ReportColumn("source", "Channel"),
-    ReportColumn("new", "New in period", ValueKind.COUNT),
-    ReportColumn("total", "All volunteers", ValueKind.COUNT),
-    ReportColumn("active", "Active now", ValueKind.COUNT),
-    ReportColumn("applicants", "Awaiting review", ValueKind.COUNT),
-    ReportColumn("retention", "Still active", ValueKind.PERCENT),
-    ReportColumn("hours", "Hours in period", ValueKind.HOURS),
-    ReportColumn("hours_each", "Hours per volunteer", ValueKind.HOURS),
+    ReportColumn("source", mark("Channel")),
+    ReportColumn("new", mark("New in period"), ValueKind.COUNT),
+    ReportColumn("total", mark("All volunteers"), ValueKind.COUNT),
+    ReportColumn("active", mark("Active now"), ValueKind.COUNT),
+    ReportColumn("applicants", mark("Awaiting review"), ValueKind.COUNT),
+    ReportColumn("retention", mark("Still active"), ValueKind.PERCENT),
+    ReportColumn("hours", mark("Hours in period"), ValueKind.HOURS),
+    ReportColumn("hours_each", mark("Hours per volunteer"), ValueKind.HOURS),
 )
 
 
@@ -620,39 +674,53 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
     )
     new_total = sum(row.new for row in rows)
     figures = (
-        Figure("New volunteers", str(new_total), "joined in this period"),
-        Figure("Awaiting review", str(sum(row.applicants for row in rows))),
-        Figure("Top channel", rows[0].source if rows and new_total else "\u2013", "by new volunteers"),
+        Figure(tr("New volunteers"), str(new_total), tr("joined in this period")),
+        Figure(tr("Awaiting review"), str(sum(row.applicants for row in rows))),
+        Figure(tr("Top channel"), rows[0].source if rows and new_total else "\u2013", tr("by new volunteers")),
     )
     insights: list[str] = []
     if rows and new_total:
-        insights.append(f"{rows[0].source} brought the most new volunteers ({rows[0].new} of {new_total}).")
+        insights.append(
+            tr(
+                "{source} brought the most new volunteers ({new} of {new_total}).",
+                source=rows[0].source,
+                new=rows[0].new,
+                new_total=new_total,
+            )
+        )
     committed = [row for row in rows if row.total >= 2]
     if committed and rows:
         deepest = max(committed, key=lambda row: row.hours_each)
         if deepest.source != rows[0].source and deepest.hours_each > 0:
             insights.append(
-                f"Volunteers from {deepest.source} serve the most hours each "
-                f"({_hours(deepest.hours_each)}) — a channel worth investing in."
+                tr(
+                    ("Volunteers from {source} serve the most hours each ({hours}) — a channel worth investing in."),
+                    source=deepest.source,
+                    hours=_hours(deepest.hours_each),
+                )
             )
     if waiting:
-        one = waiting == 1
         insights.append(
-            f"{_plural(waiting, 'applicant')} {'has' if one else 'have'} waited more than {APPLICANT_WAIT_DAYS} "
-            "days for review — quick replies keep people interested."
+            tr_n(
+                "{count} applicant has waited more than {days} days for review — quick replies keep people interested.",
+                "{count} applicants have waited more than {days} days for review — quick replies keep people "
+                "interested.",
+                waiting,
+                days=APPLICANT_WAIT_DAYS,
+            )
         )
-    chart = top_bars("New volunteers by channel", ((row.source, float(row.new)) for row in rows), ValueKind.COUNT)
+    chart = top_bars(tr("New volunteers by channel"), ((row.source, float(row.new)) for row in rows), ValueKind.COUNT)
     return _report(ReportKind.RECRUITMENT, inputs, filters, RECRUITMENT_COLUMNS, rows, figures, insights, (chart,))
 
 
 # ------------------------------------------------------------ service record
 
 SERVICE_RECORD_COLUMNS = (
-    ReportColumn("date", "Date", ValueKind.DATE),
-    ReportColumn("program", "Program"),
-    ReportColumn("category", "Category"),
-    ReportColumn("time", "Time"),
-    ReportColumn("hours", "Hours", ValueKind.HOURS),
+    ReportColumn("date", mark("Date"), ValueKind.DATE),
+    ReportColumn("program", mark("Program")),
+    ReportColumn("category", mark("Category")),
+    ReportColumn("time", mark("Time")),
+    ReportColumn("hours", mark("Hours"), ValueKind.HOURS),
 )
 
 
@@ -683,20 +751,25 @@ def service_record(inputs: ReportInputs, filters: ReportFilters, volunteer: Volu
     for fact in served:
         by_program[fact.opportunity_title] += fact.hours
     figures = (
-        Figure("Total hours", _hours(total)),
-        Figure("Shifts served", str(len(served))),
-        Figure("Programs", str(len(by_program))),
-        Figure("Community value", format_value(ValueKind.MONEY, total * inputs.hour_value)),
+        Figure(tr("Total hours"), _hours(total)),
+        Figure(tr("Shifts served"), str(len(served))),
+        Figure(tr("Programs"), str(len(by_program))),
+        Figure(tr("Community value"), format_value(ValueKind.MONEY, total * inputs.hour_value)),
     )
     insights: list[str] = []
     if by_program:
         favorite = max(by_program, key=lambda title: (by_program[title], title))
-        insights.append(f"Most time given to '{favorite}': {_hours(by_program[favorite])}.")
-    name_line = f"Volunteer: {volunteer.legal_name}"
+        insights.append(
+            tr("Most time given to '{favorite}': {hours}.", favorite=favorite, hours=_hours(by_program[favorite]))
+        )
+    name_line = tr("Volunteer: {legal_name}", legal_name=volunteer.legal_name)
     if volunteer.preferred_name:
-        name_line += f" (goes by {volunteer.preferred_name})"
-    context = (name_line, f"Volunteering since {format_value(ValueKind.DATE, volunteer.joined_on)}")
-    chart = top_bars("Hours by program", by_program.items(), ValueKind.HOURS)
+        name_line += tr(" (goes by {preferred_name})", preferred_name=volunteer.preferred_name)
+    context = (
+        name_line,
+        tr("Volunteering since {format_value}", format_value=format_value(ValueKind.DATE, volunteer.joined_on)),
+    )
+    chart = top_bars(tr("Hours by program"), by_program.items(), ValueKind.HOURS)
     return _report(
         ReportKind.SERVICE_RECORD, inputs, filters, SERVICE_RECORD_COLUMNS, rows, figures, insights, (chart,), context
     )
