@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest==9.1.1      # automated tests
+pytest-qt          # drives the interface in tests (clicks, typing)
+ruff               # linter + import sorter (style consistency)
+mypy               # static type checker
+pyinstaller==6.22.3  # builds the standalone executable
