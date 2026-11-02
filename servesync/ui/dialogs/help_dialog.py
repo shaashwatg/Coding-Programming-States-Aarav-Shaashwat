@@ -42,9 +42,29 @@ then <b>Export CSV</b> or <b>Save PDF</b>. Exports contain exactly what you see.
 </ul>
 <h3>Ask ServeSync</h3>
 <ul>
-<li>Press <b>Ctrl+K</b> (or choose <b>Ask</b> at the top) and type a question such as
+<li>Press <b>Ctrl+K</b> (or choose the <b>Ask</b> box at the top) and type a question such as
 <i>Who is free Saturday morning?</i> or <i>How is the food pantry doing?</i></li>
 <li>Type a page name instead to jump straight there. Answers come only from this computer's records.</li>
+</ul>
+<h3>Check-in kiosk</h3>
+<ul>
+<li>On the <b>Dashboard</b>, choose <b>Open check-in kiosk</b>. Volunteers type the last 4 digits of their phone to
+check in, starting 30 minutes before a shift. Only your password closes it.</li>
+<li>Check-in records the full shift. Correct anyone's hours on the shift's roster afterward.</li>
+</ul>
+<h3>Results and certifications</h3>
+<ul>
+<li>Edit a program to name <b>What this program measures</b>, then enter a result on each shift's roster. The
+<b>Impact summary</b> report turns these into a one-page PDF.</li>
+<li>Edit a program to add <b>Required certifications</b>, and edit a volunteer to record theirs. Nobody can be
+scheduled without a current one.</li>
+</ul>
+<h3>Staffing Studio</h3>
+<ul>
+<li><b>Autopilot</b> drafts sign-ups for the next two weeks. Untick anyone you'd rather not ask, then choose
+<b>Sign up selected</b>. Nothing changes until you approve, and <b>Undo last approval</b> reverses it.</li>
+<li>The <b>Attendance forecast</b> adds up each person's show-up rate, to show which shifts may come up short.</li>
+<li><b>Worth a personal invitation</b> lists regulars who have stopped coming, with a shift to invite them to.</li>
 </ul>
 <h3>Smart Match</h3>
 <ul>
@@ -79,7 +99,7 @@ SHORTCUTS = """
 <p>Everything in ServeSync works from the keyboard. On a Mac, use Command where you see Ctrl.</p>
 <table cellpadding="6">
 <tr><td><b>Ctrl+K</b></td><td>Ask ServeSync a question, or type a page name to go there</td></tr>
-<tr><td><b>Ctrl+1 ... Ctrl+6</b></td><td>Go to each page, in order</td></tr>
+<tr><td><b>Ctrl+1, Ctrl+2, ...</b></td><td>Go to each page, in order</td></tr>
 <tr><td><b>Ctrl+N</b></td><td>The main action at the top right (Add volunteer, or Find a shift)</td></tr>
 <tr><td><b>Ctrl+F</b></td><td>Jump to the search box on the current page</td></tr>
 <tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>Larger text, smaller text, normal size (saved for you)</td></tr>
@@ -152,10 +172,33 @@ detalle y luego <b>Exportar CSV</b> o <b>Guardar PDF</b>. Lo que exporta es exac
 </ul>
 <h3>Pregúntale a ServeSync</h3>
 <ul>
-<li>Presione <b>Ctrl+K</b> (o elija <b>Preguntar</b> arriba) y escriba una pregunta como
+<li>Presione <b>Ctrl+K</b> (o elija el cuadro <b>Preguntar</b> arriba) y escriba una pregunta como
 <i>¿Quién está libre el sábado por la mañana?</i> o <i>¿Cómo va la despensa de alimentos?</i></li>
 <li>También puede escribir el nombre de una página para ir directamente. Las respuestas salen solo de los registros
 de esta computadora.</li>
+</ul>
+<h3>Quiosco de llegada</h3>
+<ul>
+<li>En el <b>Panel</b>, elija <b>Abrir quiosco de llegada</b>. Los voluntarios escriben los últimos 4 dígitos de su
+teléfono para registrarse, desde 30 minutos antes del turno. Solo su contraseña lo cierra.</li>
+<li>El registro cuenta el turno completo. Después puede corregir las horas en la lista del turno.</li>
+</ul>
+<h3>Resultados y certificaciones</h3>
+<ul>
+<li>Edite un programa para indicar <b>Qué mide este programa</b> y luego escriba un resultado en la lista de cada
+turno. El informe <b>Resumen de impacto</b> los convierte en un PDF de una página.</li>
+<li>Edite un programa para agregar <b>Certificaciones requeridas</b> y edite a un voluntario para registrar las suyas.
+Nadie puede programarse sin una vigente.</li>
+</ul>
+<h3>Estudio de personal</h3>
+<ul>
+<li>El <b>Piloto automático</b> prepara inscripciones para las próximas dos semanas. Desmarque a quien prefiera no
+invitar y elija <b>Inscribir seleccionados</b>. Nada cambia hasta que usted lo apruebe, y <b>Deshacer la última
+aprobación</b> lo revierte.</li>
+<li>El <b>Pronóstico de asistencia</b> suma la tasa de asistencia de cada persona para mostrar qué turnos podrían
+quedar cortos.</li>
+<li><b>Merece una invitación personal</b> muestra a voluntarios habituales que dejaron de venir, con un turno al que
+invitarlos.</li>
 </ul>
 <h3>Smart Match</h3>
 <ul>
@@ -195,7 +238,7 @@ SHORTCUTS_ES = """
 <table cellpadding="6">
 <tr><td><b>Ctrl+K</b></td><td>Hacerle una pregunta a ServeSync, o escribir el nombre de una página
 para ir allí</td></tr>
-<tr><td><b>Ctrl+1 ... Ctrl+6</b></td><td>Ir a cada página, en orden</td></tr>
+<tr><td><b>Ctrl+1, Ctrl+2, ...</b></td><td>Ir a cada página, en orden</td></tr>
 <tr><td><b>Ctrl+N</b></td><td>La acción principal arriba a la derecha (Agregar voluntario o Buscar un turno)</td></tr>
 <tr><td><b>Ctrl+F</b></td><td>Ir al cuadro de búsqueda de la página actual</td></tr>
 <tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>Texto más grande, más pequeño o tamaño normal (se guarda para

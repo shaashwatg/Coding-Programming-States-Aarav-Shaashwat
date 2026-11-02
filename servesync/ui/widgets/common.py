@@ -118,41 +118,45 @@ class PageHeader(QWidget):
         self.title.setAccessibleName(title)
 
 
-class ImpactStrip(QFrame):
+class ImpactStrip(QWidget):
     """
-    Key figures in one quiet band separated by thin rules.
+    Key figures in a row of cards.
 
     ``set_figures`` takes (value, label, attention) triples; ``attention``
-    colors the number marigold when it calls for action.
+    colors the number and marks the card's edge when it calls for action.
     """
 
     def __init__(self, count: int) -> None:
         super().__init__()
-        self.setProperty("strip", True)
         row = QHBoxLayout(self)
-        row.setContentsMargins(20, 14, 20, 14)
-        row.setSpacing(20)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(14)
+        self._cards: list[QFrame] = []
         self._values: list[QLabel] = []
         self._labels: list[QLabel] = []
-        for index in range(count):
-            if index:
-                rule = QFrame()
-                rule.setProperty("rule", True)
-                row.addWidget(rule)
-            cell = QVBoxLayout()
-            cell.setSpacing(0)
+        for _ in range(count):
+            card = QFrame()
+            card.setProperty("kpi", True)
+            cell = QVBoxLayout(card)
+            cell.setContentsMargins(18, 14, 18, 14)
+            cell.setSpacing(2)
             value = make_label("-", "figure")
             label = make_label("", "figure-label", wrap=True)
             cell.addWidget(value)
             cell.addWidget(label)
-            row.addLayout(cell, 1)
+            cell.addStretch(1)
+            row.addWidget(card, 1)
+            self._cards.append(card)
             self._values.append(value)
             self._labels.append(label)
 
     def set_figures(self, figures: Sequence[tuple[str, str, bool]]) -> None:
-        for (value, label, attention), value_label, text_label in zip(figures, self._values, self._labels, strict=True):
+        for (value, label, attention), card, value_label, text_label in zip(
+            figures, self._cards, self._values, self._labels, strict=True
+        ):
             value_label.setText(value)
             text_label.setText(label)
+            set_prop(card, "attention", attention)
             set_prop(value_label, "role", "figure-attention" if attention else "figure")
             value_label.setAccessibleName(f"{label}: {value}")
 

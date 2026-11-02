@@ -8,7 +8,10 @@ publish service opportunities, schedule shifts, take attendance, and report on p
 impact. Volunteers sign in to a self-service portal to find shifts, sign up, and see their hours.
 
 > **Build status:** feature-complete and tested — data storage, business rules with Smart Match,
-> the desktop interface, customizable reports with CSV/PDF export, the offline *Ask ServeSync*
+> the desktop interface, customizable reports with CSV/PDF export, *Staffing Studio*
+> (Autopilot scheduling, attendance forecast, re-engagement), public applications with referrals, a
+> check-in kiosk, personal hour goals, program results with a one-page impact summary, required
+> certifications with expiry dates, the offline *Ask ServeSync*
 > assistant, inclusive profiles and comfort settings, a full **English / Español** interface, and a
 > standalone app build.
 
@@ -40,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 445 automated tests, including the interface
+python -m pytest          # 506 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -124,6 +127,30 @@ build output are listed in `.gitignore`, so each person keeps their own demo dat
 
 ---
 
+## Why Python (language selection)
+
+ServeSync's requirements are a standalone desktop program that works offline, keeps related records
+safe, runs on the Mac or Windows laptop in front of the judges, and has logic complex enough to need
+real tests. Python fits each one:
+
+| Need | How Python meets it |
+|---|---|
+| Native desktop interface, one code base for macOS and Windows | **PySide6**, the official Python binding for **Qt**, a mature cross-platform GUI framework with model/view tables, an accessibility layer, and a signal-and-slot event system |
+| Reliable offline storage | **`sqlite3`** is in the standard library: an embedded **relational database** with **ACID transactions**, foreign keys, and `CHECK` constraints, and no server to install |
+| Modular, object-oriented design | Classes, **dataclasses**, **enums**, and **dependency injection** keep models, data access, business rules, and screens in separate layers |
+| Correctness in a dynamically typed language | Optional **static type hints**, checked by **mypy** in strict mode, plus **pytest** unit and interface tests and the **ruff** linter |
+| Fast iteration | A high-level, **interpreted** language with automatic memory management, so effort goes to rules and usability rather than boilerplate |
+| Runs without Python installed | **PyInstaller** bundles the interpreter and libraries into a standalone application |
+
+**Trade-offs against the alternatives.** Java with JavaFX is also cross-platform, but needs more
+ceremony for the same data classes. C# with WinForms or WPF is strongest on Windows alone. Electron
+(JavaScript) ships a whole browser with each app and would still need a database added. A website
+would need a server and internet access, which conference Wi-Fi can't promise. Python's main cost is
+raw speed, which doesn't matter here: an organization's records are small, and the slow steps are
+database queries and password hashing, which run in compiled code.
+
+---
+
 ## Architecture
 
 ServeSync uses a **layered architecture**. Each layer depends only on the layers beneath it, so
@@ -184,12 +211,13 @@ servesync/
     ├── scheduling_service.py    Sign-ups and cancellations
     ├── attendance_service.py    Check-in, no-shows, walk-ins, hours
     ├── matching_service.py      Smart Match recommendation engine (access-aware)
+    ├── staffing_service.py      Autopilot, attendance forecast, re-engagement
     ├── settings_service.py      Organization details + per-person comfort settings
     ├── reports/                 model · analytics (pure math) · service · export (CSV, HTML)
     └── assistant/               language (parsing) · knowledge (help search) · service (answers)
 └── ui/
     ├── app.py           Start-up, sign-in/sign-out cycle, last-resort error handler
-    ├── main_window.py   Top bar (logo, navigation, call to action), pages, shortcuts
+    ├── main_window.py   Sidebar (logo, pages), header (Ask, call to action), shortcuts
     ├── theme.py         Design tokens, four themes (AAA contrast), spacing, stylesheet
     ├── motion.py        Spring easing; every animation honors Reduce motion
     ├── feedback.py      Screen-reader announcer (live region) and toasts
@@ -203,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   445 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   506 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -246,10 +274,10 @@ devtools.py              Command-line developer and demo tools
 | Principle | How ServeSync applies it |
 |---|---|
 | **1. A strong design system** | Named color tokens (evergreen, harbor blue, marigold, brick, ink); two complementary fonts — Atkinson Hyperlegible for interface text and Source Serif 4 for titles and figures; one icon set (Lucide), with each idea keeping the same icon everywhere |
-| **2. Visually pleasing, functional choices** | Green for growth and blue for trust; readable fonts; generous whitespace; click targets at least 40 px tall; Gestalt grouping (related items share a panel, icon, and color) |
+| **2. Visually pleasing, functional choices** | Green for growth and blue for trust; readable fonts; generous whitespace; click targets at least 44 px tall; Gestalt grouping (related items share a panel, icon, and color) |
 | **3. Regularly updated content** | A dynamic *Happening next* banner (one featured event, never a carousel), a live activity feed, a shift calendar, and impact figures that update as hours are recorded |
 | **4. Images and video that build empathy** | Each program can show the organization's own photo, automatically resized under 300 kB; story-video links open only when someone chooses to watch (never autoplay); original category artwork when no photo is added |
-| **5. Familiar layout conventions** | Logo top-left, main navigation top-right, one visually distinct call-to-action button in the upper-right (*Add volunteer* for leaders, *Find a shift* for volunteers); the home page leads with the mission statement, impact statistics, and a call to action; a calm callout panel sits at the bottom — no pop-up asks |
+| **5. Familiar layout conventions** | Logo top-left, pages in a sidebar that keeps your place visible, one visually distinct call-to-action button in the upper-right (*Add volunteer* for leaders, *Find a shift* for volunteers); the home page leads with the mission statement, impact statistics, and a call to action; a calm callout panel sits at the bottom — no pop-up asks |
 | **6. Easy to scan** | Concise home pages; headings, bullet points, and short sentences; deeper detail on inner pages; master-detail layouts keep your place |
 
 ### User journeys
@@ -305,14 +333,14 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
 
 ### Reports (customizable output and analysis)
 
-Pick a question — *Volunteer hours, Program impact, Shift attendance, Recruitment channels,* or one
+Pick a question — *Volunteer hours, Program impact, Shift attendance, Recruitment channels, Impact summary,* or one
 person's *Service hours record* — then a period (presets including *This school year*, or custom
 dates), and optionally a program or category. Each report shows four headline figures,
-**plain-English insights** (from the demo data: "Mondays fill best (83%) and Sundays least (68%)",
-"the top 7 volunteers (20%) gave 37% of all hours", "1 shift already started but still has
-attendance to record"), a bar
+**plain-English insights** (for example, which weekday fills best and which fills least,
+how much of the service the top fifth of volunteers gave, and which shifts have already started but
+still have attendance to record), a bar
 chart, a trend line, and a sortable table. **Columns** chooses what to show; **Export CSV** and
-**Save PDF** contain exactly what you see. All four leader reports reconcile to the same total
+**Save PDF** contain exactly what you see. All five leader reports reconcile to the same total
 hours — a test proves it.
 
 ### Ask ServeSync (interactive Q&A)
@@ -353,6 +381,9 @@ volunteers ─┬─< volunteer_skills >── skills ──< opportunity_skills
 | `assignments`            | Sign-ups and attendance outcomes, hours served                 |
 | `user_accounts`          | Sign-in identities and roles (hashed passwords only)           |
 | `opportunities.story_video_url` | Optional story video link (added in schema version 2)   |
+| `volunteers.referred_by`, `hour_goal`, `hour_goal_due` | Who invited a volunteer; their personal goal (schema version 4) |
+| `opportunities.impact_unit`, `shifts.impact_amount` | What a program measures; what a shift achieved (schema version 5) |
+| `volunteer_certifications`, `opportunity_certifications` | Certifications held, with expiry dates; certifications a program requires (schema version 5) |
 | `app_settings`           | Organization name, mission statement, value of a volunteer hour, accessibility |
 | `volunteer_participation`| *View:* hours, attendance, no-shows, reliability per volunteer |
 | `shift_fill`             | *View:* spots filled per shift                                 |
@@ -405,16 +436,51 @@ explains every score in plain English.
 Hard rules (age, status, double-booking, capacity) are filtered out *before* scoring, using the same
 rule the sign-up screen uses. "Recommended for you" shows at most two shifts per program for variety.
 
+### Recruiting, check-in, goals, results, and certifications
+
+| Feature | What it does | Rules worth explaining |
+|---|---|---|
+| **Apply to volunteer** | A public form on the sign-in screen, including *Who invited you?* | It can only create an Applicant, whatever is submitted. If someone seems to be on file already, the answer never says who. The Recruitment report names the top referrer to thank |
+| **Check-in kiosk** | *Dashboard > Open check-in kiosk* turns a laptop into a welcome desk: type the last 4 digits of your phone | Opens 30 minutes before a shift and closes when it ends. Only people on that shift can match. Shows only a first name and last initial. Only the leader's password closes it. It records the full shift, and a leader can correct the hours on the roster |
+| **Hour goals** | A volunteer sets hours and a date on *Home*, then sees progress and a weekly pace. The kiosk reports progress too | Counts from August 1. The date must be after today. Only that person or a leader can change it |
+| **Results and impact summary** | A program names what it measures (*families served*); each shift records a number; the *Impact summary* report saves as a one-page PDF | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
+| **Required certifications** | A program can require a certification; leaders record each person's, with an expiry date | A hard rule inside the one shared `signup_blockers` check, so manual sign-up, Smart Match, and Autopilot all enforce it; walk-ins and the kiosk check it too. It must still be valid on the day of the shift. Volunteers can't certify themselves. Staffing Studio lists those to renew within 45 days |
+
+Every result in the demo is sample data calculated from attendance.
+
+### Staffing Studio (look ahead, then act)
+
+Smart Match answers "who is best for this shift?" Staffing Studio answers the coordinator's bigger
+questions, on one leaders-only page, over the next two weeks.
+
+| Tool | Question | How it works |
+|---|---|---|
+| **Autopilot** | How do I staff everything at once? | Shares people *across* shifts with a greedy heuristic: the shift with the least slack (strong candidates minus open spots) chooses first. It only drafts people who score 60 or more, are usually free, and have no access gap; drafts at most 2 shifts per person, never overlapping; and takes 2 score points per hour already planned, so work is spread fairly |
+| **Attendance forecast** | Which shifts may come up short, even if they look full? | Expected turnout is the sum of each signed-up person's show-up rate (newcomers count as 70%). At least 75% of capacity is *On track*, at least 50% is *Watch*, and less is *At risk*. Always shown in words as well as color |
+| **Worth a personal invitation** | Who has quietly stopped coming? | Active volunteers with service history, nothing upcoming, and 45+ days away, most hours first, each with the shift Smart Match rates best for them |
+
+A person stays in charge. Autopilot saves nothing until the coordinator approves; each line says who,
+where, and why; any line can be unticked; every sign-up still passes the normal rules; and *Undo last
+approval* reverses the batch. If something changed since the draft, that one sign-up is skipped and
+explained. ServeSync doesn't send messages, so the coordinator tells each person. The forecast and
+thresholds are transparent rules of thumb based on past attendance, not a trained statistical model.
+
+![Staffing Studio](docs/screenshots/staffing.png)
+
+![Check-in kiosk](docs/screenshots/kiosk.png)
+
+![Impact summary](docs/screenshots/impact-summary.png)
+
 ---
 
 ## Quality checks
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 445 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 506 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
-| `mypy` (strict mode)     | No type errors in all 90 files, interface and tests included |
+| `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |
 | Contrast                 | Every text color ≥ 7:1, every boundary ≥ 3:1, in all themes (`tests/test_theme.py`) |
 | Standalone build         | `ServeSync --check` passes on the built app with no Python installed |
 

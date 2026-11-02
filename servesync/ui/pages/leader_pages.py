@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QGridLayout, QListWidget, QListWidgetItem
 from servesync.core.i18n import format_long_day, mark, tr
 from servesync.models import ShiftOverview
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_appearance
@@ -46,7 +47,11 @@ class DashboardPage(Page):
 
     def __init__(self, ctx: AppContext) -> None:
         super().__init__(ctx, scrollable=True)
-        self.header = PageHeader(tr("Dashboard"), "")
+        self.header = PageHeader(
+            tr("Dashboard"),
+            "",
+            [make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk)],
+        )
         self.layout_.addWidget(self.header)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
@@ -185,6 +190,13 @@ class DashboardPage(Page):
                     total=insight.total,
                 ),
             )
+
+    @guarded
+    def _open_kiosk(self) -> None:
+        kiosk = KioskDialog(self.ctx, self)
+        kiosk.showFullScreen()
+        kiosk.exec()
+        self.ctx.changed()
 
     @guarded
     def _open(self, overview: ShiftOverview, *, smart: bool) -> None:

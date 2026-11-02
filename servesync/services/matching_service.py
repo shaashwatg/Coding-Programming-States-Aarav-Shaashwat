@@ -19,7 +19,7 @@ black box.
 "Recommended for you" also diversifies: at most two shifts from any one
 program, so a volunteer sees a range of ways to help.
 
-Hard rules (age, active status, double-booking, capacity) are never traded
+Hard rules (age, active status, certifications, double-booking, capacity) are never traded
 off against points: anyone who breaks one is filtered out *before* scoring,
 using the same ``signup_blockers`` rule the sign-up screen uses.
 
@@ -101,6 +101,10 @@ class _MatchBase:
     @property
     def fits_access_needs(self) -> bool:
         return not self._gaps()
+
+    @property
+    def is_usually_free(self) -> bool:
+        return not self.factors[0].is_concern  # score_match always lists availability first
 
     def _gaps(self) -> tuple[str, ...]:
         return ()
@@ -328,6 +332,7 @@ class MatchingService(Service):
                 now=now,
                 already_signed_up=volunteer_id in already_on,
                 has_conflict=volunteer_id in busy,
+                required_certifications=opportunity.required_certifications,
             ):
                 continue
             factors = score_match(
@@ -411,6 +416,7 @@ class MatchingService(Service):
                 now=now,
                 already_signed_up=shift.shift_id in signed_up,
                 has_conflict=clash,
+                required_certifications=opportunity.required_certifications,
             ):
                 continue
             factors = score_match(

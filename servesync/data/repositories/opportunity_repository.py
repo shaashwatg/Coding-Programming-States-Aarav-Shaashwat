@@ -19,7 +19,7 @@ _ENTITY = mark("Opportunity")
 
 _SELECT_OPPORTUNITY = """
     SELECT opportunity_id, title, description, category, location, coordinator_name, min_age, status,
-           story_video_url
+           story_video_url, impact_unit
     FROM opportunities
 """
 
@@ -37,15 +37,16 @@ class OpportunityRepository(Repository):
             cursor = self._db.execute(
                 """
                 INSERT INTO opportunities (title, description, category, location, coordinator_name, min_age, status,
-                                           story_video_url)
+                                           story_video_url, impact_unit)
                 VALUES (:title, :description, :category, :location, :coordinator_name, :min_age, :status,
-                        :story_video_url)
+                        :story_video_url, :impact_unit)
                 """,
                 self._to_params(opportunity),
             )
             new_id = int(cursor.lastrowid or 0)
             self._write_required_skills(new_id, opportunity.required_skills)
             self._write_access_features(new_id, opportunity.access_features)
+            self._write_certifications(new_id, opportunity.required_certifications)
         # Re-read so callers get canonical values (e.g. existing skill spellings).
         return self.get(new_id)
 
@@ -58,6 +59,7 @@ class OpportunityRepository(Repository):
                 SET title = :title, description = :description, category = :category,
                     location = :location, coordinator_name = :coordinator_name,
                     min_age = :min_age, status = :status, story_video_url = :story_video_url,
+                    impact_unit = :impact_unit,
                     updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime')
                 WHERE opportunity_id = :opportunity_id
                 """,
@@ -67,8 +69,10 @@ class OpportunityRepository(Repository):
                 raise RecordNotFoundError(_ENTITY, opportunity_id)
             self._db.execute("DELETE FROM opportunity_skills WHERE opportunity_id = ?", (opportunity_id,))
             self._db.execute("DELETE FROM opportunity_access_features WHERE opportunity_id = ?", (opportunity_id,))
+            self._db.execute("DELETE FROM opportunity_certifications WHERE opportunity_id = ?", (opportunity_id,))
             self._write_required_skills(opportunity_id, opportunity.required_skills)
             self._write_access_features(opportunity_id, opportunity.access_features)
+            self._write_certifications(opportunity_id, opportunity.required_certifications)
         return self.get(opportunity_id)
 
     def set_status(self, opportunity_id: int, status: OpportunityStatus) -> None:
@@ -154,6 +158,7 @@ class OpportunityRepository(Repository):
             "min_age": opportunity.min_age,
             "status": opportunity.status.value,
             "story_video_url": opportunity.story_video_url,
+            "impact_unit": opportunity.impact_unit,
         }
 
     def _write_required_skills(self, opportunity_id: int, skills: frozenset[str]) -> None:
@@ -161,6 +166,12 @@ class OpportunityRepository(Repository):
         self._db.execute_many(
             "INSERT INTO opportunity_skills (opportunity_id, skill_id) VALUES (?, ?)",
             [(opportunity_id, skill_id) for skill_id in skill_ids.values()],
+        )
+
+    def _write_certifications(self, opportunity_id: int, names: frozenset[str]) -> None:
+        self._db.execute_many(
+            "INSERT INTO opportunity_certifications (opportunity_id, name) VALUES (?, ?)",
+            [(opportunity_id, name) for name in names],
         )
 
     def _write_access_features(self, opportunity_id: int, features: frozenset[AccessNeed]) -> None:
@@ -173,7 +184,14 @@ class OpportunityRepository(Repository):
         ids = [row["opportunity_id"] for row in rows]
         skills: defaultdict[int, set[str]] = defaultdict(set)
         features: defaultdict[int, set[AccessNeed]] = defaultdict(set)
+        certifications: defaultdict[int, set[str]] = defaultdict(set)
         for batch in chunked(ids):
+            for certification_row in self._db.query_all(
+                f"""SELECT opportunity_id, name FROM opportunity_certifications
+                    WHERE opportunity_id IN ({placeholders(batch)})""",
+                tuple(batch),
+            ):
+                certifications[certification_row["opportunity_id"]].add(certification_row["name"])
             for feature_row in self._db.query_all(
                 f"""SELECT opportunity_id, feature FROM opportunity_access_features
                     WHERE opportunity_id IN ({placeholders(batch)})""",
@@ -199,6 +217,8 @@ class OpportunityRepository(Repository):
                 required_skills=frozenset(skills[row["opportunity_id"]]),
                 story_video_url=row["story_video_url"],
                 access_features=frozenset(features[row["opportunity_id"]]),
+                impact_unit=row["impact_unit"],
+                required_certifications=frozenset(certifications[row["opportunity_id"]]),
                 opportunity_id=row["opportunity_id"],
             )
             for row in rows

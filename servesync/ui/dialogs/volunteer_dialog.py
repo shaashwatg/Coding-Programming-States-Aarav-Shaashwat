@@ -11,6 +11,8 @@ Two levels of validation meet here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QComboBox,
@@ -23,12 +25,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from servesync.core.errors import ValidationError
 from servesync.core.i18n import tr
 from servesync.core.validators import suggest_email_correction
 from servesync.models import RecruitmentSource, Volunteer, VolunteerStatus
-from servesync.services import Permission
+from servesync.services import Permission, Services, Session
 from servesync.ui.context import AppContext
-from servesync.ui.widgets.common import EnumComboBox, confirm, from_qdate, make_label, to_qdate
+from servesync.ui.widgets.common import (
+    EnumComboBox,
+    confirm,
+    format_date,
+    from_qdate,
+    make_button,
+    make_label,
+    to_qdate,
+)
 from servesync.ui.widgets.forms import AccessPicker, AvailabilityGrid, FormDialog, SkillPicker
 
 #: Common pronouns offered as suggestions; anyone can type their own instead.
@@ -160,6 +171,9 @@ class VolunteerDialog(FormDialog):
         if self._is_leader:
             self.add_section(tr("Recruitment (leaders only)"))
             self.add_field("recruitment_source", tr("How they heard about us"), self.source)
+            self.referred_by = QLineEdit()
+            self.referred_by.setMaxLength(101)
+            self.add_field("referred_by", tr("Referred by"), self.referred_by, tr("Optional. Who invited them?"))
             self.add_field("joined_on", tr("Joined on"), self.joined_on)
             if volunteer is None:
                 self.status.removeItem(
@@ -172,11 +186,69 @@ class VolunteerDialog(FormDialog):
                     tr("Applicants can't be scheduled until a leader approves them."),
                 )
             self.add_field("notes", tr("Staff notes"), self.notes, tr("Visible to leaders only."))
+            if volunteer is not None:
+                self.add_section(tr("Certifications (leaders only)"))
+                self.certification_name = QComboBox()
+                self.certification_name.setEditable(True)
+                self.certification_name.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+                self.certification_name.addItems(ctx.services.volunteers.certification_names())
+                self.add_field("certification_name", tr("Certification"), self.certification_name)
+                self.certification_expires = _date_edit(QDate(2100, 1, 1))
+                self.certification_expires.setDate(today.addYears(1))
+                self.add_field("certification_expires", tr("Expiry date"), self.certification_expires)
+                buttons = QWidget()
+                row = QHBoxLayout(buttons)
+                row.setContentsMargins(0, 0, 0, 0)
+                row.addWidget(make_button(tr("Add or renew"), on_click=self._add_certification))
+                row.addWidget(make_button(tr("Remove"), on_click=self._remove_certification))
+                row.addStretch(1)
+                self.form.addRow(buttons)
+                self.certification_list = make_label("", "muted", wrap=True)
+                self.form.addRow(self.certification_list)
+                self._show_certifications(volunteer)
 
         if volunteer is not None:
             self._load(volunteer)
         self.resize(720, 760)
         self.first_name.setFocus()
+
+    # -------------------------------------------------------- certifications
+
+    def _show_certifications(self, volunteer: Volunteer) -> None:
+        held = sorted(volunteer.certifications, key=lambda c: c.name.casefold())
+        self.certification_list.setText(
+            "\n".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held)
+            or tr("None recorded yet.")
+        )
+
+    def _add_certification(self) -> None:
+        self._change_certification(
+            lambda services, session, volunteer_id: services.volunteers.add_certification(
+                session,
+                volunteer_id,
+                self.certification_name.currentText(),
+                from_qdate(self.certification_expires.date()),
+            )
+        )
+
+    def _remove_certification(self) -> None:
+        self._change_certification(
+            lambda services, session, volunteer_id: services.volunteers.remove_certification(
+                session, volunteer_id, self.certification_name.currentText()
+            )
+        )
+
+    def _change_certification(self, change: Callable[[Services, Session, int], Volunteer]) -> None:
+        """Saved at once, separately from the form: a credential isn't part of the person's details."""
+        assert self._original is not None
+        try:
+            updated = change(self._ctx.services, self._ctx.session, self._original.volunteer_id or 0)
+        except ValidationError as error:
+            self.show_errors(error)
+            return
+        self.clear_errors()
+        self._show_certifications(updated)
+        self._ctx.events.data_changed.emit()
 
     # --------------------------------------------------------------- loading
 
@@ -194,6 +266,8 @@ class VolunteerDialog(FormDialog):
         self.skills.set_skills(volunteer.skills)
         self.availability.set_slots(volunteer.availability)
         self.source.set_value(volunteer.recruitment_source)
+        if self._is_leader:
+            self.referred_by.setText(volunteer.referred_by)
         self.joined_on.setDate(to_qdate(volunteer.joined_on))
         self.notes.setPlainText(volunteer.notes)
 
@@ -239,6 +313,9 @@ class VolunteerDialog(FormDialog):
             preferred_name=self.preferred_name.text(),
             pronouns=self.pronouns.currentText(),
             access_needs=self.access.values(),
+            referred_by=self.referred_by.text() if self._is_leader else (original.referred_by if original else ""),
+            hour_goal=original.hour_goal if original else None,
+            hour_goal_due=original.hour_goal_due if original else None,
             volunteer_id=original.volunteer_id if original else None,
         )
 

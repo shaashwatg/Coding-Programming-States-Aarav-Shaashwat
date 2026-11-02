@@ -156,7 +156,7 @@ ARTICLES: tuple[HelpArticle, ...] = (
         "Keyboard shortcuts",
         "keyboard shortcut keys hotkey mouse navigate tab without mouse",
         (
-            "Ctrl+1 to Ctrl+6 open each page; Ctrl+K opens Ask ServeSync; Ctrl+N is the main action.",
+            "Ctrl+1, Ctrl+2, and so on open each page; Ctrl+K opens Ask ServeSync; Ctrl+N is the main action.",
             "Ctrl+F jumps to search; F1 opens help; Tab moves between controls; Esc closes a window.",
             "On a Mac, use Command where you see Ctrl.",
         ),
@@ -200,6 +200,75 @@ ARTICLES: tuple[HelpArticle, ...] = (
             "for 15 minutes.",
             "To back up, copy the ServeSync data folder shown in Settings.",
         ),
+    ),
+    HelpArticle(
+        "Fill many open shifts at once",
+        "autopilot staffing studio forecast turnout attendance fill schedule plan draft short lapsed invite retention",
+        (
+            "Open Staffing Studio and read Autopilot's draft: each line says who, where, and why.",
+            "Untick anyone you'd rather not ask, then choose Sign up selected. Undo last approval reverses it.",
+            "Check the Attendance forecast for shifts that may come up short, and Worth a personal invitation "
+            "for regulars who have stopped coming.",
+        ),
+        page="staffing",
+        leaders_only=True,
+        action_label="Open Staffing Studio",
+    ),
+    HelpArticle(
+        "Let volunteers check themselves in",
+        "kiosk check in arrive arrival front desk shared laptop self phone digits",
+        (
+            "On the Dashboard, choose Open check-in kiosk and leave the laptop at the door.",
+            "Volunteers type the last 4 digits of their phone. Check-in opens 30 minutes before a shift.",
+            "Your password closes the kiosk. Correct anyone's hours on the shift's roster afterward.",
+        ),
+        page="dashboard",
+        leaders_only=True,
+        action_label="Open Dashboard",
+    ),
+    HelpArticle(
+        "Apply to become a volunteer",
+        "apply application join new become volunteer referred referral invite friend",
+        (
+            "On the sign-in screen, choose New here? Apply to volunteer.",
+            "Fill in the form, and say who invited you if someone did.",
+            "A coordinator reviews it on the Volunteers page and gives you a sign-in.",
+        ),
+    ),
+    HelpArticle(
+        "Report results, not just hours",
+        "impact result outcome measure meals donors grant board summary one page",
+        (
+            "Edit a program and fill in What this program measures, such as meals served.",
+            "After each shift, open its roster, enter the result, and choose Save result.",
+            "On Reports, choose Impact summary, then Save PDF for a one-page summary.",
+        ),
+        page="reports",
+        leaders_only=True,
+        action_label="Open Reports",
+    ),
+    HelpArticle(
+        "Require a certification for a program",
+        "certification certificate background check cpr expire expiry renew required license",
+        (
+            "Edit the program and tick or type it under Required certifications.",
+            "Edit each volunteer to add it with an expiry date. Only leaders can record one.",
+            "Nobody can be scheduled without a current one. Staffing Studio lists those to renew.",
+        ),
+        page="staffing",
+        leaders_only=True,
+        action_label="Open Staffing Studio",
+    ),
+    HelpArticle(
+        "Set a goal for my service hours",
+        "goal target hours requirement school progress pace",
+        (
+            "On Home, choose Set a goal under My hour goal.",
+            "Enter the hours and the date you want to reach them by. Hours count from August 1.",
+            "Home shows your progress and about how many hours a week it takes.",
+        ),
+        page="home",
+        action_label="Open Home",
     ),
 )
 
@@ -330,7 +399,8 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
         "Atajos de teclado",
         "teclado atajo teclas raton navegar tab sin raton",
         (
-            "Ctrl+1 a Ctrl+6 abren cada página; Ctrl+K abre Pregúntale a ServeSync; Ctrl+N es la acción principal.",
+            "Ctrl+1, Ctrl+2, etc. abren cada página; Ctrl+K abre Pregúntale a ServeSync; Ctrl+N es la "
+            "acción principal.",
             "Ctrl+F va a la búsqueda; F1 abre la ayuda; Tab pasa de un control a otro; Esc cierra una ventana.",
             "En una Mac, use Comando donde vea Ctrl.",
         ),
@@ -380,6 +450,69 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
             "Para hacer una copia de respaldo, copie la carpeta de datos de ServeSync que aparece en Configuración.",
         ),
         "",
+    ),
+    (
+        "Cubrir muchos turnos abiertos a la vez",
+        "piloto automatico estudio de personal pronostico asistencia cubrir horario plan borrador invitar retencion",
+        (
+            "Abra Estudio de personal y lea el borrador del Piloto automático: cada línea dice quién, dónde y por qué.",
+            "Desmarque a quien prefiera no invitar y elija Inscribir seleccionados. Deshacer la última aprobación "
+            "lo revierte.",
+            "Revise el Pronóstico de asistencia para ver los turnos que podrían quedar cortos, y Merece una "
+            "invitación personal para ver a quienes dejaron de venir.",
+        ),
+        "Abrir Estudio de personal",
+    ),
+    (
+        "Permitir que los voluntarios registren su llegada",
+        "quiosco registrar llegada entrada recepcion computadora compartida telefono digitos",
+        (
+            "En el Panel, elija Abrir quiosco de llegada y deje la computadora en la entrada.",
+            "Los voluntarios escriben los últimos 4 dígitos de su teléfono. El registro abre 30 minutos antes "
+            "del turno.",
+            "Su contraseña cierra el quiosco. Después puede corregir las horas en la lista del turno.",
+        ),
+        "Abrir Panel",
+    ),
+    (
+        "Solicitar ser voluntario",
+        "solicitar solicitud unirse nuevo ser voluntario referido recomendacion invitar amigo",
+        (
+            "En la pantalla de inicio de sesión, elija ¿Es nuevo? Solicite ser voluntario.",
+            "Complete el formulario y diga quién lo invitó, si alguien lo hizo.",
+            "Un coordinador la revisa en la página Voluntarios y le da un acceso.",
+        ),
+        "",
+    ),
+    (
+        "Informar resultados, no solo horas",
+        "impacto resultado medir comidas donantes subvencion junta resumen una pagina",
+        (
+            "Edite un programa y complete Qué mide este programa, por ejemplo comidas servidas.",
+            "Después de cada turno, abra su lista, escriba el resultado y elija Guardar resultado.",
+            "En Informes, elija Resumen de impacto y luego Guardar PDF para obtener un resumen de una página.",
+        ),
+        "Abrir Informes",
+    ),
+    (
+        "Exigir una certificación para un programa",
+        "certificacion certificado verificacion de antecedentes rcp vencer vencimiento renovar requerida licencia",
+        (
+            "Edite el programa y márquela o escríbala en Certificaciones requeridas.",
+            "Edite a cada voluntario para agregarla con su fecha de vencimiento. Solo los líderes pueden registrarla.",
+            "Nadie puede programarse sin una vigente. Estudio de personal muestra las que hay que renovar.",
+        ),
+        "Abrir Estudio de personal",
+    ),
+    (
+        "Fijar una meta para mis horas de servicio",
+        "meta objetivo horas requisito escuela progreso ritmo",
+        (
+            "En Inicio, elija Fijar una meta en Mi meta de horas.",
+            "Escriba las horas y la fecha en que quiere alcanzarlas. Las horas cuentan desde el 1 de agosto.",
+            "Inicio muestra su progreso y cuántas horas por semana necesita, aproximadamente.",
+        ),
+        "Abrir Inicio",
     ),
 )
 

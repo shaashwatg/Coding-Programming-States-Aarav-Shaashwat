@@ -9,6 +9,8 @@ if [ ! -x .venv/bin/python ]; then
     read -n 1 -s -r -p "Press any key to close this window."
     exit 1
 fi
+# macOS can mark files inside hidden folders as hidden, and Qt then can't find its plugins.
+chflags -R nohidden .venv 2>/dev/null
 # shellcheck disable=SC1091
 source .venv/bin/activate
 echo "Opening ServeSync... (you can minimize this window; closing it also closes ServeSync)"

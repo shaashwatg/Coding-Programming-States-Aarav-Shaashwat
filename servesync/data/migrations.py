@@ -258,10 +258,45 @@ LEFT JOIN shifts      AS s ON s.shift_id = a.shift_id
 GROUP BY v.volunteer_id;
 """
 
+_V4_REFERRALS_AND_GOALS = """
+-- Who referred a volunteer (the channel alone can't say who to thank).
+ALTER TABLE volunteers ADD COLUMN referred_by TEXT NOT NULL DEFAULT ''
+    CHECK (length(referred_by) <= 101);
+
+-- A personal service-hours goal: both parts or neither.
+ALTER TABLE volunteers ADD COLUMN hour_goal INTEGER
+    CHECK (hour_goal IS NULL OR hour_goal BETWEEN 1 AND 2000);
+ALTER TABLE volunteers ADD COLUMN hour_goal_due TEXT;
+"""
+
+_V5_IMPACT_AND_CERTIFICATIONS = """
+-- Results, not just hours: each program names what it measures; each shift records how much.
+ALTER TABLE opportunities ADD COLUMN impact_unit TEXT NOT NULL DEFAULT ''
+    CHECK (length(impact_unit) <= 40);
+ALTER TABLE shifts ADD COLUMN impact_amount INTEGER
+    CHECK (impact_amount IS NULL OR impact_amount BETWEEN 0 AND 1000000);
+
+-- Certifications a volunteer holds (leaders record them) and those a program requires.
+CREATE TABLE volunteer_certifications (
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    name         TEXT NOT NULL CHECK (length(name) BETWEEN 2 AND 60),
+    expires_on   TEXT NOT NULL,
+    PRIMARY KEY (volunteer_id, name)
+) WITHOUT ROWID;
+
+CREATE TABLE opportunity_certifications (
+    opportunity_id INTEGER NOT NULL REFERENCES opportunities (opportunity_id) ON DELETE CASCADE,
+    name           TEXT NOT NULL CHECK (length(name) BETWEEN 2 AND 60),
+    PRIMARY KEY (opportunity_id, name)
+) WITHOUT ROWID;
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
     Migration(3, "Preferred names, pronouns, access needs, and per-person preferences", _V3_INCLUSION),
+    Migration(4, "Who referred each volunteer, and personal hour goals", _V4_REFERRALS_AND_GOALS),
+    Migration(5, "Program results and required certifications", _V5_IMPACT_AND_CERTIFICATIONS),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

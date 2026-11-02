@@ -32,7 +32,7 @@ from servesync.models.read_models import (
     ShiftOverview,
     VolunteerParticipation,
 )
-from servesync.models.volunteer import AvailabilitySlot, Volunteer, access_gaps
+from servesync.models.volunteer import AvailabilitySlot, Certification, Volunteer, access_gaps
 
 __all__ = [
     "AccessNeed",
@@ -42,6 +42,7 @@ __all__ = [
     "Assignment",
     "AssignmentStatus",
     "AvailabilitySlot",
+    "Certification",
     "DayPart",
     "MessageDuration",
     "Opportunity",

@@ -2,6 +2,7 @@
 Render every major screen to PNG files (for design review, the README, and slides).
 
     python tools/capture_screens.py OUTPUT_FOLDER [--theme LIGHT|DARK|HIGH_CONTRAST] [--scale 1.0] [--language es]
+        [--date 2026-11-10]
 
 Runs against a throwaway copy of the demo data, so it never touches real records.
 """
@@ -13,6 +14,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Callable
+from datetime import date, datetime, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -23,7 +25,7 @@ from servesync.core.i18n import Language, tr
 from servesync.data import DataStore
 from servesync.data.seed import DEMO_PASSWORD, seed_demo_data
 from servesync.models import Appearance, Theme
-from servesync.services import Services
+from servesync.services import FixedClock, Services
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog
@@ -60,6 +62,7 @@ def main() -> int:
     parser.add_argument("--theme", default="LIGHT")
     parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--language", default="en", choices=[language.value for language in Language])
+    parser.add_argument("--date", type=date.fromisoformat, help="pretend today is this day (default: real today)")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -68,8 +71,9 @@ def main() -> int:
     theme.set_font_families(*assets.load_fonts())
     with tempfile.TemporaryDirectory() as temp:
         store = DataStore.open(Path(temp) / "servesync.db")
-        seed_demo_data(store, password_iterations=1_000)
-        services = Services.create(store, password_iterations=1_000)
+        seed_demo_data(store, today=args.date, password_iterations=1_000)
+        clock = FixedClock(datetime.combine(args.date, time(9, 0))) if args.date else None
+        services = Services.create(store, clock=clock, password_iterations=1_000)
         language = Language(args.language)
         theme.apply_appearance(app, Appearance(theme=Theme(args.theme), font_scale=args.scale, language=language))
         suffix = "" if args.theme == "LIGHT" and args.scale == 1.0 else f"-{args.theme.lower()}-{args.scale:g}"

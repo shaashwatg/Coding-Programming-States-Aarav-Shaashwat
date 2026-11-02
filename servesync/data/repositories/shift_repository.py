@@ -15,10 +15,10 @@ from servesync.models import OpportunityCategory, OpportunityStatus, Shift, Shif
 
 _ENTITY = mark("Shift")
 
-_SELECT_SHIFT = "SELECT shift_id, opportunity_id, starts_at, ends_at, capacity, notes FROM shifts"
+_SELECT_SHIFT = "SELECT shift_id, opportunity_id, starts_at, ends_at, capacity, notes, impact_amount FROM shifts"
 
 _SELECT_OVERVIEW = """
-    SELECT s.shift_id, s.opportunity_id, s.starts_at, s.ends_at, s.capacity, s.notes,
+    SELECT s.shift_id, s.opportunity_id, s.starts_at, s.ends_at, s.capacity, s.notes, s.impact_amount,
            o.title AS opportunity_title, o.category, o.location, o.status AS opportunity_status,
            f.filled
     FROM shifts AS s
@@ -62,6 +62,12 @@ class ShiftRepository(Repository):
             if cursor.rowcount == 0:
                 raise RecordNotFoundError(_ENTITY, shift_id)
         return shift
+
+    def set_impact(self, shift_id: int, amount: int) -> Shift:
+        cursor = self._db.execute("UPDATE shifts SET impact_amount = ? WHERE shift_id = ?", (amount, shift_id))
+        if cursor.rowcount == 0:
+            raise RecordNotFoundError(_ENTITY, shift_id)
+        return self.get(shift_id)
 
     def delete(self, shift_id: int) -> None:
         """Delete a shift only if nobody has signed up for it."""
@@ -156,6 +162,7 @@ class ShiftRepository(Repository):
             ends_at=datetime_from_db(row["ends_at"]),
             capacity=row["capacity"],
             notes=row["notes"],
+            impact_amount=row["impact_amount"],
             shift_id=row["shift_id"],
         )
 

@@ -9,14 +9,23 @@ Services gather the facts, call these rules, and act on the answer.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from datetime import datetime
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import date, datetime
 from types import MappingProxyType
 
 from servesync.core.errors import BusinessRuleError
 from servesync.core.i18n import tr
 from servesync.core.validators import calculate_age
-from servesync.models import AccessNeed, OpportunityStatus, ShiftOverview, Volunteer, VolunteerStatus, access_gaps
+from servesync.models import (
+    AccessNeed,
+    OpportunityStatus,
+    ServiceRecord,
+    ShiftOverview,
+    Volunteer,
+    VolunteerStatus,
+    access_gaps,
+)
 
 #: Allowed recruitment-pipeline moves. Applicants are approved (Active) or
 #: declined (Inactive); Active volunteers can be archived and later return.
@@ -57,6 +66,24 @@ def check_opportunity_transition(current: OpportunityStatus, new: OpportunitySta
         )
 
 
+def missing_certifications(volunteer: Volunteer, required: Iterable[str], on: date) -> list[str]:
+    """The required certifications this volunteer won't hold, or that will have run out, on the given day."""
+    missing = []
+    for name in sorted(required, key=str.casefold):
+        held = volunteer.certification(name)
+        if held is None or not held.is_valid_on(on):
+            missing.append(name)
+    return missing
+
+
+def certification_message(volunteer: Volunteer, missing: Sequence[str]) -> str:
+    return tr(
+        "{full_name} needs a current certification for this program: {names}.",
+        full_name=volunteer.full_name,
+        names=", ".join(missing),
+    )
+
+
 def signup_blockers(
     *,
     volunteer: Volunteer,
@@ -65,6 +92,7 @@ def signup_blockers(
     now: datetime,
     already_signed_up: bool,
     has_conflict: bool,
+    required_certifications: Iterable[str],
 ) -> list[str]:
     """
     Every reason ``volunteer`` cannot sign up for the shift (empty list = allowed).
@@ -107,11 +135,67 @@ def signup_blockers(
                 age=age,
             )
         )
+    missing = missing_certifications(volunteer, required_certifications, shift.starts_at.date())
+    if missing:
+        reasons.append(certification_message(volunteer, missing))
     if has_conflict:
         reasons.append(
             tr("{full_name} is already scheduled for another shift at that time.", full_name=volunteer.full_name)
         )
     return reasons
+
+
+@dataclass(frozen=True, slots=True)
+class HourGoalProgress:
+    """How a volunteer is doing against their personal goal, counted from Aug 1 (the school year)."""
+
+    goal: int
+    due: date
+    served: float
+    expected_by_now: float
+    days_left: int
+
+    @property
+    def remaining(self) -> float:
+        return max(self.goal - self.served, 0.0)
+
+    @property
+    def share(self) -> float:
+        return min(self.served / self.goal, 1.0)
+
+    @property
+    def reached(self) -> bool:
+        return self.served >= self.goal
+
+    @property
+    def on_pace(self) -> bool:
+        return self.served >= self.expected_by_now
+
+    @property
+    def hours_per_week(self) -> float:
+        """What it takes from here; the whole remainder when there are no full weeks left."""
+        return round(self.remaining / max(self.days_left / 7, 1.0), 1)
+
+
+def school_year_start(today: date) -> date:
+    return date(today.year if today.month >= 8 else today.year - 1, 8, 1)
+
+
+def hour_goal_progress(volunteer: Volunteer, records: Iterable[ServiceRecord], today: date) -> HourGoalProgress | None:
+    """Progress toward a volunteer's goal (pure: facts in, answer out), or None if no goal is set."""
+    if volunteer.hour_goal is None or volunteer.hour_goal_due is None:
+        return None
+    start = school_year_start(today)
+    served = sum(r.assignment.counted_hours for r in records if start <= r.starts_at.date() <= volunteer.hour_goal_due)
+    span = max((volunteer.hour_goal_due - start).days, 1)
+    elapsed = min(max((today - start).days, 0), span)
+    return HourGoalProgress(
+        goal=volunteer.hour_goal,
+        due=volunteer.hour_goal_due,
+        served=round(served, 2),
+        expected_by_now=round(volunteer.hour_goal * elapsed / span, 2),
+        days_left=max((volunteer.hour_goal_due - today).days, 0),
+    )
 
 
 def describe_access_gaps(needs: frozenset[AccessNeed], offered: frozenset[AccessNeed], program_title: str) -> list[str]:

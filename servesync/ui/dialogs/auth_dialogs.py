@@ -38,7 +38,8 @@ def _password_field(placeholder: str = "") -> QLineEdit:
 def _brand_panel(organization: str, mission: str) -> QFrame:
     """The left half of the welcome screens: logo, name, and the organization's mission."""
     panel = QFrame()
-    panel.setObjectName("TopBar")
+    panel.setObjectName("Sidebar")
+    panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
     panel.setMinimumWidth(320)
     column = QVBoxLayout(panel)
     column.setContentsMargins(32, 36, 32, 32)
@@ -140,6 +141,8 @@ class LoginDialog(QDialog):
         self.sign_in_button = make_button(tr("Sign in"), kind="primary", on_click=self._sign_in)
         self.sign_in_button.setDefault(True)
         column.addWidget(self.sign_in_button)
+        self.apply_button = make_button(tr("New here? Apply to volunteer"), on_click=self._apply)
+        column.addWidget(self.apply_button)
 
         if organization == DEMO_ORGANIZATION_NAME:
             hint = Panel()
@@ -169,6 +172,11 @@ class LoginDialog(QDialog):
         self._services.settings.set_device_language(language)
         self.chosen_language = language
         self.done(self.LANGUAGE_CHANGED)
+
+    def _apply(self) -> None:
+        from servesync.ui.dialogs.application_dialog import ApplicationDialog  # only needed if someone applies
+
+        ApplicationDialog(self._services, self).exec()
 
     def _sign_in(self) -> None:
         self.error.hide()

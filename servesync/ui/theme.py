@@ -10,9 +10,10 @@ Design rationale (for the UX portion of the presentation)
   7:1 against every background it can sit on (1.4.6 Contrast Enhanced); input
   borders and focus rings are at least 3:1 (1.4.11, 2.4.13). See
   ``tests/test_theme.py``, which computes the ratios for all four themes.
-* **Calm, content-first chrome.** A light top bar with one hairline, generous
-  4-point spacing, and a single accent per purpose: evergreen for actions,
-  harbor blue for information, marigold for the one call to action.
+* **Calm, content-first chrome.** A deep evergreen sidebar keeps the place you
+  are in visible; content sits on a light canvas in separate cards, with
+  generous 4-point spacing and a single accent per purpose: evergreen for
+  actions, harbor blue for information, marigold for the one call to action.
 * **Two complementary fonts.** Atkinson Hyperlegible (Braille Institute) for
   interface text; Source Serif 4 for titles and key figures.
 * **Big targets.** Every button, field and tab is at least 44 px tall
@@ -43,7 +44,7 @@ from servesync.models import Appearance, Theme
 #: 4-point spacing scale (px). Layouts use these, never arbitrary numbers.
 SPACE_1, SPACE_2, SPACE_3, SPACE_4, SPACE_5, SPACE_6, SPACE_7 = 4, 8, 12, 16, 24, 32, 48
 #: Corner radii: controls, cards, and large surfaces (dialogs, banners).
-RADIUS_SM, RADIUS_MD, RADIUS_LG = 8, 12, 16
+RADIUS_SM, RADIUS_MD, RADIUS_LG = 10, 14, 20
 #: Type scale (multiples of the body size; a 1.2 "minor third" progression).
 TYPE_CAPTION, TYPE_BODY, TYPE_LEAD, TYPE_H3, TYPE_H2, TYPE_H1, TYPE_DISPLAY = 0.88, 1.0, 1.12, 1.25, 1.5, 1.85, 2.3
 #: Minimum interactive height at 100% text (WCAG 2.5.5 AAA: 44 x 44 px).
@@ -83,6 +84,13 @@ class Palette:
     banner_line: str
     callout: str
     glow: str  # soft halo around the focused featured surface
+    sidebar: str
+    sidebar_text: str
+    sidebar_muted: str  # secondary sidebar text — still >= 7:1
+    sidebar_hover: str
+    sidebar_active: str  # background of the current page (its text stays >= 7:1)
+    sidebar_accent: str  # marker beside the current page
+    sidebar_focus: str  # keyboard focus ring inside the sidebar (>= 3:1)
     is_dark: bool = False
     focus_width: int = 2
     #: Smart Match factors (availability, skills, reliability, experience, fair share)
@@ -124,6 +132,13 @@ LIGHT = Palette(
     banner_line="#C6DDD1",
     callout="#EDF3F9",
     glow="#A9CCBC",
+    sidebar="#0F3B2E",
+    sidebar_text="#F4FAF7",
+    sidebar_muted="#C5D9CF",
+    sidebar_hover="#174A3A",
+    sidebar_active="#1F5A48",
+    sidebar_accent="#F2C14E",
+    sidebar_focus="#F2C14E",
 )
 
 DARK = Palette(
@@ -158,6 +173,13 @@ DARK = Palette(
     banner_line="#244238",
     callout="#14212B",
     glow="#2C5A4A",
+    sidebar="#0A1012",
+    sidebar_text="#E4EBE8",
+    sidebar_muted="#A3B1B8",
+    sidebar_hover="#141C1F",
+    sidebar_active="#173229",
+    sidebar_accent="#56C29A",
+    sidebar_focus="#7FB6E6",
     is_dark=True,
     factors=("#56C29A", "#7FB6E6", "#C3A1E6", "#E8B23A", "#7FCFC8"),
     chart=("#56C29A", "#7FB6E6", "#E8B23A"),
@@ -195,6 +217,13 @@ HIGH_CONTRAST = Palette(
     banner_line="#FFFFFF",
     callout="#000000",
     glow="#00E5FF",
+    sidebar="#000000",
+    sidebar_text="#FFFFFF",
+    sidebar_muted="#FFFFFF",
+    sidebar_hover="#1A1A1A",
+    sidebar_active="#333333",
+    sidebar_accent="#FFD400",
+    sidebar_focus="#00E5FF",
     is_dark=True,
     focus_width=3,
     factors=("#7CFF9E", "#80D8FF", "#EA80FC", "#FFD400", "#FFFFFF"),
@@ -385,6 +414,7 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     /* ---------- text roles (type scale) ---------- */
     QLabel[role="title"] {{ {serif} font-size: {pt(TYPE_H1)}; font-weight: 600; }}
     QLabel[role="display"] {{ {serif} font-size: {pt(TYPE_DISPLAY)}; font-weight: 600; }}
+    QLabel[role="lead"] {{ font-size: {pt(TYPE_LEAD)}; }}
     QLabel[role="mission"] {{ {serif} font-size: {pt(TYPE_LEAD)}; font-style: italic; color: {p.text}; }}
     QLabel[role="subtitle"] {{ font-size: {pt(TYPE_BODY)}; color: {p.text_muted}; }}
     QLabel[role="section"] {{ {serif} font-size: {pt(TYPE_H3)}; font-weight: 600; padding-top: 2px; }}
@@ -411,8 +441,9 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
 
     /* ---------- containers ---------- */
     QFrame[panel="true"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
-    QFrame[strip="true"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
-    QFrame[rule="true"] {{ background: {p.line}; max-width: 1px; min-width: 1px; border: none; }}
+    QFrame[kpi="true"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
+    QFrame[kpi="true"]:hover {{ border-color: {p.line_strong}; }}
+    QFrame[kpi="true"][attention="true"] {{ border-left: 4px solid {p.attention_fill}; }}
     QFrame[card="true"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
     QFrame[tile="true"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
     QFrame[bubble="assistant"] {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {md}px; }}
@@ -423,24 +454,27 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         margin-top: 18px; padding: 14px 12px 12px 12px; font-weight: 600; }}
     QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 4px; }}
 
-    /* ---------- top bar (logo top-left, navigation top-right) ---------- */
+    /* ---------- sidebar (brand, then pages) and header (ask, main action, account) ---------- */
+    QWidget#Sidebar {{ background: {p.sidebar}; }}
+    QWidget#Sidebar QLabel {{ color: {p.sidebar_text}; }}
+    QWidget#Sidebar QLabel#OrgName {{ color: {p.sidebar_muted}; }}
     QWidget#TopBar {{ background: {p.topbar}; border-bottom: 1px solid {p.line}; }}
     QWidget#TopBar QLabel {{ color: {p.topbar_text}; }}
     QLabel#Brand {{ {serif} font-size: {pt(1.45)}; font-weight: 600; color: {p.topbar_text}; }}
     QLabel#OrgName {{ color: {p.topbar_muted}; font-size: {pt(TYPE_CAPTION)}; }}
-    QWidget#NavIndicator {{ background: {p.primary}; border-radius: 2px; }}
-    QPushButton[nav="true"] {{ background: transparent; color: {p.topbar_text}; border: none;
-        border-radius: {sm}px; padding: 8px 12px; min-height: {target - 8}px; font-size: {pt(TYPE_BODY)}; }}
-    QPushButton[nav="true"]:hover {{ background: {p.surface_alt}; }}
-    QPushButton[nav="true"]:checked {{ background: {p.topbar_active}; color: {p.topbar_text}; }}
-    QPushButton[nav="true"]:focus {{ border: {fw}px solid {p.focus}; }}
+    QWidget#NavIndicator {{ background: {p.sidebar_accent}; border-radius: 2px; }}
+    QPushButton[nav="true"] {{ background: transparent; color: {p.sidebar_text}; border: none; text-align: left;
+        border-radius: {sm}px; padding: 8px 14px; min-height: {target - 8}px; font-size: {pt(TYPE_BODY)}; }}
+    QPushButton[nav="true"]:hover {{ background: {p.sidebar_hover}; }}
+    QPushButton[nav="true"]:checked {{ background: {p.sidebar_active}; font-weight: 600; }}
+    QPushButton[nav="true"]:focus {{ border: {fw}px solid {p.sidebar_focus}; }}
     QPushButton#CallToAction {{ background: {p.cta}; color: {p.on_cta}; border: none; border-radius: {target // 2}px;
         padding: 8px 18px; min-height: {target - 8}px; font-weight: 700; }}
     QPushButton#CallToAction:hover {{ background: {p.cta_hover}; }}
     QPushButton#CallToAction:focus {{ border: {fw}px solid {p.focus}; }}
-    QPushButton#AskButton {{ background: {p.surface}; color: {p.topbar_text}; border: 1px solid {p.line_strong};
-        border-radius: {target // 2}px; padding: 6px 14px; min-height: {target - 8}px; }}
-    QPushButton#AskButton:hover {{ background: {p.surface_alt}; }}
+    QPushButton#AskButton {{ background: {p.surface_alt}; color: {p.text_muted}; border: 1px solid {p.line};
+        border-radius: {target // 2}px; padding: 6px 16px; min-height: {target - 8}px; text-align: left; }}
+    QPushButton#AskButton:hover {{ border-color: {p.line_strong}; color: {p.text}; }}
     QPushButton#AskButton:focus {{ border: {fw}px solid {p.focus}; }}
     QToolButton {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
         border-radius: {sm}px; padding: 7px 14px; min-height: {target - 16}px; }}
@@ -454,7 +488,8 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QToolButton#UserMenu::menu-indicator {{ image: none; }}
 
     /* ---------- featured banner, callout, toast ---------- */
-    QFrame[banner="true"] {{ background: {p.banner}; border: 1px solid {p.banner_line}; border-radius: {lg}px; }}
+    QFrame[banner="true"] {{ background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 {p.banner},
+        stop: 1 {p.surface}); border: 1px solid {p.banner_line}; border-radius: {lg}px; }}
     QFrame[callout="true"] {{ background: {p.callout}; border: 1px solid {p.line}; border-left: 4px solid {p.info};
         border-radius: {md}px; }}
     QFrame#Toast {{ background: {p.text}; border-radius: {md}px; }}
@@ -466,7 +501,7 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     /* ---------- buttons ---------- */
     QPushButton {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
         border-radius: {sm}px; padding: 7px 14px; min-height: {target - 16}px; }}
-    QPushButton:hover {{ background: {p.surface_alt}; }}
+    QPushButton:hover {{ background: {p.surface_alt}; border-color: {p.text_muted}; }}
     QPushButton:pressed {{ background: {p.primary_soft}; }}
     QPushButton:focus {{ border: {fw}px solid {p.focus}; }}
     QPushButton:disabled {{ color: {p.text_muted}; background: {p.surface_alt}; border-color: {p.line}; }}
@@ -535,6 +570,11 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         selection-background-color: {p.selection}; selection-color: {p.on_selection}; }}
     QTableView:focus, QListWidget:focus {{ border: {fw}px solid {p.focus}; }}
     QTableView::item, QListWidget::item {{ padding: 6px 8px; }}
+    QListWidget::item:hover {{ background: {p.surface_alt}; color: {p.text}; }}
+    QListWidget::item:selected {{ background: {p.selection}; color: {p.on_selection}; }}
+    QListWidget::indicator {{ width: {box}px; height: {box}px; border: 2px solid {p.line_strong};
+        background: {p.surface}; border-radius: 4px; }}
+    QListWidget::indicator:checked {{ background: {p.primary}; border-color: {p.primary}; image: url("{check}"); }}
     QHeaderView::section {{ background: {p.surface}; color: {p.text_muted}; border: none;
         border-bottom: 1px solid {p.line_strong}; padding: 8px; font-weight: 600; }}
     QTabWidget::pane {{ border: 1px solid {p.line}; border-radius: {md}px; background: {p.surface}; top: -1px; }}

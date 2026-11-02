@@ -86,6 +86,23 @@ class OpportunityDialog(FormDialog):
             tr("Tick what this program offers. Volunteers who need these see it first."),
         )
 
+        self.certifications = SkillPicker(ctx.services.volunteers.certification_names())
+        self.add_field(
+            "required_certifications",
+            tr("Required certifications"),
+            self.certifications,
+            tr("A firm rule: nobody can be scheduled here without a current one, such as a background check."),
+        )
+        self.impact_unit = QLineEdit()
+        self.impact_unit.setMaxLength(40)
+        self.impact_unit.setPlaceholderText(tr("for example, meals served"))
+        self.add_field(
+            "impact_unit",
+            tr("What this program measures"),
+            self.impact_unit,
+            tr("Optional. Record a number after each shift to report results, not just hours."),
+        )
+
         self.add_section(tr("Photo and story"))
         photo_box = QWidget()
         photo_row = QHBoxLayout(photo_box)
@@ -129,6 +146,8 @@ class OpportunityDialog(FormDialog):
             self.min_age.setValue(opportunity.min_age)
             self.skills.set_skills(opportunity.required_skills)
             self.access.set_values(opportunity.access_features)
+            self.certifications.set_skills(opportunity.required_certifications)
+            self.impact_unit.setText(opportunity.impact_unit)
             self.story.setText(opportunity.story_video_url)
             if opportunity.opportunity_id is not None:
                 self._photo = ctx.services.opportunities.photo(ctx.session, opportunity.opportunity_id)
@@ -175,6 +194,8 @@ class OpportunityDialog(FormDialog):
             required_skills=self.skills.skills(),
             story_video_url=self.story.text(),
             access_features=self.access.values(),
+            impact_unit=self.impact_unit.text(),
+            required_certifications=self.certifications.skills(),
             opportunity_id=original.opportunity_id if original else None,
         )
         services, session = self._ctx.services, self._ctx.session
@@ -259,6 +280,7 @@ class ShiftDialog(FormDialog):
             ends_at=ends,
             capacity=self.capacity.value(),
             notes=self.notes.text(),
+            impact_amount=self._original.impact_amount if self._original else None,
             shift_id=self._original.shift_id if self._original else None,
         )
         services, session = self._ctx.services, self._ctx.session

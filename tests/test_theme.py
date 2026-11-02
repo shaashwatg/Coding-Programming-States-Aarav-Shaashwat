@@ -68,6 +68,15 @@ def test_button_labels_meet_aaa(palette: Palette) -> None:
     assert contrast(palette.on_selection, palette.selection) >= 7.0
 
 
+@pytest.mark.parametrize("palette", THEMES, ids=lambda p: p.name)
+def test_sidebar_text_and_focus_are_visible(palette: Palette) -> None:
+    for background in (palette.sidebar, palette.sidebar_hover, palette.sidebar_active):
+        assert contrast(palette.sidebar_text, background) >= 7.0
+    assert contrast(palette.sidebar_muted, palette.sidebar) >= 7.0
+    assert contrast(palette.sidebar_focus, palette.sidebar) >= 3.0
+    assert contrast(palette.sidebar_accent, palette.sidebar_active) >= 3.0
+
+
 def test_every_theme_has_a_palette_or_follows_the_system() -> None:
     assert set(PALETTES) | {Theme.SYSTEM} == set(Theme)
     assert resolve_theme(Theme.SYSTEM) in (Theme.LIGHT, Theme.DARK)

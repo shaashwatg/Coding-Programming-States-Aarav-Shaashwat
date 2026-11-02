@@ -11,23 +11,30 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 
 from servesync.core.errors import BusinessRuleError
 from servesync.core.i18n import tr
+from servesync.core.validators import ErrorCollector, parse_date, parse_int
 from servesync.models import (
     AssignmentStatus,
     AvailabilitySlot,
+    Certification,
     ServiceRecord,
     Volunteer,
     VolunteerParticipation,
     VolunteerStatus,
 )
+from servesync.models.volunteer import clean_certification_name
 from servesync.services.base import Service
-from servesync.services.rules import check_volunteer_transition
+from servesync.services.rules import HourGoalProgress, check_volunteer_transition, hour_goal_progress
 from servesync.services.session import Permission, Session
 
 logger = logging.getLogger(__name__)
+
+MAX_HOUR_GOAL = 2000  # about a full-time year; anything higher is a typo
+CERTIFICATION_WARNING_DAYS = 45
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +57,27 @@ class VolunteerService(Service):
             raise BusinessRuleError(tr("New volunteers start as Applicant or Active."))
         saved = self._store.volunteers.add(volunteer)
         logger.info("Volunteer #%s registered by account #%s", saved.volunteer_id, session.account_id)
+        return saved
+
+    def apply(self, volunteer: Volunteer) -> Volunteer:
+        """
+        Someone applies from the sign-in screen, with no account yet. They can only ever
+        become an Applicant awaiting review, and the answer never says who is already on file.
+        """
+        if self._store.volunteers.find_possible_duplicates(volunteer):
+            raise BusinessRuleError(tr("We may already have you on file. Please ask a coordinator for help."))
+        today = self._clock.now().date()
+        application = dataclasses.replace(
+            volunteer,
+            status=VolunteerStatus.APPLICANT,
+            joined_on=min(today, date.today()),
+            notes="",
+            hour_goal=None,
+            hour_goal_due=None,
+            volunteer_id=None,
+        )
+        saved = self._store.volunteers.add(application)
+        logger.info("Volunteer #%s applied from the sign-in screen", saved.volunteer_id)
         return saved
 
     def possible_duplicates(self, session: Session, volunteer: Volunteer) -> list[Volunteer]:
@@ -130,8 +158,70 @@ class VolunteerService(Service):
                 "joined_on": existing.joined_on,
                 "recruitment_source": existing.recruitment_source,
                 "notes": existing.notes,
+                "referred_by": existing.referred_by,
             }
         return self._store.volunteers.update(dataclasses.replace(volunteer, **protected))
+
+    def set_hour_goal(self, session: Session, volunteer_id: int, hours: object, due: object) -> Volunteer:
+        """Set a personal hour goal (format: a whole number and a date; meaning: the date is ahead of us)."""
+        session.require_self_or(Permission.MANAGE_VOLUNTEERS, volunteer_id)
+        errors = ErrorCollector()
+        goal = errors.check("hour_goal", parse_int, hours, tr("Hour goal"), minimum=1, maximum=MAX_HOUR_GOAL)
+        day = errors.check("hour_goal_due", parse_date, due, tr("Goal date"))
+        today = self._clock.now().date()
+        if isinstance(day, date) and day <= today:
+            errors.add("hour_goal_due", tr("Choose a goal date after today."))
+        errors.raise_if_any()
+        volunteer = self._store.volunteers.get(volunteer_id)
+        return self._store.volunteers.update(dataclasses.replace(volunteer, hour_goal=goal, hour_goal_due=day))
+
+    def clear_hour_goal(self, session: Session, volunteer_id: int) -> Volunteer:
+        session.require_self_or(Permission.MANAGE_VOLUNTEERS, volunteer_id)
+        volunteer = self._store.volunteers.get(volunteer_id)
+        return self._store.volunteers.update(dataclasses.replace(volunteer, hour_goal=None, hour_goal_due=None))
+
+    def hour_goal_progress(self, session: Session, volunteer_id: int) -> HourGoalProgress | None:
+        session.require_self_or(Permission.MANAGE_VOLUNTEERS, volunteer_id)
+        return hour_goal_progress(
+            self._store.volunteers.get(volunteer_id),
+            self._store.assignments.history(volunteer_id),
+            self._clock.now().date(),
+        )
+
+    def add_certification(self, session: Session, volunteer_id: int, name: object, expires_on: object) -> Volunteer:
+        """Record or renew a certification. Leaders only: a volunteer can't vouch for their own."""
+        session.require(Permission.MANAGE_VOLUNTEERS)
+        errors = ErrorCollector()
+        clean_name = errors.check("certification_name", clean_certification_name, name)
+        day = errors.check("certification_expires", parse_date, expires_on, tr("Expiry date"))
+        if isinstance(day, date) and day <= self._clock.now().date():
+            errors.add("certification_expires", tr("This has already expired. Enter a date after today."))
+        errors.raise_if_any()
+        self._store.volunteers.save_certification(volunteer_id, Certification(clean_name, day))
+        return self._store.volunteers.get(volunteer_id)
+
+    def remove_certification(self, session: Session, volunteer_id: int, name: str) -> Volunteer:
+        session.require(Permission.MANAGE_VOLUNTEERS)
+        self._store.volunteers.remove_certification(volunteer_id, name)
+        return self._store.volunteers.get(volunteer_id)
+
+    def certification_names(self) -> list[str]:
+        """All known certification names, for pick lists."""
+        return self._store.volunteers.certification_names()
+
+    def expiring_certifications(
+        self, session: Session, *, within_days: int = CERTIFICATION_WARNING_DAYS
+    ) -> list[tuple[Volunteer, Certification]]:
+        """Active volunteers' certifications that have run out or soon will, soonest first."""
+        session.require(Permission.MANAGE_VOLUNTEERS)
+        cutoff = self._clock.now().date() + timedelta(days=within_days)
+        found = [
+            (volunteer, certification)
+            for volunteer in self._store.volunteers.find_all(status=VolunteerStatus.ACTIVE)
+            for certification in volunteer.certifications
+            if certification.expires_on <= cutoff
+        ]
+        return sorted(found, key=lambda pair: (pair[1].expires_on, pair[0].last_name))
 
     def participation(self, session: Session, volunteer_id: int) -> VolunteerParticipation:
         session.require_self_or(Permission.MANAGE_VOLUNTEERS, volunteer_id)

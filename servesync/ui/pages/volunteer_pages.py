@@ -22,6 +22,7 @@ from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AssignmentStatus, OpportunityCategory, ServiceRecord, ShiftOverview
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
+from servesync.ui.dialogs.goal_dialog import HourGoalPanel
 from servesync.ui.dialogs.shift_detail import status_color
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
@@ -59,6 +60,8 @@ class HomePage(Page):
         self.layout_.addWidget(self.mission)
         self.strip = ImpactStrip(4)
         self.layout_.addWidget(self.strip)
+        self.goal_panel = HourGoalPanel(ctx)
+        self.layout_.addWidget(self.goal_panel)
         self.banner = FeaturedBanner()
         self.layout_.addWidget(self.banner)
 
@@ -132,6 +135,7 @@ class HomePage(Page):
             ]
         )
 
+        self.goal_panel.refresh()
         featured = services.dashboard.featured_event(session)
         self.banner.setVisible(featured is not None)
         if featured is not None:

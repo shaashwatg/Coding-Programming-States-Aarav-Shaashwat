@@ -12,7 +12,7 @@ import pytest
 from servesync.core.errors import ValidationError
 from servesync.core.validators import InvalidInputError, clean_pronouns
 from servesync.data import DataStore
-from servesync.data.migrations import current_version
+from servesync.data.migrations import MIGRATIONS, current_version
 from servesync.models import AccessNeed, Appearance, MessageDuration, Theme, UserAccount, UserRole, access_gaps
 from servesync.services import Services, Session
 from servesync.services.rules import describe_access_gaps
@@ -190,6 +190,10 @@ def test_version_2_file_upgrades_with_inclusion_columns(tmp_path: Path) -> None:
         volunteer = store.volunteers.add(make_volunteer())
     with closing(sqlite3.connect(path)) as raw:  # rewind the file to look like version 2
         raw.executescript(
+            "DROP TABLE opportunity_certifications; DROP TABLE volunteer_certifications;"
+            "ALTER TABLE shifts DROP COLUMN impact_amount; ALTER TABLE opportunities DROP COLUMN impact_unit;"
+            "ALTER TABLE volunteers DROP COLUMN hour_goal_due; ALTER TABLE volunteers DROP COLUMN hour_goal;"
+            "ALTER TABLE volunteers DROP COLUMN referred_by;"
             "DROP TABLE account_preferences; DROP TABLE opportunity_access_features; DROP TABLE volunteer_access_needs;"
             "DROP VIEW volunteer_participation;"
             "ALTER TABLE volunteers DROP COLUMN pronouns; ALTER TABLE volunteers DROP COLUMN preferred_name;"
@@ -197,7 +201,7 @@ def test_version_2_file_upgrades_with_inclusion_columns(tmp_path: Path) -> None:
             "PRAGMA user_version = 2;"
         )
     with DataStore.open(path) as store:
-        assert current_version(store.db) == 3
+        assert current_version(store.db) == MIGRATIONS[-1].version
         upgraded = store.volunteers.get(volunteer.volunteer_id or 0)
         assert (upgraded.preferred_name, upgraded.pronouns, upgraded.access_needs) == ("", "", frozenset())
         assert store.volunteers.get_participation(volunteer.volunteer_id or 0).full_name == "Ana Lopez"

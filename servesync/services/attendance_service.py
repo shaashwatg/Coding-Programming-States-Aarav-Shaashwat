@@ -12,15 +12,49 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from dataclasses import dataclass
+from datetime import timedelta
 
+from servesync.config import MAX_SHIFT_HOURS
 from servesync.core.errors import BusinessRuleError
 from servesync.core.i18n import tr
-from servesync.core.validators import calculate_age, parse_hours, validate_field
-from servesync.models import Assignment, AssignmentStatus, RosterEntry, Shift
+from servesync.core.validators import calculate_age, parse_hours, parse_int, validate_field
+from servesync.models import Assignment, AssignmentStatus, RosterEntry, Shift, ShiftOverview
+from servesync.models.opportunity import MAX_IMPACT_AMOUNT
 from servesync.services.base import Service
+from servesync.services.rules import (
+    HourGoalProgress,
+    certification_message,
+    hour_goal_progress,
+    missing_certifications,
+)
 from servesync.services.session import Permission, Session
 
 logger = logging.getLogger(__name__)
+
+CHECK_IN_EARLY_MINUTES = 30
+PHONE_DIGITS_FOR_CHECK_IN = 4
+
+
+@dataclass(frozen=True, slots=True)
+class KioskPerson:
+    """One possible match on the check-in screen (just enough to tell people apart)."""
+
+    assignment_id: int
+    short_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class KioskResult:
+    given_name: str
+    hours: float
+    goal: HourGoalProgress | None
+    assignment: Assignment
+
+
+def _first_name_and_initial(full_name: str) -> str:
+    first, _, last = full_name.rpartition(" ")
+    return f"{first} {last[:1]}." if first else full_name
 
 
 class AttendanceService(Service):
@@ -93,6 +127,9 @@ class AttendanceService(Service):
                     min_age=opportunity.min_age,
                 )
             )
+        missing = missing_certifications(volunteer, opportunity.required_certifications, shift.starts_at.date())
+        if missing:
+            raise BusinessRuleError(certification_message(volunteer, missing))
         if self._store.assignments.conflicting_shifts(
             volunteer_id, shift.starts_at, shift.ends_at, exclude_shift_id=shift_id
         ):
@@ -111,7 +148,76 @@ class AttendanceService(Service):
         logger.info("Walk-in: volunteer #%s on shift #%s", volunteer_id, shift_id)
         return saved
 
+    # ------------------------------------------------------------ check-in kiosk
+
+    def kiosk_shifts(self, session: Session) -> list[ShiftOverview]:
+        """Shifts people can check in for right now: from 30 minutes before the start until the end."""
+        session.require(Permission.RECORD_ATTENDANCE)
+        now = self._clock.now()
+        nearby = self._store.shifts.overviews(
+            starts_after=now - timedelta(hours=MAX_SHIFT_HOURS),
+            starts_before=now + timedelta(minutes=CHECK_IN_EARLY_MINUTES + 1),  # the bound is exclusive
+        )
+        earliest_start = now + timedelta(minutes=CHECK_IN_EARLY_MINUTES)
+        return [o for o in nearby if o.shift.starts_at <= earliest_start and o.shift.ends_at > now]
+
+    def kiosk_lookup(self, session: Session, shift_id: int, last_four: str) -> list[KioskPerson]:
+        """
+        Find who is checking in from the last 4 digits of their phone. Only people on this
+        shift can match, and only a first name and last initial are shown on the shared screen.
+        """
+        session.require(Permission.RECORD_ATTENDANCE)
+        digits = last_four.strip()
+        if len(digits) != PHONE_DIGITS_FOR_CHECK_IN or not digits.isdecimal():
+            raise BusinessRuleError(tr("Enter the last 4 digits of your phone number."))
+        people = [
+            KioskPerson(entry.assignment.assignment_id or 0, _first_name_and_initial(entry.volunteer_name))
+            for entry in self._store.assignments.roster(shift_id)
+            if entry.volunteer_phone.endswith(digits)
+        ]
+        if not people:
+            raise BusinessRuleError(tr("We couldn't find you on this shift. Please see a coordinator."))
+        return people
+
+    def kiosk_check_in(self, session: Session, assignment_id: int) -> KioskResult:
+        """Record arrival for the full shift (a leader can correct the hours on the roster afterward)."""
+        session.require(Permission.RECORD_ATTENDANCE)
+        signup = self._store.assignments.get(assignment_id)
+        shift = self._store.shifts.get(signup.shift_id)
+        if shift.shift_id not in {o.shift.shift_id for o in self.kiosk_shifts(session)}:
+            raise BusinessRuleError(tr("Check-in for this shift isn't open right now."))
+        if signup.status is AssignmentStatus.ATTENDED:
+            raise BusinessRuleError(tr("You're already checked in. Thank you for coming!"))
+        volunteer = self._store.volunteers.get(signup.volunteer_id)
+        required = self._store.opportunities.get(shift.opportunity_id).required_certifications
+        if missing_certifications(volunteer, required, shift.starts_at.date()):
+            raise BusinessRuleError(tr("Please see a coordinator before you start today."))
+        saved = self._store.assignments.update(
+            dataclasses.replace(signup, status=AssignmentStatus.ATTENDED, hours_served=shift.duration_hours)
+        )
+        logger.info("Kiosk check-in: sign-up #%s", assignment_id)
+        return KioskResult(
+            volunteer.given_name,
+            shift.duration_hours,
+            hour_goal_progress(
+                volunteer, self._store.assignments.history(signup.volunteer_id), self._clock.now().date()
+            ),
+            saved,
+        )
+
     # ---------------------------------------------------------------- helpers
+
+    def record_impact(self, session: Session, shift_id: int, amount: object) -> Shift:
+        """Record what a shift achieved, in its program's unit (only once the shift has started)."""
+        session.require(Permission.RECORD_ATTENDANCE)
+        shift = self._started_shift(shift_id)
+        opportunity = self._store.opportunities.get(shift.opportunity_id)
+        if not opportunity.impact_unit:
+            raise BusinessRuleError(
+                tr("Choose what '{title}' measures first (edit the program).", title=opportunity.title)
+            )
+        value = validate_field("impact_amount", parse_int, amount, tr("Result"), minimum=0, maximum=MAX_IMPACT_AMOUNT)
+        return self._store.shifts.set_impact(shift_id, int(value))
 
     def _started_shift(self, shift_id: int) -> Shift:
         shift = self._store.shifts.get(shift_id)

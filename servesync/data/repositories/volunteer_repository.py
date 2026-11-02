@@ -28,6 +28,7 @@ from servesync.data.repositories.skill_repository import SkillRepository
 from servesync.models import (
     AccessNeed,
     AvailabilitySlot,
+    Certification,
     DayPart,
     RecruitmentSource,
     Volunteer,
@@ -42,7 +43,7 @@ _DUPLICATE_EMAIL = mark("Another volunteer already uses this email address.")
 _SELECT_VOLUNTEER = """
     SELECT volunteer_id, first_name, last_name, email, phone, birth_date, joined_on,
            status, recruitment_source, emergency_contact_name, emergency_contact_phone, notes,
-           preferred_name, pronouns
+           preferred_name, pronouns, referred_by, hour_goal, hour_goal_due
     FROM volunteers
 """
 
@@ -76,10 +77,10 @@ class VolunteerRepository(Repository):
                     INSERT INTO volunteers (
                         first_name, last_name, email, phone, birth_date, joined_on, status,
                         recruitment_source, emergency_contact_name, emergency_contact_phone, notes,
-                        preferred_name, pronouns)
+                        preferred_name, pronouns, referred_by, hour_goal, hour_goal_due)
                     VALUES (:first_name, :last_name, :email, :phone, :birth_date, :joined_on, :status,
                             :recruitment_source, :emergency_contact_name, :emergency_contact_phone, :notes,
-                            :preferred_name, :pronouns)
+                            :preferred_name, :pronouns, :referred_by, :hour_goal, :hour_goal_due)
                     """,
                     self._to_params(volunteer),
                 )
@@ -107,6 +108,7 @@ class VolunteerRepository(Repository):
                         emergency_contact_name = :emergency_contact_name,
                         emergency_contact_phone = :emergency_contact_phone, notes = :notes,
                         preferred_name = :preferred_name, pronouns = :pronouns,
+                        referred_by = :referred_by, hour_goal = :hour_goal, hour_goal_due = :hour_goal_due,
                         updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime')
                     WHERE volunteer_id = :volunteer_id
                     """,
@@ -135,6 +137,31 @@ class VolunteerRepository(Repository):
         )
         if cursor.rowcount == 0:
             raise RecordNotFoundError(_ENTITY, volunteer_id)
+
+    def save_certification(self, volunteer_id: int, certification: Certification) -> None:
+        """Add a certification, or renew it. Names match however they were typed, so renewing can't duplicate one."""
+        with self._db.transaction():
+            self._db.execute(
+                "DELETE FROM volunteer_certifications WHERE volunteer_id = ? AND name = ? COLLATE NOCASE",
+                (volunteer_id, certification.name),
+            )
+            self._db.execute(
+                "INSERT INTO volunteer_certifications (volunteer_id, name, expires_on) VALUES (?, ?, ?)",
+                (volunteer_id, certification.name, date_to_db(certification.expires_on)),
+            )
+
+    def remove_certification(self, volunteer_id: int, name: str) -> None:
+        self._db.execute(
+            "DELETE FROM volunteer_certifications WHERE volunteer_id = ? AND name = ? COLLATE NOCASE",
+            (volunteer_id, name),
+        )
+
+    def certification_names(self) -> list[str]:
+        rows = self._db.query_all(
+            """SELECT name FROM volunteer_certifications UNION SELECT name FROM opportunity_certifications
+               ORDER BY name COLLATE NOCASE"""
+        )
+        return [row["name"] for row in rows]
 
     def delete(self, volunteer_id: int) -> None:
         """
@@ -294,6 +321,9 @@ class VolunteerRepository(Repository):
             "notes": volunteer.notes,
             "preferred_name": volunteer.preferred_name,
             "pronouns": volunteer.pronouns,
+            "referred_by": volunteer.referred_by,
+            "hour_goal": volunteer.hour_goal,
+            "hour_goal_due": date_to_db(volunteer.hour_goal_due) if volunteer.hour_goal_due else None,
         }
 
     def _write_skills(self, volunteer_id: int, skills: frozenset[str]) -> None:
@@ -324,8 +354,16 @@ class VolunteerRepository(Repository):
         skills: defaultdict[int, set[str]] = defaultdict(set)
         slots: defaultdict[int, set[AvailabilitySlot]] = defaultdict(set)
         needs: defaultdict[int, set[AccessNeed]] = defaultdict(set)
+        certifications: defaultdict[int, set[Certification]] = defaultdict(set)
         for batch in chunked(ids):
             marks = placeholders(batch)
+            for certification_row in self._db.query_all(
+                f"SELECT volunteer_id, name, expires_on FROM volunteer_certifications WHERE volunteer_id IN ({marks})",
+                tuple(batch),
+            ):
+                certifications[certification_row["volunteer_id"]].add(
+                    Certification(certification_row["name"], date_from_db(certification_row["expires_on"]))
+                )
             for skill_row in self._db.query_all(
                 f"""SELECT vs.volunteer_id, sk.name FROM volunteer_skills AS vs
                     JOIN skills AS sk ON sk.skill_id = vs.skill_id
@@ -364,6 +402,10 @@ class VolunteerRepository(Repository):
                 preferred_name=row["preferred_name"],
                 pronouns=row["pronouns"],
                 access_needs=frozenset(needs[row["volunteer_id"]]),
+                referred_by=row["referred_by"],
+                hour_goal=row["hour_goal"],
+                hour_goal_due=optional_date_from_db(row["hour_goal_due"]),
+                certifications=frozenset(certifications[row["volunteer_id"]]),
                 volunteer_id=row["volunteer_id"],
             )
             for row in rows

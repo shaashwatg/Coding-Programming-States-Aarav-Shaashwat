@@ -17,7 +17,7 @@ from servesync.core.security import DEFAULT_ITERATIONS
 from servesync.data import DataStore
 from servesync.models import Appearance
 from servesync.services.assistant import AssistantService
-from servesync.services.attendance_service import AttendanceService
+from servesync.services.attendance_service import AttendanceService, KioskPerson, KioskResult
 from servesync.services.auth_service import AuthService
 from servesync.services.clock import Clock, FixedClock, SystemClock
 from servesync.services.dashboard_service import (
@@ -34,6 +34,15 @@ from servesync.services.scheduling_service import SchedulingService
 from servesync.services.session import Permission, Session
 from servesync.services.settings_service import SettingsService
 from servesync.services.setup_service import SetupService
+from servesync.services.staffing_service import (
+    DriftAlert,
+    PlanProposal,
+    PlanResult,
+    ShiftForecast,
+    StaffingPlan,
+    StaffingService,
+    TurnoutOutlook,
+)
 from servesync.services.volunteer_service import StatusChange, VolunteerService
 
 
@@ -54,6 +63,7 @@ class Services:
     assistant: AssistantService
     settings: SettingsService
     setup: SetupService
+    staffing: StaffingService
 
     @classmethod
     def create(
@@ -66,13 +76,14 @@ class Services:
         clock = clock or SystemClock()
         matching = MatchingService(store, clock)
         reports = ReportService(store, clock)
+        scheduling = SchedulingService(store, clock)
         return cls(
             store=store,
             clock=clock,
             auth=AuthService(store, clock, password_iterations=password_iterations),
             volunteers=VolunteerService(store, clock),
             opportunities=OpportunityService(store, clock),
-            scheduling=SchedulingService(store, clock),
+            scheduling=scheduling,
             attendance=AttendanceService(store, clock),
             matching=matching,
             dashboard=DashboardService(store, clock),
@@ -80,6 +91,7 @@ class Services:
             assistant=AssistantService(store, clock, matching=matching, reports=reports),
             settings=SettingsService(store, clock),
             setup=SetupService(store, clock, password_iterations=password_iterations),
+            staffing=StaffingService(store, clock, matching=matching, scheduling=scheduling),
         )
 
 
@@ -90,12 +102,17 @@ __all__ = [
     "AuthService",
     "Clock",
     "DashboardService",
+    "DriftAlert",
     "FeaturedEvent",
     "FixedClock",
+    "KioskPerson",
+    "KioskResult",
     "LeaderSummary",
     "MatchingService",
     "OpportunityService",
     "Permission",
+    "PlanProposal",
+    "PlanResult",
     "RecruitmentInsight",
     "ReportService",
     "SchedulingService",
@@ -104,9 +121,13 @@ __all__ = [
     "Session",
     "SettingsService",
     "SetupService",
+    "ShiftForecast",
     "ShiftMatch",
+    "StaffingPlan",
+    "StaffingService",
     "StatusChange",
     "SystemClock",
+    "TurnoutOutlook",
     "VolunteerMatch",
     "VolunteerService",
     "VolunteerSummary",

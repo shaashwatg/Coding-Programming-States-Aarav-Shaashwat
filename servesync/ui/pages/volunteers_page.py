@@ -108,6 +108,12 @@ class VolunteerProfileCard(Panel):
             lines.append(tr("• What helps: {needs}", needs=needs))
         if self._show_notes:
             lines.append(tr("• Heard about us: {label}", label=volunteer.recruitment_source.label))
+            if volunteer.certifications:
+                held = sorted(volunteer.certifications, key=lambda c: c.name.casefold())
+                text = ", ".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held)
+                lines.append(tr("• Certifications: {text}", text=text))
+            if volunteer.referred_by:
+                lines.append(tr("• Referred by: {name}", name=volunteer.referred_by))
             if volunteer.notes:
                 lines.append(tr("• Notes: {notes}", notes=volunteer.notes))
         self.lines.setText("\n".join(lines))

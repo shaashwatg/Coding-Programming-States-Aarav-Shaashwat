@@ -55,5 +55,6 @@ class ReportService(Service):
             ReportKind.PROGRAM_IMPACT: analytics.program_impact,
             ReportKind.SHIFT_ATTENDANCE: analytics.shift_attendance,
             ReportKind.RECRUITMENT: analytics.recruitment,
+            ReportKind.IMPACT_SUMMARY: analytics.impact_summary,
         }
         return builders[kind](inputs, filters)

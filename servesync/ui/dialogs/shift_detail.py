@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from servesync.core.i18n import tr, tr_for, tr_n
 from servesync.models import AssignmentStatus, OpportunityStatus, RosterEntry, Shift, VolunteerStatus
+from servesync.models.opportunity import MAX_IMPACT_AMOUNT
 from servesync.services import Permission
 from servesync.ui.context import AppContext
 from servesync.ui.theme import current_palette
@@ -253,6 +255,19 @@ class ShiftDetailDialog(QDialog):
         for button in (self.attended_button, self.no_show_button, self.everyone_button, self.walk_in_button):
             actions.addWidget(button)
         roster_layout.addLayout(actions)
+
+        self.impact_row = QWidget()
+        impact = QHBoxLayout(self.impact_row)
+        impact.setContentsMargins(0, 0, 0, 0)
+        self.impact_label = make_label("")
+        self.impact_amount = QSpinBox()
+        self.impact_amount.setRange(0, MAX_IMPACT_AMOUNT)
+        self.save_impact_button = make_button(tr("Save result"), on_click=self._save_impact)
+        impact.addWidget(self.impact_label)
+        impact.addWidget(self.impact_amount)
+        impact.addWidget(self.save_impact_button)
+        impact.addStretch(1)
+        roster_layout.addWidget(self.impact_row)
         self.tabs.addTab(roster_page, tr("Roster and attendance"))
 
         # Smart Match tab ----------------------------------------------------
@@ -321,6 +336,16 @@ class ShiftDetailDialog(QDialog):
         )
         self._update_buttons()
         self._refresh_matches()
+        unit = services.opportunities.get(session, shift.opportunity_id).impact_unit
+        self.impact_row.setVisible(bool(unit) and self._started)
+        self.impact_label.setText(tr("Result ({unit}):", unit=unit))
+        self.impact_amount.setAccessibleName(tr("Result ({unit}):", unit=unit))
+        self.impact_amount.setValue(shift.impact_amount or 0)
+
+    @guarded
+    def _save_impact(self) -> None:
+        self._ctx.services.attendance.record_impact(self._ctx.session, self._shift_id, self.impact_amount.value())
+        self._done(tr("Result saved."))
 
     def _refresh_matches(self) -> None:
         clear_layout(self.match_list)

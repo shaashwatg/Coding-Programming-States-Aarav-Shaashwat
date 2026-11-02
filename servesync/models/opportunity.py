@@ -24,9 +24,10 @@ from servesync.core.validators import (
 )
 from servesync.models._common import clean_skill_set, validate_optional_id, validate_reference_id
 from servesync.models.enums import AccessNeed, DayPart, OpportunityCategory, OpportunityStatus, Weekday
-from servesync.models.volunteer import clean_access_needs
+from servesync.models.volunteer import clean_access_needs, clean_certification_names
 
 MIN_SHIFT_MINUTES = 15
+MAX_IMPACT_AMOUNT = 1_000_000
 
 
 @dataclass(slots=True)
@@ -43,6 +44,8 @@ class Opportunity:
     required_skills: frozenset[str] = frozenset()
     story_video_url: str = ""  # optional link to a video story; opened only when clicked
     access_features: frozenset[AccessNeed] = frozenset()  # supports this program offers
+    impact_unit: str = ""  # what one shift's result is counted in, e.g. "meals served"
+    required_certifications: frozenset[str] = frozenset()  # a hard rule, unlike skills, which only guide matching
     opportunity_id: int | None = None
 
     def __post_init__(self) -> None:
@@ -75,6 +78,12 @@ class Opportunity:
         self.access_features = errors.check(
             "access_features", clean_access_needs, self.access_features, tr("Access features")
         )
+        self.impact_unit = errors.check(
+            "impact_unit", clean_text, self.impact_unit, tr("What this program measures"), max_length=40, required=False
+        )
+        self.required_certifications = errors.check(
+            "required_certifications", clean_certification_names, self.required_certifications
+        )
         self.opportunity_id = errors.check(
             "opportunity_id", validate_optional_id, self.opportunity_id, tr("Opportunity ID")
         )
@@ -90,6 +99,7 @@ class Shift:
     ends_at: datetime
     capacity: int
     notes: str = ""  # e.g. "Wear closed-toe shoes"
+    impact_amount: int | None = None  # the shift's result, in its program's impact_unit
     shift_id: int | None = None
 
     def __post_init__(self) -> None:

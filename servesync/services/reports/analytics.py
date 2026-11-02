@@ -18,7 +18,7 @@ Data structures used (the rubric's "arrays/lists where appropriate"):
 from __future__ import annotations
 
 import math
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
@@ -699,6 +699,17 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
                     hours=_hours(deepest.hours_each),
                 )
             )
+    referrers = Counter(v.referred_by for v in inputs.volunteers if v.referred_by)
+    if referrers:
+        name, invited = referrers.most_common(1)[0]
+        insights.append(
+            tr_n(
+                "{name} has referred {count} volunteer — worth a thank-you.",
+                "{name} has referred {count} volunteers — worth a thank-you.",
+                invited,
+                name=name,
+            )
+        )
     if waiting:
         insights.append(
             tr_n(
@@ -714,6 +725,93 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
 
 
 # ------------------------------------------------------------ service record
+
+IMPACT_COLUMNS = (
+    ReportColumn("program", mark("Program")),
+    ReportColumn("result", mark("Result"), ValueKind.COUNT),
+    ReportColumn("unit", mark("Measured in")),
+    ReportColumn("hours", mark("Hours served"), ValueKind.HOURS),
+    ReportColumn("volunteers", mark("Volunteers"), ValueKind.COUNT),
+    ReportColumn("shifts_recorded", mark("Shifts with results"), ValueKind.COUNT),
+    ReportColumn("shifts_missing", mark("Shifts without results"), ValueKind.COUNT),
+    ReportColumn("value", mark("Community value"), ValueKind.MONEY),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ImpactRow:  # field names match IMPACT_COLUMNS keys
+    program: str
+    result: int
+    unit: str
+    hours: float
+    volunteers: int
+    shifts_recorded: int
+    shifts_missing: int
+    value: float
+
+
+def impact_summary(inputs: ReportInputs, filters: ReportFilters) -> Report:
+    """Results as well as hours. Only finished shifts count; a missing result is reported, never guessed."""
+    facts, shifts = apply_scope(inputs, filters)
+    tallies = tally_by(facts, lambda f: f.opportunity_id, inputs.now)
+    results: defaultdict[int, int] = defaultdict(int)
+    recorded: defaultdict[int, int] = defaultdict(int)
+    missing: defaultdict[int, int] = defaultdict(int)
+    for overview in shifts:
+        shift = overview.shift
+        if shift.ends_at > inputs.now:
+            continue
+        if shift.impact_amount is None:
+            missing[shift.opportunity_id] += 1
+        else:
+            results[shift.opportunity_id] += shift.impact_amount
+            recorded[shift.opportunity_id] += 1
+
+    rows: list[_ImpactRow] = []
+    for program_id in sorted(set(tallies) | set(recorded)):
+        opportunity = inputs.opportunities.get(program_id)
+        if opportunity is None:
+            continue
+        tally = tallies.get(program_id, _Tally())
+        rows.append(
+            _ImpactRow(
+                program=opportunity.title,
+                result=results[program_id],
+                unit=opportunity.impact_unit,
+                hours=round(tally.hours, 2),
+                volunteers=len(tally.volunteers),
+                shifts_recorded=recorded[program_id],
+                shifts_missing=missing[program_id] if opportunity.impact_unit else 0,
+                value=round(tally.hours * inputs.hour_value, 2),
+            )
+        )
+    rows.sort(key=lambda row: (-row.hours, row.program))
+
+    total_hours = sum(row.hours for row in rows)
+    everyone = {fact.volunteer_id for fact in facts if fact.hours > 0}
+    figures = (
+        Figure(tr("Volunteers who served"), str(len(everyone))),
+        Figure(tr("Hours served"), _hours(total_hours)),
+        Figure(tr("Community value"), format_value(ValueKind.MONEY, total_hours * inputs.hour_value)),
+        Figure(tr("Programs"), str(len(rows))),
+    )
+    insights = [
+        tr("{program}: {result} {unit}.", program=row.program, result=f"{row.result:,}", unit=row.unit)
+        for row in rows
+        if row.unit and row.shifts_recorded
+    ]
+    unrecorded = sum(row.shifts_missing for row in rows)
+    if unrecorded:
+        insights.append(
+            tr_n(
+                "{count} finished shift has no result recorded, so these totals may be low.",
+                "{count} finished shifts have no result recorded, so these totals may be low.",
+                unrecorded,
+            )
+        )
+    chart = top_bars(tr("Hours by program"), ((row.program, row.hours) for row in rows), ValueKind.HOURS)
+    return _report(ReportKind.IMPACT_SUMMARY, inputs, filters, IMPACT_COLUMNS, rows, figures, insights, (chart,))
+
 
 SERVICE_RECORD_COLUMNS = (
     ReportColumn("date", mark("Date"), ValueKind.DATE),

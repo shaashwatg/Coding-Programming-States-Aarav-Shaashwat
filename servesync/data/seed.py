@@ -21,6 +21,7 @@ reserved ``example.org`` domain and phone numbers use the 555-0100 to
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import random
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ from servesync.models import (
     Assignment,
     AssignmentStatus,
     AvailabilitySlot,
+    Certification,
     DayPart,
     Opportunity,
     OpportunityCategory,
@@ -156,6 +158,30 @@ _SOURCE_WEIGHTS: dict[RecruitmentSource, int] = {
 }
 
 
+#: Personal goals for the two volunteer logins, due June 1 (the end of a school year).
+DEMO_GOAL_MONTH, DEMO_STUDENT_GOAL_HOURS, DEMO_ADULT_GOAL_HOURS = 6, 40, 80
+#: Back-to-back shifts today, so the check-in kiosk can be shown from 7 AM to 7 PM.
+DEMO_CHECKIN_START_HOURS = (7, 11, 15)
+DEMO_CHECKIN_SHIFT_HOURS, DEMO_CHECKIN_CAPACITY, DEMO_CHECKIN_ROSTER, DEMO_SIGNUP_LEAD = 4, 8, 6, 3
+
+#: What each program measures, and a typical result per person attending (results come from attendance).
+DEMO_IMPACT = {
+    "Weekend Food Pantry Distribution": ("families served", 6),
+    "After-School Reading Buddies": ("students tutored", 2),
+    "Senior Wellness Phone Calls": ("calls made", 8),
+    "Animal Shelter Care Team": ("animals cared for", 4),
+    "Riverside Park Cleanup": ("bags of litter collected", 3),
+}
+DEMO_IMPACT_BLANK_EVERY = 25  # one shift in this many has no result yet
+#: The program that requires a certification (it works with children).
+DEMO_CERTIFIED_PROGRAM, DEMO_CERTIFICATION = "After-School Reading Buddies", "Background Check"
+DEMO_CERTIFIED_SHARE, DEMO_RENEW_SOON_EVERY = 2, 7  # every 2nd person holds one; every 7th renews soon
+DEMO_CERTIFICATION_DAYS, DEMO_RENEW_SOON_DAYS = 300, 20
+
+#: Which active volunteers stop coming in the demo (fixed positions, so every reset matches).
+LAPSED_START, LAPSED_STEP, LAPSED_COUNT = 5, 9, 3
+
+
 @dataclass(frozen=True, slots=True)
 class SeedSummary:
     volunteers: int
@@ -234,11 +260,15 @@ def seed_demo_data(
         shifts = _create_shifts(store, plans, today)
         assignment_count, hours = _create_assignments(store, rng, volunteers, shifts, today)
         account_count = _create_accounts(store, volunteers, password_iterations)
+        _add_referrals_and_goals(store, volunteers, today)
+        _add_impact_results(store, shifts, today)
+        _add_certifications(store, volunteers, shifts, today)
+        checkin_shifts = _create_todays_checkin_shifts(store, volunteers, shifts, today)
 
     summary = SeedSummary(
         volunteers=len(volunteers),
         opportunities=len(plans) + 1,  # +1 draft program with no shifts yet
-        shifts=len(shifts),
+        shifts=len(shifts) + checkin_shifts,
         assignments=assignment_count,
         accounts=account_count,
         hours_served=round(hours, 2),
@@ -622,6 +652,9 @@ def _create_assignments(
     reliability[volunteers[0].volunteer_id] = 0.96  # personas are dependable demo subjects
     reliability[volunteers[1].volunteer_id] = 0.98
     booked: dict[int | None, list[Shift]] = {v.volunteer_id: [] for v in volunteers}
+    # A few active regulars who stopped coming, so Staffing Studio has people to re-engage.
+    active = [v for v in volunteers[2:] if v.status is VolunteerStatus.ACTIVE]
+    lapsed = {v.volunteer_id for v in active[LAPSED_START::LAPSED_STEP][:LAPSED_COUNT]}
 
     count = 0
     hours_total = 0.0
@@ -676,6 +709,13 @@ def _create_assignments(
                 else:
                     status = AssignmentStatus.NO_SHOW
 
+            if volunteer.volunteer_id in lapsed and shift.starts_at >= inactive_since:
+                # Leave the record out, but count them as booked and draw the same random numbers,
+                # so everyone else's demo history stays exactly the same.
+                hours_total -= hours or 0.0
+                booked[volunteer.volunteer_id].append(shift)
+                continue
+
             store.assignments.add(
                 Assignment(
                     shift_id=_saved_id(shift.shift_id),
@@ -689,6 +729,96 @@ def _create_assignments(
                 booked[volunteer.volunteer_id].append(shift)
             count += 1
     return count, hours_total
+
+
+def _add_referrals_and_goals(store: DataStore, volunteers: list[Volunteer], today: date) -> None:
+    """Named referrers and two personal goals. Drawn without random numbers, so the demo history is untouched."""
+    jordan, priya = volunteers[0], volunteers[1]
+    referred = [v for v in volunteers[2:] if v.recruitment_source is RecruitmentSource.REFERRAL]
+    for index, volunteer in enumerate(referred):
+        # Priya invited two of every three, so the recruiting report has a clear person to thank.
+        referrer = jordan if index % 3 == 2 else priya
+        store.volunteers.update(dataclasses.replace(volunteer, referred_by=referrer.full_name))
+    due = date(today.year + (today.month >= DEMO_GOAL_MONTH), DEMO_GOAL_MONTH, 1)
+    for person, hours in ((jordan, DEMO_STUDENT_GOAL_HOURS), (priya, DEMO_ADULT_GOAL_HOURS)):
+        store.volunteers.update(
+            dataclasses.replace(store.volunteers.get(person.volunteer_id or 0), hour_goal=hours, hour_goal_due=due)
+        )
+
+
+def _add_impact_results(store: DataStore, shifts: list[tuple[Shift, Opportunity]], today: date) -> None:
+    """What each program measures, and results for past shifts: a steady rate per person who attended."""
+    units = {o.opportunity_id: o for _, o in shifts}
+    for opportunity in units.values():
+        unit, _ = DEMO_IMPACT.get(opportunity.title, ("", 0))
+        store.opportunities.update(dataclasses.replace(opportunity, impact_unit=unit))
+    for position, (shift, opportunity) in enumerate(shifts):
+        _, per_person = DEMO_IMPACT.get(opportunity.title, ("", 0))
+        # A few recent shifts stay blank, so the report can show its "results missing" note.
+        if not per_person or shift.starts_at.date() >= today or position % DEMO_IMPACT_BLANK_EVERY == 0:
+            continue
+        attended = sum(
+            entry.assignment.status is AssignmentStatus.ATTENDED
+            for entry in store.assignments.roster(_saved_id(shift.shift_id))
+        )
+        store.shifts.set_impact(_saved_id(shift.shift_id), attended * per_person)
+
+
+def _add_certifications(
+    store: DataStore, volunteers: list[Volunteer], shifts: list[tuple[Shift, Opportunity]], today: date
+) -> None:
+    """One program requires a background check. Everyone on its roster holds one; a few need renewing soon."""
+    program = next(o for _, o in shifts if o.title == DEMO_CERTIFIED_PROGRAM)
+    store.opportunities.update(
+        dataclasses.replace(
+            store.opportunities.get(_saved_id(program.opportunity_id)),
+            required_certifications=frozenset({DEMO_CERTIFICATION}),
+        )
+    )
+    on_roster = {
+        entry.assignment.volunteer_id
+        for shift, opportunity in shifts
+        if opportunity.opportunity_id == program.opportunity_id and shift.starts_at.date() >= today
+        for entry in store.assignments.roster(_saved_id(shift.shift_id))
+    }
+    active = [v for v in volunteers if v.status is VolunteerStatus.ACTIVE]
+    for position, volunteer in enumerate(active):
+        volunteer_id = _saved_id(volunteer.volunteer_id)
+        if volunteer_id not in on_roster and position % DEMO_CERTIFIED_SHARE != 0:
+            continue
+        renew_soon = position % DEMO_RENEW_SOON_EVERY == 0
+        days = DEMO_RENEW_SOON_DAYS if renew_soon else DEMO_CERTIFICATION_DAYS
+        store.volunteers.save_certification(
+            volunteer_id, Certification(DEMO_CERTIFICATION, today + timedelta(days=days))
+        )
+
+
+def _create_todays_checkin_shifts(
+    store: DataStore, volunteers: list[Volunteer], shifts: list[tuple[Shift, Opportunity]], today: date
+) -> int:
+    """Shifts throughout today, so the check-in kiosk has someone to welcome whenever the demo happens."""
+    open_programs = (o for _, o in shifts if o.status is OpportunityStatus.OPEN and o.title != DEMO_CERTIFIED_PROGRAM)
+    opportunity = min(open_programs, key=lambda o: o.min_age)
+    count = 0
+    for start_hour in DEMO_CHECKIN_START_HOURS:
+        starts_at = datetime.combine(today, time(start_hour))
+        ends_at = starts_at + timedelta(hours=DEMO_CHECKIN_SHIFT_HOURS)
+        shift = store.shifts.add(
+            Shift(_saved_id(opportunity.opportunity_id), starts_at, ends_at, DEMO_CHECKIN_CAPACITY)
+        )
+        count += 1
+        roster = 0
+        for volunteer in (v for v in volunteers if v.status is VolunteerStatus.ACTIVE):
+            volunteer_id = _saved_id(volunteer.volunteer_id)
+            if roster == DEMO_CHECKIN_ROSTER or store.assignments.conflicting_shifts(volunteer_id, starts_at, ends_at):
+                continue
+            store.assignments.add(
+                Assignment(
+                    _saved_id(shift.shift_id), volunteer_id, signed_up_at=starts_at - timedelta(days=DEMO_SIGNUP_LEAD)
+                )
+            )
+            roster += 1
+    return count
 
 
 # ----------------------------------------------------------------- accounts

@@ -92,4 +92,5 @@ class SchedulingService(Service):
                     volunteer_id, shift.starts_at, shift.ends_at, exclude_shift_id=shift_id
                 )
             ),
+            required_certifications=opportunity.required_certifications,
         )

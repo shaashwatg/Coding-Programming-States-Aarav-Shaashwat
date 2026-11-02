@@ -29,6 +29,7 @@ class ReportKind(Enum):
     PROGRAM_IMPACT = "PROGRAM_IMPACT"
     SHIFT_ATTENDANCE = "SHIFT_ATTENDANCE"
     RECRUITMENT = "RECRUITMENT"
+    IMPACT_SUMMARY = "IMPACT_SUMMARY"
     SERVICE_RECORD = "SERVICE_RECORD"
 
     @property
@@ -61,6 +62,10 @@ _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
     ReportKind.RECRUITMENT: (
         mark("Recruitment channels"),
         mark("Where do new volunteers come from, and which channels bring people who stay?"),
+    ),
+    ReportKind.IMPACT_SUMMARY: (
+        mark("Impact summary"),
+        mark("What did our volunteers achieve? One page for donors, grants, or the board."),
     ),
     ReportKind.SERVICE_RECORD: (
         mark("Service hours record"),
