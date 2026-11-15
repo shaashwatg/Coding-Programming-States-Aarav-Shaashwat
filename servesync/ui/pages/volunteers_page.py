@@ -17,6 +17,7 @@ from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AccessNeed, AssignmentStatus, Volunteer, VolunteerParticipation, VolunteerStatus
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.data_dialogs import ImportDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_palette
@@ -108,6 +109,12 @@ class VolunteerProfileCard(Panel):
             lines.append(tr("• What helps: {needs}", needs=needs))
         if self._show_notes:
             lines.append(tr("• Heard about us: {label}", label=volunteer.recruitment_source.label))
+            if volunteer.certifications:
+                held = sorted(volunteer.certifications, key=lambda c: c.name.casefold())
+                text = ", ".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held)
+                lines.append(tr("• Certifications: {text}", text=text))
+            if volunteer.referred_by:
+                lines.append(tr("• Referred by: {name}", name=volunteer.referred_by))
             if volunteer.notes:
                 lines.append(tr("• Notes: {notes}", notes=volunteer.notes))
         self.lines.setText("\n".join(lines))
@@ -129,6 +136,11 @@ class VolunteersPage(Page):
                     "Search everyone, approve applicants, and keep contact details "
                     "current. Double-click a person to edit their profile."
                 ),
+                [
+                    make_button(
+                        tr("Import..."), tooltip=tr("Add many volunteers from a CSV file"), on_click=self._import
+                    )
+                ],
             )
         )
         filters = QHBoxLayout()
@@ -178,7 +190,7 @@ class VolunteersPage(Page):
         actions = QHBoxLayout()
         self.edit_button = make_button(tr("Edit profile"), on_click=self._edit)
         self.approve_button = make_button(
-            tr("Approve"), kind="primary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
+            tr("Approve"), kind="secondary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
         )
         self.archive_button = make_button(tr("Archive"), on_click=lambda: self._change(VolunteerStatus.INACTIVE))
         self.delete_button = make_button(tr("Delete"), kind="danger", on_click=self._delete)
@@ -205,6 +217,11 @@ class VolunteersPage(Page):
         status = options.get("status")
         if status:
             self.status_filter.set_value(VolunteerStatus(status))
+
+    @guarded
+    def _import(self) -> None:
+        dialog = ImportDialog(self.ctx, self)
+        dialog.exec()
 
     def refresh(self) -> None:
         services, session = self.ctx.services, self.ctx.session

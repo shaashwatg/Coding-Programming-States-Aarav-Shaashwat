@@ -30,9 +30,11 @@ from servesync.core.validators import (
     validate_birth_date,
 )
 from servesync.models._common import clean_skill_set, validate_optional_id
-from servesync.models.enums import AccessNeed, DayPart, RecruitmentSource, VolunteerStatus, Weekday
+from servesync.models.enums import AccessNeed, CredentialKind, DayPart, RecruitmentSource, VolunteerStatus, Weekday
 
 NOTES_MAX_LENGTH = 1000
+REFERRER_MAX_LENGTH = 101  # two 50-character names and a space
+CERTIFICATION_NAME_MIN_LENGTH, CERTIFICATION_NAME_MAX_LENGTH = 2, 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +85,16 @@ def access_gaps(needs: frozenset[AccessNeed], offered: frozenset[AccessNeed]) ->
     return [need for need in AccessNeed if need in needs and need not in effective]
 
 
+def clean_referrer(value: object) -> str:
+    """A person's name, or blank. Allows a space-separated first and last name, up to 101 characters."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return ""
+    text = clean_text(value, tr("Referred by"), max_length=REFERRER_MAX_LENGTH)
+    if not any(character.isalpha() for character in text):
+        raise InvalidInputError(tr("Referred by must be a person's name."))
+    return text
+
+
 def _clean_availability(values: object) -> frozenset[AvailabilitySlot]:
     if values is None:
         return frozenset()
@@ -92,6 +104,42 @@ def _clean_availability(values: object) -> frozenset[AvailabilitySlot]:
     if not all(isinstance(slot, AvailabilitySlot) for slot in slots):
         raise InvalidInputError(tr("Availability contains an unrecognized time slot."))
     return slots
+
+
+@dataclass(frozen=True, slots=True)
+class Certification:
+    """
+    A certification or waiver a leader has verified, such as a background check,
+    with when it was issued and when it runs out. ``issued_on`` is None only for
+    records saved before ServeSync tracked issue dates.
+    """
+
+    name: str
+    expires_on: date
+    kind: CredentialKind = CredentialKind.CERTIFICATION
+    issued_on: date | None = None
+
+    def __post_init__(self) -> None:
+        if self.issued_on is not None and self.issued_on > self.expires_on:
+            raise InvalidInputError(tr("The issue date must be on or before the expiry date."))
+
+    def is_valid_on(self, day: date) -> bool:
+        return self.expires_on >= day
+
+
+def clean_certification_name(value: object) -> str:
+    text = clean_text(value, tr("Certification"), max_length=CERTIFICATION_NAME_MAX_LENGTH)
+    if len(text) < CERTIFICATION_NAME_MIN_LENGTH:
+        raise InvalidInputError(tr("Certification must be at least 2 characters."))
+    return text
+
+
+def clean_certification_names(values: object) -> frozenset[str]:
+    if values is None:
+        return frozenset()
+    if isinstance(values, str) or not isinstance(values, Iterable):
+        raise InvalidInputError(tr("Required certifications must be a list of names."))
+    return frozenset(clean_certification_name(value) for value in values)
 
 
 @dataclass(slots=True)
@@ -114,6 +162,10 @@ class Volunteer:
     preferred_name: str = ""  # the name they go by; shown everywhere instead of first_name
     pronouns: str = ""  # optional, self-described (e.g. "she/her"); never inferred
     access_needs: frozenset[AccessNeed] = frozenset()  # shared by the volunteer, used for matching
+    referred_by: str = ""  # the person who invited them (thanks and recruiting reports)
+    hour_goal: int | None = None  # personal service-hours goal; set together with hour_goal_due
+    hour_goal_due: date | None = None
+    certifications: frozenset[Certification] = frozenset()  # saved separately; only leaders can change them
     volunteer_id: int | None = None
 
     def __post_init__(self) -> None:
@@ -154,6 +206,7 @@ class Volunteer:
         )
         self.pronouns = errors.check("pronouns", clean_pronouns, self.pronouns)
         self.access_needs = errors.check("access_needs", clean_access_needs, self.access_needs)
+        self.referred_by = errors.check("referred_by", clean_referrer, self.referred_by)
         self.volunteer_id = errors.check("volunteer_id", validate_optional_id, self.volunteer_id, tr("Volunteer ID"))
 
         # --- Cross-field semantic checks (need other fields to be valid) ----
@@ -194,6 +247,9 @@ class Volunteer:
                 ),
             )
 
+        if (self.hour_goal is None) != (self.hour_goal_due is None):
+            errors.add("hour_goal_due", tr("An hour goal needs both a number of hours and a date."))
+
         errors.raise_if_any()
 
     # --- Convenience properties used by the UI and reports ----------------
@@ -233,6 +289,11 @@ class Volunteer:
 
     def is_available_at(self, moment: datetime) -> bool:
         return AvailabilitySlot.for_datetime(moment) in self.availability
+
+    def certification(self, name: str) -> Certification | None:
+        """Names match however they were typed ("cpr" finds "CPR")."""
+        wanted = name.casefold()
+        return next((c for c in self.certifications if c.name.casefold() == wanted), None)
 
     def sorted_skills(self) -> list[str]:
         return sorted(self.skills, key=str.casefold)

@@ -166,6 +166,10 @@ def test_demo_recommendations_obey_every_hard_rule(demo: Services, store: DataSt
         assert not store.assignments.conflicting_shifts(
             volunteer.volunteer_id or 0, shift.starts_at, shift.ends_at, exclude_shift_id=shift.shift_id
         )
+        for required in opportunity.required_certifications:  # the 5K requires a signed waiver
+            held = volunteer.certification(required)
+            assert held is not None and held.is_valid_on(shift.starts_at.date())
+        assert match.role is not None and match.role.role.fits(volunteer.skills)
     # The top picks are actually free at that time.
     slot = AvailabilitySlot(Weekday(shift.starts_at.weekday()), DayPart.from_hour(shift.starts_at.hour))
     assert all(slot in m.volunteer.availability for m in matches[:3])

@@ -36,10 +36,12 @@ from servesync.core.errors import ValidationError
 from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import OpportunityCategory
 from servesync.services import Permission
-from servesync.services.reports import DatePreset, Report, ReportFilters, ReportKind, format_value
+from servesync.services.records_service import display_code
+from servesync.services.reports import DatePreset, Report, ReportFilters, ReportKind, ReportSection, format_value
 from servesync.services.reports.export import suggested_filename
 from servesync.ui import assets
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.records_dialogs import CertificatesPanel, VerifyDialog
 from servesync.ui.pages.base import Page
 from servesync.ui.report_files import save_csv, save_pdf
 from servesync.ui.theme import current_palette
@@ -79,7 +81,7 @@ class ReportsPage(Page):
             tr("Export CSV"), tooltip=tr("Save exactly what you see as a spreadsheet file"), on_click=self._export_csv
         )
         self.export_pdf = make_button(
-            tr("Save PDF"), kind="primary", tooltip=tr("Save a printable copy"), on_click=self._export_pdf
+            tr("Save PDF"), kind="secondary", tooltip=tr("Save a printable copy"), on_click=self._export_pdf
         )
         self.columns_button = QToolButton()
         self.columns_button.setText(tr("Columns"))
@@ -87,8 +89,29 @@ class ReportsPage(Page):
         self.columns_button.setToolTip(tr("Show or hide columns in the table and exports"))
         self.columns_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.columns_button.setMenu(QMenu(self.columns_button))
+        # Impact summary: choose which parts go on the page (and in the PDF).
+        self.sections: set[ReportSection] = set(ReportSection)
+        self.sections_button = QToolButton()
+        self.sections_button.setText(tr("Sections"))
+        self.sections_button.setAccessibleName(tr("Choose sections"))
+        self.sections_button.setToolTip(tr("Choose which parts of the summary to show and print"))
+        self.sections_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        sections_menu = QMenu(self.sections_button)
+        for section in ReportSection:
+            action = sections_menu.addAction(section.label)
+            action.setCheckable(True)
+            action.setChecked(True)
+            action.toggled.connect(lambda on, section=section: self._toggle_section(section, on))
+        self.sections_button.setMenu(sections_menu)
+        self.verify_button = make_button(
+            tr("Verify a record..."),
+            tooltip=tr("Check the code printed on a service record or certificate"),
+            on_click=self._verify,
+        )
         actions: list[QWidget] = (
-            [self.columns_button, self.export_csv, self.export_pdf] if self.leader else [self.export_pdf]
+            [self.verify_button, self.sections_button, self.columns_button, self.export_csv, self.export_pdf]
+            if self.leader
+            else [self.export_pdf]
         )
         self.header = PageHeader(
             self.title,
@@ -153,7 +176,7 @@ class ReportsPage(Page):
 
         # ---------------------------------------------------------- output
         self.figures_row = QHBoxLayout()
-        self.figures_row.setSpacing(12)
+        self.figures_row.setSpacing(24)
         self.layout_.addLayout(self.figures_row)
         self.insights = Panel(tr("What stands out"))
         self.insight_list = QVBoxLayout()
@@ -166,6 +189,9 @@ class ReportsPage(Page):
         self.table_holder = QVBoxLayout()
         self.layout_.addLayout(self.table_holder)
         self.table: RecordTable[Row] | None = None
+        if not self.leader:
+            self.certificates = CertificatesPanel(ctx)
+            self.layout_.insertWidget(1, self.certificates)
 
         self._resolve_dates()
         self.kind_box.currentIndexChanged.connect(self._kind_changed)
@@ -211,14 +237,39 @@ class ReportsPage(Page):
         for edit in (self.start, self.end):
             edit.setEnabled(False)
         self._resolve_dates()
+        for widget in (self.period_box, self.start, self.end):  # some reports always look ahead from today
+            self._set_visible(widget, kind.uses_period)
         if self.leader:
             self._set_visible(self.volunteer_box, is_record)
             self._set_visible(self.program_box, not is_record)
             self._set_visible(self.category_box, not is_record)
         self.include_inactive.setVisible(kind is ReportKind.VOLUNTEER_HOURS)
+        self.sections_button.setVisible(self.leader and kind is ReportKind.IMPACT_SUMMARY)
         self.columns_button.setVisible(self.leader)
         if apply:
             self.reload()
+
+    def _toggle_section(self, section: ReportSection, on: bool) -> None:
+        (self.sections.add if on else self.sections.discard)(section)
+        self._apply_sections()
+
+    def _apply_sections(self) -> None:
+        """Hide the parts of the Impact summary a leader switched off (every other report shows everything)."""
+        chosen = self.sections if self.kind is ReportKind.IMPACT_SUMMARY else set(ReportSection)
+        for layout, section in ((self.figures_row, ReportSection.FIGURES), (self.chart_row, ReportSection.CHARTS)):
+            for index in range(layout.count()):
+                item = layout.itemAt(index)
+                widget = item.widget() if item is not None else None
+                if widget is not None:
+                    widget.setVisible(section in chosen)
+        if self.report is not None:
+            self.insights.setVisible(bool(self.report.insights) and ReportSection.INSIGHTS in chosen)
+        if self.table is not None:
+            self.table.setVisible(ReportSection.TABLE in chosen)
+
+    @guarded
+    def _verify(self) -> None:
+        VerifyDialog(self.ctx, self).exec()
 
     def _set_visible(self, widget: QWidget, visible: bool) -> None:
         widget.setVisible(visible)
@@ -300,6 +351,9 @@ class ReportsPage(Page):
         self._show_insights(report)
         self._show_charts(report, animate)
         self._show_table(report)
+        self._apply_sections()
+        if not self.leader:
+            self.certificates.refresh()
         self.export_csv.setEnabled(not report.is_empty)
         self.export_pdf.setEnabled(True)
         self.ctx.announce(
@@ -311,8 +365,9 @@ class ReportsPage(Page):
         clear_layout(self.figures_row)
         for figure in report.figures:
             tile = Panel()
-            tile.setProperty("tile", True)
-            tile.body.setSpacing(2)
+            tile.setProperty("kpi", True)  # a figure set off by a hairline, like the dashboard's
+            tile.body.setContentsMargins(16, 4, 8, 4)
+            tile.body.setSpacing(4)
             value = make_label(figure.value, "figure")
             label = make_label(figure.label, "figure-label", wrap=True)
             tile.body.addWidget(value)
@@ -442,7 +497,17 @@ class ReportsPage(Page):
             return
         path = self._ask_path("pdf", tr("PDF document"))
         if path is not None:
+            code = ""
+            filters = self.report.filters
+            if self.report.kind is ReportKind.SERVICE_RECORD and filters.volunteer_id is not None:
+                # Each service-hours PDF gets its own code, so a school or employer can have it confirmed.
+                code = display_code(
+                    self.ctx.services.records.issue_service_record(
+                        self.ctx.session, filters.volunteer_id, filters.start, filters.end
+                    )
+                )
             with BusyCursor():
                 images = [chart.render_image() for chart in self.charts]
-                save_pdf(self.report, path, self.visible_columns() if self.leader else None, images)
+                sections = self.sections if self.report.kind is ReportKind.IMPACT_SUMMARY else None
+                save_pdf(self.report, path, self.visible_columns() if self.leader else None, images, code, sections)
             self.ctx.events.status_message.emit(tr("Saved {title}.", title=path.name))

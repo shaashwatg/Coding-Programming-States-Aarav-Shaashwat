@@ -17,6 +17,7 @@ from servesync.services.reports.model import (
     ReportColumn,
     ReportFilters,
     ReportKind,
+    ReportSection,
     ValueKind,
     format_value,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "ReportColumn",
     "ReportFilters",
     "ReportKind",
+    "ReportSection",
     "ReportService",
     "ValueKind",
     "format_value",

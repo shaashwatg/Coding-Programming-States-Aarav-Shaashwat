@@ -20,13 +20,19 @@ from servesync.data.migrations import apply_migrations
 from servesync.data.photo_store import PhotoStore
 from servesync.data.repositories import (
     AccountRepository,
+    AnnouncementRepository,
     AssignmentRepository,
+    ChangeLogRepository,
+    DeletionRequestRepository,
+    DocumentRepository,
+    NoticeRepository,
     OpportunityRepository,
     PreferenceRepository,
     SettingsRepository,
     ShiftRepository,
     SkillRepository,
     VolunteerRepository,
+    WaitlistRepository,
 )
 
 
@@ -44,6 +50,12 @@ class DataStore:
         self.accounts = AccountRepository(db)
         self.settings = SettingsRepository(db)
         self.preferences = PreferenceRepository(db)
+        self.waitlist = WaitlistRepository(db)
+        self.notices = NoticeRepository(db)
+        self.announcements = AnnouncementRepository(db)
+        self.documents = DocumentRepository(db)
+        self.changes = ChangeLogRepository(db)
+        self.deletion_requests = DeletionRequestRepository(db)
 
     @classmethod
     def open(cls, path: Path | str) -> DataStore:

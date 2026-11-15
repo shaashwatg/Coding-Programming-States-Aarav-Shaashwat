@@ -13,11 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from servesync.core.i18n import tr
 from servesync.core.validators import format_phone
 from servesync.models.assignment import Assignment
 from servesync.models.enums import (
     ActivityKind,
     AssignmentStatus,
+    NoticeKind,
     OpportunityCategory,
     OpportunityStatus,
     RecruitmentSource,
@@ -58,10 +60,15 @@ class RosterEntry:
     volunteer_name: str
     volunteer_email: str
     volunteer_phone: str
+    role_name: str = ""  # "" is the shift's general role
 
     @property
     def display_phone(self) -> str:
         return format_phone(self.volunteer_phone)
+
+    @property
+    def role_display(self) -> str:
+        return self.role_name or tr("General")
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,3 +151,88 @@ class ServiceFact:
         if self.status is not AssignmentStatus.ATTENDED:
             return 0.0
         return self.hours_served or 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistEntry:
+    """One person waiting for a spot on a full shift (oldest first)."""
+
+    entry_id: int
+    shift_id: int
+    volunteer_id: int
+    volunteer_name: str
+    joined_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Notice:
+    """A message waiting on a volunteer's Home page, with the shift it is about."""
+
+    notice_id: int
+    volunteer_id: int
+    kind: NoticeKind
+    created_at: datetime
+    shift_id: int
+    opportunity_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_name: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class Announcement:
+    """A leader's note to everyone signed up for a program or for one shift."""
+
+    announcement_id: int
+    body: str
+    posted_by: str
+    posted_at: datetime
+    opportunity_title: str
+    opportunity_id: int | None = None  # set when it is for the whole program
+    shift_id: int | None = None  # set when it is for one shift
+    shift_starts_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IssuedDocument:
+    """A service record or certificate that left the building, by its verification code."""
+
+    code: str
+    kind: str  # "SERVICE_RECORD" or "MILESTONE"
+    volunteer_id: int
+    volunteer_name: str  # the legal name, as printed on the document
+    hours: float
+    issued_at: datetime
+    issued_by: str
+    period_start: date | None = None
+    period_end: date | None = None
+    milestone: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeEntry:
+    """One line of the change history (codes; worded when shown)."""
+
+    change_id: int
+    changed_at: datetime
+    changed_by: str
+    action: str  # ADDED, CHANGED, REMOVED, STATUS, IMPORTED, RESTORED, ANONYMIZED, REQUESTED
+    entity: str  # VOLUNTEER, PROGRAM, SHIFT, SIGN_UP, ACCOUNT, SETTINGS, DATA
+    entity_id: int | None
+    label: str  # the record's name at the time, e.g. "Priya Patel"
+    details: str  # changed field names, or "OLD>NEW" for a status change
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionRequest:
+    """A volunteer asked for their personal details to be removed."""
+
+    request_id: int
+    volunteer_id: int
+    volunteer_name: str
+    requested_at: datetime
+    reason: str
+    status: str  # PENDING, COMPLETED, DECLINED
+    handled_by: str | None = None
+    handled_at: datetime | None = None
+    response: str = ""

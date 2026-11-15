@@ -29,6 +29,8 @@ class ReportKind(Enum):
     PROGRAM_IMPACT = "PROGRAM_IMPACT"
     SHIFT_ATTENDANCE = "SHIFT_ATTENDANCE"
     RECRUITMENT = "RECRUITMENT"
+    IMPACT_SUMMARY = "IMPACT_SUMMARY"
+    CERTIFICATION_EXPIRY = "CERTIFICATION_EXPIRY"
     SERVICE_RECORD = "SERVICE_RECORD"
 
     @property
@@ -43,6 +45,11 @@ class ReportKind(Enum):
     @property
     def for_leaders(self) -> bool:
         return self is not ReportKind.SERVICE_RECORD
+
+    @property
+    def uses_period(self) -> bool:
+        """False for reports that always look ahead from today (the period picker is hidden)."""
+        return self is not ReportKind.CERTIFICATION_EXPIRY
 
 
 _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
@@ -62,11 +69,32 @@ _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
         mark("Recruitment channels"),
         mark("Where do new volunteers come from, and which channels bring people who stay?"),
     ),
+    ReportKind.IMPACT_SUMMARY: (
+        mark("Impact summary"),
+        mark("What did our volunteers achieve? One page for donors, grants, or the board."),
+    ),
+    ReportKind.CERTIFICATION_EXPIRY: (
+        mark("Certification expiry"),
+        mark("Whose certifications and waivers have run out or will soon, and which programs need them?"),
+    ),
     ReportKind.SERVICE_RECORD: (
         mark("Service hours record"),
         mark("A verified list of one volunteer's service, for school, scholarships, or employers."),
     ),
 }
+
+
+class ReportSection(Enum):
+    """Parts of a report a leader can leave out (used by the one-page Impact summary)."""
+
+    FIGURES = "Headline figures"
+    INSIGHTS = "What stands out"
+    CHARTS = "Charts"
+    TABLE = "Details table"
+
+    @property
+    def label(self) -> str:
+        return tr(self.value)
 
 
 class DatePreset(Enum):

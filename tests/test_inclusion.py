@@ -12,7 +12,7 @@ import pytest
 from servesync.core.errors import ValidationError
 from servesync.core.validators import InvalidInputError, clean_pronouns
 from servesync.data import DataStore
-from servesync.data.migrations import current_version
+from servesync.data.migrations import MIGRATIONS, current_version
 from servesync.models import AccessNeed, Appearance, MessageDuration, Theme, UserAccount, UserRole, access_gaps
 from servesync.services import Services, Session
 from servesync.services.rules import describe_access_gaps
@@ -184,23 +184,54 @@ def test_invalid_preference_change_saves_nothing(services: Services, world: Worl
 # ------------------------------------------------------------ migration
 
 
+def _old_file(path: Path, version: int) -> None:
+    """Write a data file exactly as an older ServeSync would have: only the first ``version`` migrations."""
+    with closing(sqlite3.connect(path)) as raw:
+        raw.execute("PRAGMA foreign_keys = ON")
+        for migration in MIGRATIONS[:version]:
+            raw.executescript(migration.sql)
+        raw.execute(
+            """INSERT INTO volunteers (first_name, last_name, email, phone, birth_date, joined_on, status,
+                                       recruitment_source)
+               VALUES ('Ana', 'Lopez', 'ana.lopez@example.org', '3125550142', '1998-04-12', '2025-01-15',
+                       'ACTIVE', 'OTHER')"""
+        )
+        raw.execute(f"PRAGMA user_version = {version}")
+        raw.commit()
+
+
 def test_version_2_file_upgrades_with_inclusion_columns(tmp_path: Path) -> None:
     path = tmp_path / "v2.db"
+    _old_file(path, 2)
     with DataStore.open(path) as store:
-        volunteer = store.volunteers.add(make_volunteer())
-    with closing(sqlite3.connect(path)) as raw:  # rewind the file to look like version 2
-        raw.executescript(
-            "DROP TABLE account_preferences; DROP TABLE opportunity_access_features; DROP TABLE volunteer_access_needs;"
-            "DROP VIEW volunteer_participation;"
-            "ALTER TABLE volunteers DROP COLUMN pronouns; ALTER TABLE volunteers DROP COLUMN preferred_name;"
-            "CREATE VIEW volunteer_participation AS SELECT 1 AS volunteer_id;"
-            "PRAGMA user_version = 2;"
-        )
-    with DataStore.open(path) as store:
-        assert current_version(store.db) == 3
-        upgraded = store.volunteers.get(volunteer.volunteer_id or 0)
+        assert current_version(store.db) == MIGRATIONS[-1].version
+        upgraded = store.volunteers.find_all()[0]
         assert (upgraded.preferred_name, upgraded.pronouns, upgraded.access_needs) == ("", "", frozenset())
-        assert store.volunteers.get_participation(volunteer.volunteer_id or 0).full_name == "Ana Lopez"
+        assert store.volunteers.get_participation(upgraded.volunteer_id or 0).full_name == "Ana Lopez"
+
+
+def test_version_5_file_gives_each_shift_one_general_role(tmp_path: Path) -> None:
+    path = tmp_path / "v5.db"
+    _old_file(path, 5)
+    with closing(sqlite3.connect(path)) as raw:
+        raw.execute(
+            """INSERT INTO opportunities (title, description, category, location, coordinator_name, min_age, status)
+               VALUES ('Food Pantry', 'Pack boxes for families.', 'FOOD_SECURITY', 'Gym', 'Dana', 14, 'OPEN')"""
+        )
+        raw.execute(
+            """INSERT INTO shifts (opportunity_id, starts_at, ends_at, capacity)
+               VALUES (1, '2030-01-05T09:00', '2030-01-05T12:00', 6)"""
+        )
+        raw.execute(
+            """INSERT INTO assignments (shift_id, volunteer_id, status, signed_up_at)
+               VALUES (1, 1, 'SCHEDULED', '2029-12-01T10:00')"""
+        )
+        raw.commit()
+    with DataStore.open(path) as store:
+        (role,) = store.shifts.roles(1)
+        assert role.role.is_general and role.role.capacity == 6 and role.filled == 1
+        assert store.assignments.find(1, 1) is not None
+        assert store.assignments.find(1, 1).role_id == role.role.role_id  # type: ignore[union-attr]
 
 
 def test_database_rejects_unknown_access_codes(store: DataStore, world: World) -> None:

@@ -111,6 +111,7 @@ class AuthService(Service):
         with self._store.transaction():
             self._store.accounts.update_password_hash(account_id, self._hash(new_password))
             self._store.accounts.unlock(account_id)
+            self._log(session.username, "CHANGED", "ACCOUNT", account_id, account.username, "password")
         logger.info("Account #%s password reset by account #%s", account_id, session.account_id)
 
     # --------------------------------------------------------------- accounts
@@ -137,6 +138,7 @@ class AuthService(Service):
             volunteer_id=volunteer_id if role is UserRole.VOLUNTEER else None,
         )
         saved = self._store.accounts.add(account)
+        self._log(session.username, "ADDED", "ACCOUNT", saved.account_id, saved.username, role.value)
         logger.info("Account #%s (%s) created by account #%s", saved.account_id, role.value, session.account_id)
         return saved
 
@@ -153,6 +155,8 @@ class AuthService(Service):
             ):
                 raise BusinessRuleError(tr("At least one administrator account must stay active."))
         self._store.accounts.set_active(account_id, active)
+        details = f"{'INACTIVE' if account.is_active else 'ACTIVE'}>{'ACTIVE' if active else 'INACTIVE'}"
+        self._log(session.username, "STATUS", "ACCOUNT", account_id, account.username, details)
 
     def list_accounts(self, session: Session) -> list[UserAccount]:
         session.require(Permission.MANAGE_ACCOUNTS)

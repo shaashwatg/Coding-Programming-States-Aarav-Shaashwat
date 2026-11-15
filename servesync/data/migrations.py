@@ -258,10 +258,180 @@ LEFT JOIN shifts      AS s ON s.shift_id = a.shift_id
 GROUP BY v.volunteer_id;
 """
 
+_V4_REFERRALS_AND_GOALS = """
+-- Who referred a volunteer (the channel alone can't say who to thank).
+ALTER TABLE volunteers ADD COLUMN referred_by TEXT NOT NULL DEFAULT ''
+    CHECK (length(referred_by) <= 101);
+
+-- A personal service-hours goal: both parts or neither.
+ALTER TABLE volunteers ADD COLUMN hour_goal INTEGER
+    CHECK (hour_goal IS NULL OR hour_goal BETWEEN 1 AND 2000);
+ALTER TABLE volunteers ADD COLUMN hour_goal_due TEXT;
+"""
+
+_V5_IMPACT_AND_CERTIFICATIONS = """
+-- Results, not just hours: each program names what it measures; each shift records how much.
+ALTER TABLE opportunities ADD COLUMN impact_unit TEXT NOT NULL DEFAULT ''
+    CHECK (length(impact_unit) <= 40);
+ALTER TABLE shifts ADD COLUMN impact_amount INTEGER
+    CHECK (impact_amount IS NULL OR impact_amount BETWEEN 0 AND 1000000);
+
+-- Certifications a volunteer holds (leaders record them) and those a program requires.
+CREATE TABLE volunteer_certifications (
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    name         TEXT NOT NULL CHECK (length(name) BETWEEN 2 AND 60),
+    expires_on   TEXT NOT NULL,
+    PRIMARY KEY (volunteer_id, name)
+) WITHOUT ROWID;
+
+CREATE TABLE opportunity_certifications (
+    opportunity_id INTEGER NOT NULL REFERENCES opportunities (opportunity_id) ON DELETE CASCADE,
+    name           TEXT NOT NULL CHECK (length(name) BETWEEN 2 AND 60),
+    PRIMARY KEY (opportunity_id, name)
+) WITHOUT ROWID;
+"""
+
+_V6_ROLES_WAITLIST_CREDENTIALS = """
+-- Roles within a shift (Registration x2, Water station x6), each with its own capacity and an
+-- optional skill. An empty name is the shift's general role, shown as "General" in either language.
+-- A shift's capacity is always the sum of its roles' capacities (kept by the service layer).
+CREATE TABLE shift_roles (
+    role_id        INTEGER PRIMARY KEY,
+    shift_id       INTEGER NOT NULL REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    name           TEXT NOT NULL COLLATE NOCASE CHECK (length(name) <= 40),
+    capacity       INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 500),
+    required_skill TEXT NOT NULL DEFAULT '' CHECK (length(required_skill) <= 40),
+    position       INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+    UNIQUE (shift_id, name)
+);
+CREATE INDEX idx_shift_roles_shift ON shift_roles (shift_id);
+
+-- Every existing shift gets one general role holding its whole capacity.
+INSERT INTO shift_roles (shift_id, name, capacity) SELECT shift_id, '', capacity FROM shifts;
+
+-- Each sign-up fills one role of its shift.
+ALTER TABLE assignments ADD COLUMN role_id INTEGER REFERENCES shift_roles (role_id) ON DELETE RESTRICT;
+UPDATE assignments
+SET role_id = (SELECT r.role_id FROM shift_roles AS r WHERE r.shift_id = assignments.shift_id);
+CREATE INDEX idx_assignments_role ON assignments (role_id);
+
+-- A sign-up's role must belong to the same shift (defense in depth behind the service rules).
+CREATE TRIGGER assignment_role_same_shift_insert BEFORE INSERT ON assignments
+WHEN NEW.role_id IS NOT NULL
+ AND (SELECT shift_id FROM shift_roles WHERE role_id = NEW.role_id) IS NOT NEW.shift_id
+BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: role belongs to another shift'); END;
+CREATE TRIGGER assignment_role_same_shift_update BEFORE UPDATE OF role_id, shift_id ON assignments
+WHEN NEW.role_id IS NOT NULL
+ AND (SELECT shift_id FROM shift_roles WHERE role_id = NEW.role_id) IS NOT NEW.shift_id
+BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: role belongs to another shift'); END;
+
+-- Waitlist for full shifts: oldest first. An entry is removed when the person is signed up or leaves.
+CREATE TABLE waitlist (
+    entry_id     INTEGER PRIMARY KEY,
+    shift_id     INTEGER NOT NULL REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    joined_at    TEXT NOT NULL,
+    UNIQUE (shift_id, volunteer_id)
+);
+CREATE INDEX idx_waitlist_shift ON waitlist (shift_id, joined_at);
+
+-- Messages for a volunteer's Home page. The wording is built when shown, in their language.
+CREATE TABLE notices (
+    notice_id    INTEGER PRIMARY KEY,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    kind         TEXT NOT NULL CHECK (kind IN ('WAITLIST_PROMOTED')),
+    shift_id     INTEGER REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    dismissed    INTEGER NOT NULL DEFAULT 0 CHECK (dismissed IN (0, 1))
+);
+CREATE INDEX idx_notices_volunteer ON notices (volunteer_id, dismissed);
+
+-- Certifications and waivers: what kind of document, and when it was issued.
+ALTER TABLE volunteer_certifications ADD COLUMN kind TEXT NOT NULL DEFAULT 'CERTIFICATION'
+    CHECK (kind IN ('CERTIFICATION', 'WAIVER'));
+ALTER TABLE volunteer_certifications ADD COLUMN issued_on TEXT
+    CHECK (issued_on IS NULL OR issued_on <= expires_on);
+"""
+
+_V7_ANNOUNCEMENTS_AND_CHECK_OUT = """
+-- A leader's note to everyone signed up for one program or one shift (exactly one of the two).
+CREATE TABLE announcements (
+    announcement_id INTEGER PRIMARY KEY,
+    opportunity_id  INTEGER REFERENCES opportunities (opportunity_id) ON DELETE CASCADE,
+    shift_id        INTEGER REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    body            TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 500),
+    posted_by       TEXT NOT NULL CHECK (length(posted_by) BETWEEN 1 AND 80),
+    posted_at       TEXT NOT NULL,
+    CHECK ((opportunity_id IS NULL) <> (shift_id IS NULL))
+);
+CREATE INDEX idx_announcements_opportunity ON announcements (opportunity_id);
+CREATE INDEX idx_announcements_shift ON announcements (shift_id);
+
+-- The kiosk records arrival and departure times; hours are worked out from them.
+ALTER TABLE assignments ADD COLUMN checked_in_at TEXT;
+ALTER TABLE assignments ADD COLUMN checked_out_at TEXT
+    CHECK (checked_out_at IS NULL OR (checked_in_at IS NOT NULL AND checked_out_at >= checked_in_at));
+"""
+
+_V8_ISSUED_DOCUMENTS = """
+-- Every service-hours record and milestone certificate saved as a PDF gets a short code,
+-- so a school or employer can ask the organization to confirm it is genuine.
+CREATE TABLE issued_documents (
+    code         TEXT PRIMARY KEY CHECK (length(code) = 8),
+    kind         TEXT NOT NULL CHECK (kind IN ('SERVICE_RECORD', 'MILESTONE')),
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    period_start TEXT,
+    period_end   TEXT,
+    hours        REAL NOT NULL CHECK (hours >= 0),
+    milestone    INTEGER CHECK (milestone IS NULL OR milestone IN (25, 50, 100)),
+    issued_at    TEXT NOT NULL,
+    issued_by    TEXT NOT NULL CHECK (length(issued_by) BETWEEN 1 AND 80),
+    CHECK ((kind = 'MILESTONE') = (milestone IS NOT NULL))
+) WITHOUT ROWID;
+CREATE INDEX idx_issued_documents_volunteer ON issued_documents (volunteer_id);
+"""
+
+_V9_CHANGE_LOG_AND_PRIVACY = """
+-- Who changed what, and when. Stored as codes (action, record type, field names), so the
+-- history reads in either language. Rows are only ever added.
+CREATE TABLE change_log (
+    change_id  INTEGER PRIMARY KEY,
+    changed_at TEXT NOT NULL,
+    changed_by TEXT NOT NULL CHECK (length(changed_by) BETWEEN 1 AND 80),
+    action     TEXT NOT NULL CHECK (action IN ('ADDED', 'CHANGED', 'REMOVED', 'STATUS', 'IMPORTED',
+                                               'RESTORED', 'ANONYMIZED', 'REQUESTED')),
+    entity     TEXT NOT NULL CHECK (entity IN ('VOLUNTEER', 'PROGRAM', 'SHIFT', 'SIGN_UP', 'ACCOUNT',
+                                               'SETTINGS', 'DATA')),
+    entity_id  INTEGER,
+    label      TEXT NOT NULL DEFAULT '' CHECK (length(label) <= 160),
+    details    TEXT NOT NULL DEFAULT '' CHECK (length(details) <= 500)
+);
+CREATE INDEX idx_change_log_time ON change_log (changed_at);
+
+-- A volunteer's request to have their personal details removed.
+CREATE TABLE deletion_requests (
+    request_id   INTEGER PRIMARY KEY,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    requested_at TEXT NOT NULL,
+    reason       TEXT NOT NULL DEFAULT '' CHECK (length(reason) <= 500),
+    status       TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COMPLETED', 'DECLINED')),
+    handled_by   TEXT,
+    handled_at   TEXT,
+    response     TEXT NOT NULL DEFAULT '' CHECK (length(response) <= 500)
+);
+CREATE UNIQUE INDEX idx_one_open_request ON deletion_requests (volunteer_id) WHERE status = 'PENDING';
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
     Migration(3, "Preferred names, pronouns, access needs, and per-person preferences", _V3_INCLUSION),
+    Migration(4, "Who referred each volunteer, and personal hour goals", _V4_REFERRALS_AND_GOALS),
+    Migration(5, "Program results and required certifications", _V5_IMPACT_AND_CERTIFICATIONS),
+    Migration(6, "Shift roles, waitlists, notices, and certification types", _V6_ROLES_WAITLIST_CREDENTIALS),
+    Migration(7, "Announcements, and kiosk check-in and check-out times", _V7_ANNOUNCEMENTS_AND_CHECK_OUT),
+    Migration(8, "Verification codes for service records and certificates", _V8_ISSUED_DOCUMENTS),
+    Migration(9, "Change history and privacy requests", _V9_CHANGE_LOG_AND_PRIVACY),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

@@ -79,7 +79,16 @@ def test_translations_keep_every_placeholder() -> None:
 def test_translations_are_real_translations() -> None:
     entries = messages.load_catalog()
     assert all(value.strip() for value in entries.values())
-    same_in_both = {"Error: {message}", "Smart Match"}  # genuinely identical in Spanish
+    same_in_both = {  # genuinely identical in Spanish
+        "Error: {message}",
+        "Smart Match",
+        "{program}: {result} {unit}.",
+        "General",
+        "{role}: {message}",
+        "{column}: {message}",
+        "{program} ({organization})",
+        "{program}, {when}",
+    }
     untouched = [k for k, v in entries.items() if k == v and len(k) > 4 and k not in same_in_both]
     assert untouched == []  # copied English would slip through the missing-message check
 
@@ -270,7 +279,7 @@ def test_the_whole_window_is_in_spanish(demo: Services, qapp: QApplication, qtbo
     qtbot.addWidget(window)
     window.resize(1360, 860)
     window.show()
-    names = {button.text() for button in window.findChildren(QPushButton) if button.property("nav")}
+    names = {button.accessibleName() for button in window.findChildren(QPushButton) if button.property("nav")}
     assert {"Panel", "Voluntarios", "Programas", "Calendario", "Informes", "Configuración"} <= names
     for key in window.pages:
         window.navigate(key)

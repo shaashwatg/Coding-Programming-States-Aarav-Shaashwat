@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTabWidget, QTextBrowse
 from servesync import __app_name__, __version__
 from servesync.core.i18n import Language, current_language, format_clock, tr
 from servesync.models import UserRole
+from servesync.ui.help_topics import page_help_html, topic_html
 from servesync.ui.widgets.common import make_label
 
 LEADER_GUIDE = """
@@ -25,6 +26,10 @@ LEADER_GUIDE = """
 <ul>
 <li>Choose <b>Add volunteer</b> (top right) to register someone. New people start as <i>Applicants</i>.</li>
 <li>On <b>Volunteers</b>, select an applicant and choose <b>Approve</b> once they've completed orientation.</li>
+<li>New people can also apply on their own: <b>Become a volunteer</b> on the sign-in screen creates an
+<i>Applicant</i> for you to review. Anyone under 18 must give a parent or guardian as their contact.</li>
+<li>The form asks <i>Who invited you?</i> The <b>Recruitment</b> report counts referrals for each channel and
+charts who brings in the most volunteers, so you know whom to thank.</li>
 <li>Archive people who step away; their service history is always kept.</li>
 </ul>
 <h3>Programs and shifts</h3>
@@ -39,12 +44,61 @@ LEADER_GUIDE = """
 or one person's service record), a period, and optionally a program or category.</li>
 <li>Read <i>What stands out</i> for plain-English findings, choose <b>Columns</b> to show more detail,
 then <b>Export CSV</b> or <b>Save PDF</b>. Exports contain exactly what you see.</li>
+<li>For the one-page <b>Impact summary</b>, choose <b>Sections</b> to leave out parts you don't need.</li>
+<li>Every service-hours PDF and certificate carries a verification code. Choose <b>Verify a record</b> and type it to
+confirm a document someone sends you is genuine.</li>
 </ul>
 <h3>Ask ServeSync</h3>
 <ul>
-<li>Press <b>Ctrl+K</b> (or choose <b>Ask</b> at the top) and type a question such as
+<li>Press <b>Ctrl+K</b> (or choose the <b>Ask</b> box at the top) and type a question such as
 <i>Who is free Saturday morning?</i> or <i>How is the food pantry doing?</i></li>
 <li>Type a page name instead to jump straight there. Answers come only from this computer's records.</li>
+</ul>
+<h3>Check-in kiosk</h3>
+<ul>
+<li>On the <b>Dashboard</b>, choose <b>Open check-in kiosk</b>. Volunteers find their name, tap it to check in, and
+tap it again to check out. Check-in opens 30 minutes before a shift. Only your password closes it.</li>
+<li>Hours come from the two times (only time inside the shift counts). Anyone still checked in at the end gets time
+from arrival to the end with <b>Check in everyone</b>. Correct anyone's hours on the roster.</li>
+</ul>
+<h3>Coordinating people</h3>
+<ul>
+<li>Open a shift (or select a program) and choose <b>Announce</b> to post a note everyone signed up sees on Home.</li>
+<li><b>Tomorrow's reminders</b> on the Dashboard lists who is coming with phone and email; export it as CSV.</li>
+<li>In a shift, <b>Add to calendar</b> saves a calendar file, and <b>Print sign-in sheet</b> saves a paper
+fallback as a PDF.</li>
+</ul>
+<h3>Results and certifications</h3>
+<ul>
+<li>Edit a program to name <b>What this program measures</b>, then enter a result on each shift's roster. The
+<b>Impact summary</b> report turns these into a one-page PDF.</li>
+<li>Edit a program to add <b>Required certifications</b> (a certification or a signed waiver), and edit a volunteer to
+record theirs with its type, issue date, and expiry date. Nobody can be scheduled without a current one, and the
+reason is shown.</li>
+<li>The <b>Dashboard</b> lists everything that runs out in the next 30 days. The <b>Certification expiry</b> report
+lists what has expired or runs out within 90 days, and which programs need it.</li>
+</ul>
+<h3>Data and trust</h3>
+<ul>
+<li>On <b>Volunteers</b>, choose <b>Import</b> to add many people from a spreadsheet saved as CSV. ServeSync checks
+every row and lists what to fix; nothing is saved until every row is ready. <b>Save template</b> gives the right
+headings.</li>
+<li>Administrators: <b>Settings</b> has <b>Back up</b> and <b>Restore</b> (one file with every record and photo), the
+<b>Change history</b> (who changed what, and when), and <b>Privacy requests</b> from volunteers.</li>
+</ul>
+<h3>Roles and waitlists</h3>
+<ul>
+<li>Open a shift and choose <b>Edit roles</b> to split it into jobs (for example Registration x2, Water station x6).
+A role can require one skill. The roster is grouped by role, and Smart Match places people by skill.</li>
+<li>When a shift is full, volunteers can <b>Join waitlist</b>. If someone cancels, the first person who still
+qualifies is signed up automatically and sees a note on their Home page. The roster shows who is waiting.</li>
+</ul>
+<h3>Staffing Studio</h3>
+<ul>
+<li><b>Autopilot</b> drafts sign-ups for the next two weeks. Untick anyone you'd rather not ask, then choose
+<b>Sign up selected</b>. Nothing changes until you approve, and <b>Undo last approval</b> reverses it.</li>
+<li>The <b>Attendance forecast</b> adds up each person's show-up rate, to show which shifts may come up short.</li>
+<li><b>Worth a personal invitation</b> lists regulars who have stopped coming, with a shift to invite them to.</li>
 </ul>
 <h3>Smart Match</h3>
 <ul>
@@ -65,11 +119,21 @@ VOLUNTEER_GUIDE = """
 <li>Choose <b>Find a shift</b> (top right) to browse everything that's open. Select a shift to see details,
 then choose <b>Sign up</b>. If you can't sign up, ServeSync tells you why.</li>
 <li><b>Calendar</b> shows every open shift by date.</li>
+<li>Some shifts have roles, such as Registration or Water station. When you sign up you can choose one; ServeSync
+suggests the one that fits your skills.</li>
+<li>Choose <b>Add to calendar</b> on any shift to save it to your phone or email calendar. Notes from coordinators
+appear on <b>Home</b>.</li>
+<li>On <b>My profile</b>, <b>Download my data</b> saves everything ServeSync holds about you, and <b>Request
+deletion</b> asks for your personal details to be removed.</li>
+<li>Shift full? Choose <b>Join waitlist</b>. If a spot opens, you're signed up automatically and a note appears on
+<b>Home</b>.</li>
 <li>Need to cancel? Select the shift on <b>Home</b> and choose <b>Cancel sign-up</b>, any time before it starts.</li>
 <li>Keep your availability and skills current on <b>My profile</b> so recommendations fit your life.
 You can also add the name you go by, your pronouns, and any access needs (step-free entry, seated tasks,
 public transit, a quiet space, no cost, or remote).</li>
-<li><b>My hours</b> lists your verified service. Choose <b>Save PDF</b> for school, scholarships, or employers.</li>
+<li><b>My hours</b> lists your verified service. Choose <b>Save PDF</b> for school, scholarships, or employers. At
+25, 50, and 100 hours you can save a certificate. Each PDF has a code the organization can confirm.</li>
+<li>Set an <b>hour goal</b> on Home to see your progress and the date you're likely to finish.</li>
 <li>Press <b>Ctrl+K</b> and ask things like <i>When is my next shift?</i> or <i>What should I sign up for?</i></li>
 </ul>
 """
@@ -79,14 +143,14 @@ SHORTCUTS = """
 <p>Everything in ServeSync works from the keyboard. On a Mac, use Command where you see Ctrl.</p>
 <table cellpadding="6">
 <tr><td><b>Ctrl+K</b></td><td>Ask ServeSync a question, or type a page name to go there</td></tr>
-<tr><td><b>Ctrl+1 ... Ctrl+6</b></td><td>Go to each page, in order</td></tr>
+<tr><td><b>Ctrl+1, Ctrl+2, ...</b></td><td>Go to each page, in order</td></tr>
 <tr><td><b>Ctrl+N</b></td><td>The main action at the top right (Add volunteer, or Find a shift)</td></tr>
 <tr><td><b>Ctrl+F</b></td><td>Jump to the search box on the current page</td></tr>
 <tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>Larger text, smaller text, normal size (saved for you)</td></tr>
 <tr><td><b>Ctrl+Shift+H</b></td><td>High contrast on or off</td></tr>
 <tr><td><b>Arrow keys</b></td><td>On a chart: move between bars or points; each value is read aloud</td></tr>
 <tr><td><b>F1</b></td><td>Open this help</td></tr>
-<tr><td><b>Tab / Shift+Tab</b></td><td>Move between controls (the focused control has a blue outline)</td></tr>
+<tr><td><b>Tab / Shift+Tab</b></td><td>Move between controls (the focused control has a colored outline)</td></tr>
 <tr><td><b>Enter</b></td><td>Open the selected row, or press the highlighted button</td></tr>
 <tr><td><b>Esc</b></td><td>Close a window without saving</td></tr>
 </table>
@@ -103,8 +167,8 @@ ABOUT = f"""
 FBLA Coding &amp; Programming event (2026-2027).</p>
 <h3>Credits</h3>
 <ul>
-<li>Fonts: Atkinson Hyperlegible (Braille Institute of America) and Source Serif 4 (Adobe),
-both under the SIL Open Font License 1.1.</li>
+<li>Fonts: Atkinson Hyperlegible (Braille Institute of America) for text and Manrope
+(The Manrope Project Authors) for headings, both under the SIL Open Font License 1.1.</li>
 <li>Icons: Lucide, ISC License.</li>
 <li>Interface toolkit: Qt for Python (PySide6), LGPL v3.</li>
 <li>Value of a volunteer hour: Independent Sector and the Do Good Institute, University of
@@ -133,6 +197,11 @@ la asistencia.</li>
 <i>Solicitantes</i>.</li>
 <li>En <b>Voluntarios</b>, seleccione a un solicitante y elija <b>Aprobar</b> cuando haya completado
 la orientación.</li>
+<li>Las personas nuevas también pueden postularse por su cuenta: <b>Hacerme voluntario</b>, en la pantalla de
+inicio de sesión, crea un <i>Solicitante</i> para que usted lo revise. Quien tenga menos de 18 años debe indicar a
+su madre, padre o tutor como contacto.</li>
+<li>El formulario pregunta <i>¿Quién lo invitó?</i> El informe de <b>Reclutamiento</b> cuenta las referencias de
+cada canal y muestra en un gráfico quién trae más voluntarios, para que sepa a quién agradecer.</li>
 <li>Archive a quienes se retiren; su historial de servicio siempre se conserva.</li>
 </ul>
 <h3>Programas y turnos</h3>
@@ -149,13 +218,70 @@ inscribirse.</li>
 reclutamiento o el historial de servicio de una persona), un período y, si quiere, un programa o una categoría.</li>
 <li>Lea <i>Lo más destacado</i> para ver los hallazgos en lenguaje sencillo, elija <b>Columnas</b> para ver más
 detalle y luego <b>Exportar CSV</b> o <b>Guardar PDF</b>. Lo que exporta es exactamente lo que ve.</li>
+<li>En el <b>Resumen de impacto</b> de una página, elija <b>Secciones</b> para quitar las partes que no necesite.</li>
+<li>Cada PDF de horas de servicio y cada certificado lleva un código de verificación. Elija <b>Verificar un
+documento</b> y escríbalo para confirmar que un documento que le envían es auténtico.</li>
 </ul>
-<h3>Pregúntale a ServeSync</h3>
+<h3>Pregunte a ServeSync</h3>
 <ul>
-<li>Presione <b>Ctrl+K</b> (o elija <b>Preguntar</b> arriba) y escriba una pregunta como
+<li>Presione <b>Ctrl+K</b> (o elija el cuadro <b>Preguntar</b> arriba) y escriba una pregunta como
 <i>¿Quién está libre el sábado por la mañana?</i> o <i>¿Cómo va la despensa de alimentos?</i></li>
 <li>También puede escribir el nombre de una página para ir directamente. Las respuestas salen solo de los registros
 de esta computadora.</li>
+</ul>
+<h3>Quiosco de llegada</h3>
+<ul>
+<li>En el <b>Panel</b>, elija <b>Abrir quiosco de llegada</b>. Los voluntarios buscan su nombre, lo tocan para
+registrar su llegada y lo vuelven a tocar al irse. El registro abre 30 minutos antes del turno. Solo su contraseña
+lo cierra.</li>
+<li>Las horas salen de esos dos momentos (solo cuenta el tiempo dentro del turno). Con <b>Registrar a todos</b>,
+quien siga registrado al final recibe el tiempo desde su llegada. Puede corregir las horas en la lista del turno.</li>
+</ul>
+<h3>Coordinar a las personas</h3>
+<ul>
+<li>Abra un turno (o seleccione un programa) y elija <b>Anunciar</b> para publicar una nota que verán en Inicio
+todas las personas inscritas.</li>
+<li><b>Recordatorios de mañana</b>, en el Panel, muestra quién viene, con teléfono y correo; expórtelo como CSV.</li>
+<li>En un turno, <b>Agregar al calendario</b> guarda un archivo de calendario, e <b>Imprimir hoja de asistencia</b>
+guarda una alternativa en papel como PDF.</li>
+</ul>
+<h3>Resultados y certificaciones</h3>
+<ul>
+<li>Edite un programa para indicar <b>Qué mide este programa</b> y luego escriba un resultado en la lista de cada
+turno. El informe <b>Resumen de impacto</b> los convierte en un PDF de una página.</li>
+<li>Edite un programa para agregar <b>Certificaciones requeridas</b> (una certificación o una exención firmada) y
+edite a un voluntario para registrar las suyas con su tipo, fecha de emisión y fecha de vencimiento. Nadie puede
+programarse sin una vigente, y se muestra el motivo.</li>
+<li>El <b>Panel</b> muestra todo lo que vence en los próximos 30 días. El informe <b>Vencimiento de
+certificaciones</b> muestra lo que ya venció o vence en 90 días, y qué programas lo requieren.</li>
+</ul>
+<h3>Datos y confianza</h3>
+<ul>
+<li>En <b>Voluntarios</b>, elija <b>Importar</b> para agregar a muchas personas desde una hoja de cálculo guardada como
+CSV. ServeSync revisa cada fila y muestra qué corregir; no se guarda nada hasta que todas estén listas. <b>Guardar
+plantilla</b> le da los encabezados correctos.</li>
+<li>Administradores: <b>Configuración</b> tiene <b>Hacer copia de seguridad</b> y <b>Restaurar</b> (un solo archivo con
+todos los registros y fotos), el <b>Historial de cambios</b> (quién cambió qué y cuándo) y las <b>Solicitudes de
+privacidad</b> de los voluntarios.</li>
+</ul>
+<h3>Funciones y listas de espera</h3>
+<ul>
+<li>Abra un turno y elija <b>Editar funciones</b> para dividirlo en tareas (por ejemplo, Registro x2, Puesto de agua
+x6). Una función puede requerir una habilidad. La lista se agrupa por función, y Smart Match ubica a cada persona
+según sus habilidades.</li>
+<li>Cuando un turno está completo, los voluntarios pueden <b>Unirse a la lista de espera</b>. Si alguien cancela, la
+primera persona que todavía cumple los requisitos queda inscrita automáticamente y ve un aviso en su página de
+Inicio. La lista del turno muestra quién espera.</li>
+</ul>
+<h3>Estudio de personal</h3>
+<ul>
+<li>El <b>Piloto automático</b> prepara inscripciones para las próximas dos semanas. Desmarque a quien prefiera no
+invitar y elija <b>Inscribir seleccionados</b>. Nada cambia hasta que usted lo apruebe, y <b>Deshacer la última
+aprobación</b> lo revierte.</li>
+<li>El <b>Pronóstico de asistencia</b> suma la tasa de asistencia de cada persona para mostrar qué turnos podrían
+quedar cortos.</li>
+<li><b>Merece una invitación personal</b> muestra a voluntarios habituales que dejaron de venir, con un turno al que
+invitarlos.</li>
 </ul>
 <h3>Smart Match</h3>
 <ul>
@@ -178,12 +304,23 @@ VOLUNTEER_GUIDE_ES = """
 <li>Elija <b>Buscar un turno</b> (arriba a la derecha) para ver todo lo que está abierto. Seleccione un turno para ver
 los detalles y luego elija <b>Inscribirme</b>. Si no puede inscribirse, ServeSync le dice por qué.</li>
 <li><b>Calendario</b> muestra cada turno abierto por fecha.</li>
+<li>Algunos turnos tienen funciones, como Registro o Puesto de agua. Al inscribirse puede elegir una; ServeSync le
+sugiere la que encaja con sus habilidades.</li>
+<li>Elija <b>Agregar al calendario</b> en cualquier turno para guardarlo en el calendario de su teléfono o correo.
+Las notas de los coordinadores aparecen en <b>Inicio</b>.</li>
+<li>En <b>Mi perfil</b>, <b>Descargar mis datos</b> guarda todo lo que ServeSync tiene sobre usted, y <b>Pedir la
+eliminación</b> solicita que se eliminen sus datos personales.</li>
+<li>¿El turno está completo? Elija <b>Unirme a la lista de espera</b>. Si se libera un lugar, quedará inscrito
+automáticamente y verá un aviso en <b>Inicio</b>.</li>
 <li>¿Necesita cancelar? Seleccione el turno en <b>Inicio</b> y elija <b>Cancelar inscripción</b> en cualquier
 momento antes de que empiece.</li>
 <li>Mantenga al día su disponibilidad y sus habilidades en <b>Mi perfil</b> para que las recomendaciones se ajusten a
 su vida. También puede agregar el nombre que usa, sus pronombres y cualquier necesidad de acceso (entrada sin
 escalones, tareas sentado, transporte público, un espacio tranquilo, sin costo o a distancia).</li>
-<li><b>Mis horas</b> enumera su servicio verificado. Elija <b>Guardar PDF</b> para la escuela, becas o empleadores.</li>
+<li><b>Mis horas</b> enumera su servicio verificado. Elija <b>Guardar PDF</b> para la escuela, becas o empleadores. Al
+llegar a 25, 50 y 100 horas puede guardar un certificado. Cada PDF tiene un código que la organización puede
+confirmar.</li>
+<li>Defina una <b>meta de horas</b> en Inicio para ver su progreso y la fecha en que probablemente terminará.</li>
 <li>Presione <b>Ctrl+K</b> y pregunte cosas como <i>¿Cuándo es mi próximo turno?</i> o
 <i>¿En qué debería inscribirme?</i></li>
 </ul>
@@ -195,7 +332,7 @@ SHORTCUTS_ES = """
 <table cellpadding="6">
 <tr><td><b>Ctrl+K</b></td><td>Hacerle una pregunta a ServeSync, o escribir el nombre de una página
 para ir allí</td></tr>
-<tr><td><b>Ctrl+1 ... Ctrl+6</b></td><td>Ir a cada página, en orden</td></tr>
+<tr><td><b>Ctrl+1, Ctrl+2, ...</b></td><td>Ir a cada página, en orden</td></tr>
 <tr><td><b>Ctrl+N</b></td><td>La acción principal arriba a la derecha (Agregar voluntario o Buscar un turno)</td></tr>
 <tr><td><b>Ctrl+F</b></td><td>Ir al cuadro de búsqueda de la página actual</td></tr>
 <tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>Texto más grande, más pequeño o tamaño normal (se guarda para
@@ -204,7 +341,7 @@ usted)</td></tr>
 <tr><td><b>Teclas de flecha</b></td><td>En un gráfico: moverse entre barras o puntos; cada valor se lee en voz
 alta</td></tr>
 <tr><td><b>F1</b></td><td>Abrir esta ayuda</td></tr>
-<tr><td><b>Tab / Shift+Tab</b></td><td>Moverse entre controles (el control activo tiene un contorno azul)</td></tr>
+<tr><td><b>Tab / Shift+Tab</b></td><td>Moverse entre controles (el control activo tiene un contorno de color)</td></tr>
 <tr><td><b>Enter</b></td><td>Abrir la fila seleccionada o presionar el botón resaltado</td></tr>
 <tr><td><b>Esc</b></td><td>Cerrar una ventana sin guardar</td></tr>
 </table>
@@ -221,8 +358,8 @@ ABOUT_ES = f"""
 FBLA Coding &amp; Programming (2026-2027).</p>
 <h3>Créditos</h3>
 <ul>
-<li>Fuentes: Atkinson Hyperlegible (Braille Institute of America) y Source Serif 4 (Adobe),
-ambas bajo la SIL Open Font License 1.1.</li>
+<li>Fuentes: Atkinson Hyperlegible (Braille Institute of America) para el texto y Manrope
+(The Manrope Project Authors) para los títulos, ambas bajo la SIL Open Font License 1.1.</li>
 <li>Íconos: Lucide, licencia ISC.</li>
 <li>Herramientas de interfaz: Qt for Python (PySide6), LGPL v3.</li>
 <li>Valor de una hora de voluntariado: Independent Sector y el Do Good Institute, Universidad de
@@ -254,6 +391,7 @@ class HelpDialog(QDialog):
             (tr("Getting started"), guide),
             (tr("Keyboard shortcuts"), shortcuts),
             (tr("About"), about),
+            (tr("How ServeSync addresses the topic"), topic_html()),
         ):
             browser = QTextBrowser()
             browser.setOpenExternalLinks(False)
@@ -265,6 +403,36 @@ class HelpDialog(QDialog):
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close.rejected.connect(self.reject)
         column.addWidget(close)
+
+
+#: Tabs of the help window, for links that open a particular one.
+GUIDE_TAB, SHORTCUTS_TAB, ABOUT_TAB, TOPIC_TAB = range(4)
+
+
+class PageHelpDialog(QDialog):
+    """The "?" button: what this page is for, in a few lines, with a way to the full help."""
+
+    def __init__(self, page_key: str, role: UserRole, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._role = role
+        self.setWindowTitle(tr("Help for this page"))
+        self.resize(560, 380)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(24, 24, 24, 16)
+        column.setSpacing(16)
+        self.browser = QTextBrowser()
+        self.browser.setHtml(page_help_html(page_key))
+        self.browser.setAccessibleName(tr("Help for this page"))
+        column.addWidget(self.browser, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        more = buttons.addButton(tr("All help topics"), QDialogButtonBox.ButtonRole.ActionRole)
+        more.clicked.connect(self._all_topics)
+        buttons.rejected.connect(self.reject)
+        column.addWidget(buttons)
+
+    def _all_topics(self) -> None:
+        self.accept()
+        HelpDialog(self._role, self.parentWidget()).exec()
 
 
 class RecentMessagesDialog(QDialog):

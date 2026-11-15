@@ -18,7 +18,7 @@ Data structures used (the rubric's "arrays/lists where appropriate"):
 from __future__ import annotations
 
 import math
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
@@ -309,9 +309,9 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if share >= 50:
             insights.append(
                 tr_n(
-                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours. Consider spreading "
                     "shifts around to prevent burnout.",
-                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours. Consider spreading "
                     "shifts around to prevent burnout.",
                     top_count,
                     share=share,
@@ -330,8 +330,8 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if idle and not scoped:
         insights.append(
             tr_n(
-                "{count} active volunteer didn't serve in this period — a friendly check-in could bring them back.",
-                "{count} active volunteers didn't serve in this period — a friendly check-in could bring them back.",
+                "{count} active volunteer didn't serve in this period. A friendly check-in could bring them back.",
+                "{count} active volunteers didn't serve in this period. A friendly check-in could bring them back.",
                 len(idle),
             )
         )
@@ -345,9 +345,9 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if shaky:
         insights.append(
             tr_n(
-                "{count} volunteer kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "{count} volunteer kept fewer than {limit:.0f}% of their commitments. Ask whether their "
                 "schedule has changed.",
-                "{count} volunteers kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "{count} volunteers kept fewer than {limit:.0f}% of their commitments. Ask whether their "
                 "schedule has changed.",
                 len(shaky),
                 limit=LOW_RELIABILITY_PERCENT,
@@ -376,6 +376,8 @@ PROGRAM_COLUMNS = (
     ReportColumn("hours", mark("Hours"), ValueKind.HOURS),
     ReportColumn("volunteers", mark("Volunteers"), ValueKind.COUNT),
     ReportColumn("value", mark("Community value"), ValueKind.MONEY),
+    ReportColumn("result", mark("Result"), ValueKind.COUNT),
+    ReportColumn("unit", mark("Measured in")),
 )
 
 
@@ -393,6 +395,8 @@ class _ProgramRow:
     hours: float
     volunteers: int
     value: float
+    result: int | None  # what finished shifts achieved, in the program's own unit (None = not measured)
+    unit: str
 
 
 def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
@@ -400,9 +404,12 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
     tallies = tally_by(facts, lambda f: f.opportunity_id, inputs.now)
     shift_count: defaultdict[int, int] = defaultdict(int)
     capacity: defaultdict[int, int] = defaultdict(int)
+    results: defaultdict[int, int] = defaultdict(int)
     for overview in shifts:
         shift_count[overview.shift.opportunity_id] += 1
         capacity[overview.shift.opportunity_id] += overview.shift.capacity
+        if overview.shift.impact_amount is not None and overview.shift.ends_at <= inputs.now:
+            results[overview.shift.opportunity_id] += overview.shift.impact_amount
 
     rows: list[_ProgramRow] = []
     for program_id in sorted(set(shift_count) | set(tallies)):
@@ -424,6 +431,8 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
                 hours=round(tally.hours, 2),
                 volunteers=len(tally.volunteers),
                 value=round(tally.hours * inputs.hour_value, 2),
+                result=results[program_id] if opportunity.impact_unit else None,
+                unit=opportunity.impact_unit,
             )
         )
     rows.sort(key=lambda row: (-row.hours, row.program))
@@ -460,7 +469,7 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
             insights.append(
                 tr(
                     (
-                        "'{program}' fills only {fill_rate:.0f}% of its spots — try Smart "
+                        "'{program}' fills only {fill_rate:.0f}% of its spots. Try Smart "
                         "Match on its next shifts, or offer fewer spots."
                     ),
                     program=weakest.program,
@@ -471,7 +480,7 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
     for row in flaky[:2]:
         insights.append(
             tr(
-                ("'{program}' has a {value:.0f}% no-show rate — a reminder the day before usually helps."),
+                ("'{program}' has a {value:.0f}% no-show rate. A reminder the day before usually helps."),
                 program=row.program,
                 value=100 - (row.show_up_rate or 0),
             )
@@ -570,9 +579,9 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if to_record:
         insights.append(
             tr_n(
-                "{count} shift already started but still has attendance to record — open it from the "
+                "{count} shift already started but still has attendance to record. Open it from the "
                 "Calendar so the hours count.",
-                "{count} shifts already started but still have attendance to record — open them from the "
+                "{count} shifts already started but still have attendance to record. Open them from the "
                 "Calendar so the hours count.",
                 to_record,
             )
@@ -583,8 +592,8 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if weekday_fill[best] > weekday_fill[worst]:
             insights.append(
                 tr(
-                    "{best} fill best ({best_rate:.0f}%) and {worst} least ({worst_rate:.0f}%) — "
-                    "plan big events for {best}.",
+                    "{best} fill best ({best_rate:.0f}%) and {worst} least ({worst_rate:.0f}%). "
+                    "Plan big events for {best}.",
                     best=weekday_plural(best),
                     best_rate=weekday_fill[best],
                     worst=weekday_plural(worst),
@@ -622,7 +631,34 @@ RECRUITMENT_COLUMNS = (
     ReportColumn("retention", mark("Still active"), ValueKind.PERCENT),
     ReportColumn("hours", mark("Hours in period"), ValueKind.HOURS),
     ReportColumn("hours_each", mark("Hours per volunteer"), ValueKind.HOURS),
+    ReportColumn("referred", mark("Referred"), ValueKind.COUNT),
+    ReportColumn("top_referrer", mark("Top referrer")),
 )
+
+#: How many people the "who brings in the most volunteers" chart lists.
+TOP_REFERRERS = 5
+
+
+def referral_counts(volunteers: Iterable[Volunteer]) -> list[tuple[str, int]]:
+    """
+    Who invited the most volunteers, most first: (name as most often written, count).
+
+    "Who invited you?" is typed freely, so "Priya Patel", "priya patel" and
+    "Priya  Patel" must count as one person. Names are compared ignoring case
+    and extra spaces; the spelling shown is the one people used most.
+    """
+    counts: Counter[str] = Counter()
+    spellings: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    for volunteer in volunteers:
+        name = " ".join(volunteer.referred_by.split())
+        if not name:
+            continue
+        key = name.casefold()
+        counts[key] += 1
+        spellings[key][name] += 1
+    ranked = [(spellings[key].most_common(1)[0][0], count) for key, count in counts.items()]
+    ranked.sort(key=lambda pair: (-pair[1], pair[0].casefold()))
+    return ranked
 
 
 @dataclass(frozen=True, slots=True)
@@ -635,6 +671,8 @@ class _SourceRow:
     retention: float | None
     hours: float
     hours_each: float
+    referred: int  # volunteers from this channel who named the person who invited them
+    top_referrer: str  # "Priya Patel (6)", or empty
 
 
 def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
@@ -652,6 +690,7 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         active = sum(v.status is VolunteerStatus.ACTIVE for v in people)
         inactive = sum(v.status is VolunteerStatus.INACTIVE for v in people)
         hours = round(hours_by_source[source], 2)
+        referrers = referral_counts(people)
         rows.append(
             _SourceRow(
                 source=source.label,
@@ -662,9 +701,13 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
                 retention=percent(active, active + inactive),
                 hours=hours,
                 hours_each=round(hours / len(people), 1),
+                referred=sum(count for _name, count in referrers),
+                top_referrer=f"{referrers[0][0]} ({referrers[0][1]})" if referrers else "",
             )
         )
     rows.sort(key=lambda row: (-row.new, -row.total, row.source))
+    referrers = referral_counts(inputs.volunteers)
+    referred_total = sum(count for _name, count in referrers)
 
     today = inputs.now.date()
     waiting = sum(
@@ -677,6 +720,11 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         Figure(tr("New volunteers"), str(new_total), tr("joined in this period")),
         Figure(tr("Awaiting review"), str(sum(row.applicants for row in rows))),
         Figure(tr("Top channel"), rows[0].source if rows and new_total else "\u2013", tr("by new volunteers")),
+        Figure(
+            tr("Referred by someone"),
+            str(referred_total),
+            tr("most by {name}", name=referrers[0][0]) if referrers else "",
+        ),
     )
     insights: list[str] = []
     if rows and new_total:
@@ -694,26 +742,279 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if deepest.source != rows[0].source and deepest.hours_each > 0:
             insights.append(
                 tr(
-                    ("Volunteers from {source} serve the most hours each ({hours}) — a channel worth investing in."),
+                    (
+                        "Volunteers from {source} serve the most hours each ({hours}). "
+                        "That channel is worth investing in."
+                    ),
                     source=deepest.source,
                     hours=_hours(deepest.hours_each),
                 )
             )
+    if referrers:
+        name, invited = referrers[0]
+        insights.append(
+            tr_n(
+                "{name} has referred {count} volunteer. Consider a thank-you note.",
+                "{name} has referred {count} volunteers. Consider a thank-you note.",
+                invited,
+                name=name,
+            )
+        )
     if waiting:
         insights.append(
             tr_n(
-                "{count} applicant has waited more than {days} days for review — quick replies keep people interested.",
-                "{count} applicants have waited more than {days} days for review — quick replies keep people "
+                "{count} applicant has waited more than {days} days for review. Quick replies keep people interested.",
+                "{count} applicants have waited more than {days} days for review. Quick replies keep people "
                 "interested.",
                 waiting,
                 days=APPLICANT_WAIT_DAYS,
             )
         )
     chart = top_bars(tr("New volunteers by channel"), ((row.source, float(row.new)) for row in rows), ValueKind.COUNT)
-    return _report(ReportKind.RECRUITMENT, inputs, filters, RECRUITMENT_COLUMNS, rows, figures, insights, (chart,))
+    referral_chart = top_bars(
+        tr("Who brings in the most volunteers"),
+        ((name, float(count)) for name, count in referrers),
+        ValueKind.COUNT,
+        limit=TOP_REFERRERS,
+    )
+    return _report(
+        ReportKind.RECRUITMENT,
+        inputs,
+        filters,
+        RECRUITMENT_COLUMNS,
+        rows,
+        figures,
+        insights,
+        (chart, referral_chart),
+    )
 
 
 # ------------------------------------------------------------ service record
+
+IMPACT_COLUMNS = (
+    ReportColumn("program", mark("Program")),
+    ReportColumn("result", mark("Result"), ValueKind.COUNT),
+    ReportColumn("unit", mark("Measured in")),
+    ReportColumn("hours", mark("Hours served"), ValueKind.HOURS),
+    ReportColumn("volunteers", mark("Volunteers"), ValueKind.COUNT),
+    ReportColumn("shifts_recorded", mark("Shifts with results"), ValueKind.COUNT),
+    ReportColumn("shifts_missing", mark("Shifts without results"), ValueKind.COUNT),
+    ReportColumn("value", mark("Community value"), ValueKind.MONEY),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ImpactRow:  # field names match IMPACT_COLUMNS keys
+    program: str
+    result: int
+    unit: str
+    hours: float
+    volunteers: int
+    shifts_recorded: int
+    shifts_missing: int
+    value: float
+
+
+def impact_summary(inputs: ReportInputs, filters: ReportFilters) -> Report:
+    """Results as well as hours. Only finished shifts count; a missing result is reported, never guessed."""
+    facts, shifts = apply_scope(inputs, filters)
+    tallies = tally_by(facts, lambda f: f.opportunity_id, inputs.now)
+    results: defaultdict[int, int] = defaultdict(int)
+    recorded: defaultdict[int, int] = defaultdict(int)
+    missing: defaultdict[int, int] = defaultdict(int)
+    for overview in shifts:
+        shift = overview.shift
+        if shift.ends_at > inputs.now:
+            continue
+        if shift.impact_amount is None:
+            missing[shift.opportunity_id] += 1
+        else:
+            results[shift.opportunity_id] += shift.impact_amount
+            recorded[shift.opportunity_id] += 1
+
+    rows: list[_ImpactRow] = []
+    for program_id in sorted(set(tallies) | set(recorded)):
+        opportunity = inputs.opportunities.get(program_id)
+        if opportunity is None:
+            continue
+        tally = tallies.get(program_id, _Tally())
+        rows.append(
+            _ImpactRow(
+                program=opportunity.title,
+                result=results[program_id],
+                unit=opportunity.impact_unit,
+                hours=round(tally.hours, 2),
+                volunteers=len(tally.volunteers),
+                shifts_recorded=recorded[program_id],
+                shifts_missing=missing[program_id] if opportunity.impact_unit else 0,
+                value=round(tally.hours * inputs.hour_value, 2),
+            )
+        )
+    rows.sort(key=lambda row: (-row.hours, row.program))
+
+    total_hours = sum(row.hours for row in rows)
+    everyone = {fact.volunteer_id for fact in facts if fact.hours > 0}
+    figures = (
+        Figure(tr("Volunteers who served"), str(len(everyone))),
+        Figure(tr("Hours served"), _hours(total_hours)),
+        Figure(tr("Community value"), format_value(ValueKind.MONEY, total_hours * inputs.hour_value)),
+        Figure(tr("Programs"), str(len(rows))),
+    )
+    insights = [
+        tr("{program}: {result} {unit}.", program=row.program, result=f"{row.result:,}", unit=row.unit)
+        for row in rows
+        if row.unit and row.shifts_recorded
+    ]
+    unrecorded = sum(row.shifts_missing for row in rows)
+    if unrecorded:
+        insights.append(
+            tr_n(
+                "{count} finished shift has no result recorded, so these totals may be low.",
+                "{count} finished shifts have no result recorded, so these totals may be low.",
+                unrecorded,
+            )
+        )
+    chart = top_bars(tr("Hours by program"), ((row.program, row.hours) for row in rows), ValueKind.HOURS)
+    return _report(ReportKind.IMPACT_SUMMARY, inputs, filters, IMPACT_COLUMNS, rows, figures, insights, (chart,))
+
+
+# ------------------------------------------------------ certification expiry
+
+#: The expiry report covers what has run out and what runs out within this many days.
+EXPIRY_REPORT_DAYS = 90
+EXPIRY_SOON_DAYS = 30
+
+EXPIRY_COLUMNS = (
+    ReportColumn("volunteer", mark("Volunteer")),
+    ReportColumn("item", mark("Certification or waiver")),
+    ReportColumn("kind", mark("Type")),
+    ReportColumn("issued", mark("Issued"), ValueKind.DATE),
+    ReportColumn("expires", mark("Expires"), ValueKind.DATE),
+    ReportColumn("state", mark("Status")),
+    ReportColumn("days_left", mark("Days left"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("needed_by", mark("Required by")),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ExpiryRow:
+    volunteer: str
+    item: str
+    kind: str
+    issued: date | None
+    expires: date
+    state: str
+    days_left: int  # negative once expired
+    needed_by: str
+
+
+def certification_expiry(inputs: ReportInputs, filters: ReportFilters) -> Report:
+    """
+    Active volunteers' certifications and waivers that have expired or will within
+    EXPIRY_REPORT_DAYS, soonest first, with the programs that require each one. A
+    program or category filter keeps only items those programs require.
+    """
+    today = inputs.now.date()
+    cutoff = today + timedelta(days=EXPIRY_REPORT_DAYS)
+    programs = [
+        o
+        for o in inputs.opportunities.values()
+        if (filters.opportunity_id is None or o.opportunity_id == filters.opportunity_id)
+        and (filters.category is None or o.category is filters.category)
+    ]
+    required_by: defaultdict[str, list[str]] = defaultdict(list)
+    for program in programs:
+        for name in program.required_certifications:
+            required_by[name.casefold()].append(program.title)
+    scoped = filters.opportunity_id is not None or filters.category is not None
+
+    rows: list[_ExpiryRow] = []
+    for volunteer in inputs.volunteers:
+        if volunteer.status is not VolunteerStatus.ACTIVE:
+            continue
+        for item in volunteer.certifications:
+            needed = sorted(required_by.get(item.name.casefold(), []), key=str.casefold)
+            if item.expires_on > cutoff or (scoped and not needed):
+                continue
+            days_left = (item.expires_on - today).days
+            if days_left < 0:
+                state = tr_n("Expired {count} day ago", "Expired {count} days ago", -days_left)
+            elif days_left == 0:
+                state = tr("Expires today")
+            else:
+                state = tr_n("Expires in {count} day", "Expires in {count} days", days_left)
+            rows.append(
+                _ExpiryRow(
+                    volunteer=volunteer.full_name,
+                    item=item.name,
+                    kind=item.kind.label,
+                    issued=item.issued_on,
+                    expires=item.expires_on,
+                    state=state,
+                    days_left=days_left,
+                    needed_by=", ".join(needed),
+                )
+            )
+    rows.sort(key=lambda row: (row.expires, row.volunteer.casefold(), row.item.casefold()))
+
+    expired = [row for row in rows if row.days_left < 0]
+    soon = [row for row in rows if 0 <= row.days_left <= EXPIRY_SOON_DAYS]
+    later = [row for row in rows if row.days_left > EXPIRY_SOON_DAYS]
+    figures = (
+        Figure(tr("Expired"), str(len(expired)), tr("renew before scheduling")),
+        Figure(tr("Expire within 30 days"), str(len(soon))),
+        Figure(tr("Expire in 31 to 90 days"), str(len(later))),
+        Figure(tr("People to contact"), str(len({row.volunteer for row in rows}))),
+    )
+    insights: list[str] = []
+    if expired:
+        insights.append(
+            tr_n(
+                "{count} item has already expired. Those volunteers can't be scheduled for programs that need it.",
+                "{count} items have already expired. Those volunteers can't be scheduled for programs that need them.",
+                len(expired),
+            )
+        )
+    if soon:
+        first = soon[0]
+        insights.append(
+            tr(
+                "Next to run out: {volunteer}'s {item}, on {day}.",
+                volunteer=first.volunteer,
+                item=first.item,
+                day=format_value(ValueKind.DATE, first.expires),
+            )
+        )
+    by_item = Counter(row.item for row in rows)
+    if by_item:
+        busiest, count = max(by_item.items(), key=lambda pair: (pair[1], pair[0]))
+        if count > 1:
+            insights.append(
+                tr(
+                    "{item} needs the most renewals ({count}). One group session could cover them.",
+                    item=busiest,
+                    count=count,
+                )
+            )
+    by_month: Counter[date] = Counter(row.expires.replace(day=1) for row in rows if row.days_left >= 0)
+    months = sorted(by_month)
+    chart = ChartSeries(
+        tr("Items running out, by month"),
+        tuple(format_month_year(month) for month in months),
+        tuple(float(by_month[month]) for month in months),
+        ValueKind.COUNT,
+    )
+    context = (
+        tr(
+            "Expired, or running out by {day} ({count} days from today).",
+            day=format_value(ValueKind.DATE, cutoff),
+            count=EXPIRY_REPORT_DAYS,
+        ),
+    )
+    return _report(
+        ReportKind.CERTIFICATION_EXPIRY, inputs, filters, EXPIRY_COLUMNS, rows, figures, insights, (chart,), context
+    )
+
 
 SERVICE_RECORD_COLUMNS = (
     ReportColumn("date", mark("Date"), ValueKind.DATE),

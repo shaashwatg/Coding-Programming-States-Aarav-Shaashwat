@@ -73,7 +73,7 @@ def test_sign_in_dialog_rejects_wrong_password_then_accepts(demo: Services, qtbo
 def test_leader_window_has_every_page_and_role_specific_call_to_action(demo: Services, qtbot) -> None:  # type: ignore[no-untyped-def]
     window = _window(demo, "coordinator")
     qtbot.addWidget(window)
-    assert list(window.pages) == ["dashboard", "volunteers", "programs", "calendar", "reports", "settings"]
+    assert list(window.pages) == ["dashboard", "volunteers", "programs", "calendar", "staffing", "reports", "settings"]
     assert window.cta.text() == "Add volunteer"
     for key in window.pages:
         window.navigate(key)

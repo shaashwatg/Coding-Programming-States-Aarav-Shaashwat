@@ -39,6 +39,23 @@ class DisplayEnum(str, Enum):
         return tr(self.english_label)
 
 
+class CredentialKind(DisplayEnum):
+    """
+    What kind of document a volunteer has on file. Both are checked the same way
+    (a program can require either, and both run out), but people call them by
+    different names, so the interface keeps the distinction.
+    """
+
+    CERTIFICATION = "CERTIFICATION"  # a skill or clearance: CPR, food handler card, background check
+    WAIVER = "WAIVER"  # a signed form: liability waiver, photo release
+
+
+class NoticeKind(str, Enum):
+    """What a Home-page notice is about. The words are built when shown, in the reader's language."""
+
+    WAITLIST_PROMOTED = "WAITLIST_PROMOTED"  # a spot opened and the person was signed up from the waitlist
+
+
 class VolunteerStatus(DisplayEnum):
     """Where a person is in the recruitment pipeline."""
 

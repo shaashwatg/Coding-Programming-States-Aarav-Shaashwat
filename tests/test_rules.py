@@ -43,6 +43,7 @@ def _blockers(**overrides: object) -> list[str]:
         "now": NOW,
         "already_signed_up": False,
         "has_conflict": False,
+        "required_certifications": frozenset(),
     }
     facts.update(overrides)
     return signup_blockers(**facts)  # type: ignore[arg-type]

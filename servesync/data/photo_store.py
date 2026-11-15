@@ -72,6 +72,26 @@ class PhotoStore:
             logger.exception("Could not read photo %s", path)
             return None
 
+    def all(self) -> dict[int, bytes]:
+        """Every program photo, by program number (for backups)."""
+        if self._folder is None:
+            return dict(self._memory)
+        photos: dict[int, bytes] = {}
+        if self._folder.exists():
+            for path in self._folder.glob("program-*.jpg"):
+                number = path.stem.removeprefix("program-")
+                if number.isdecimal():
+                    photos[int(number)] = path.read_bytes()
+        return photos
+
+    def replace_all(self, photos: dict[int, bytes]) -> None:
+        """Make these the only program photos (after restoring a backup). Each is checked like any upload."""
+        for opportunity_id in list(self.all()):
+            if opportunity_id not in photos:
+                self.delete(opportunity_id)
+        for opportunity_id, data in photos.items():
+            self.save(opportunity_id, data)
+
     def delete(self, opportunity_id: int) -> None:
         if self._folder is None:
             self._memory.pop(opportunity_id, None)

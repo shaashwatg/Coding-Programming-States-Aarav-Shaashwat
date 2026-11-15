@@ -20,6 +20,8 @@ from PySide6.QtWidgets import QGridLayout, QListWidget, QListWidgetItem
 from servesync.core.i18n import format_long_day, mark, tr
 from servesync.models import ShiftOverview
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
+from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_appearance
@@ -46,7 +48,14 @@ class DashboardPage(Page):
 
     def __init__(self, ctx: AppContext) -> None:
         super().__init__(ctx, scrollable=True)
-        self.header = PageHeader(tr("Dashboard"), "")
+        self.header = PageHeader(
+            tr("Dashboard"),
+            "",
+            [
+                make_button(tr("Tomorrow's reminders"), on_click=self._open_reminders),
+                make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk),
+            ],
+        )
         self.layout_.addWidget(self.header)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
@@ -103,6 +112,17 @@ class DashboardPage(Page):
         self.feed.setMinimumHeight(220)
         activity.body.addWidget(self.feed)
         grid.addWidget(activity, 1, 1)
+        expiring = Panel(tr("Certifications and waivers expiring in the next 30 days"))
+        self.expiring = QListWidget()
+        self.expiring.setAccessibleName(tr("Certifications and waivers expiring in the next 30 days"))
+        self.expiring.setMaximumHeight(150)
+        expiring.body.addWidget(self.expiring)
+        expiring.body.addWidget(
+            make_button(tr("Open the expiry report"), on_click=lambda: ctx.go("reports", kind="CERTIFICATION_EXPIRY")),
+            0,
+            Qt.AlignmentFlag.AlignLeft,
+        )
+        grid.addWidget(expiring, 2, 0, 1, 2)
         grid.setColumnStretch(0, 3)
         grid.setColumnStretch(1, 2)
         self.layout_.addLayout(grid)
@@ -153,7 +173,7 @@ class DashboardPage(Page):
             self.banner.set_actions(
                 [
                     make_button(
-                        tr("Find volunteers"), kind="primary", on_click=lambda: self._open(overview, smart=True)
+                        tr("Find volunteers"), kind="secondary", on_click=lambda: self._open(overview, smart=True)
                     ),
                     make_button(tr("Open roster"), on_click=lambda: self._open(overview, smart=False)),
                 ]
@@ -169,6 +189,19 @@ class DashboardPage(Page):
             )
             self.applicants.addItem(item)
         self.feed.set_items(services.dashboard.activity_feed(session, limit=8), now)
+        self.expiring.clear()
+        if not summary.expiring:
+            self.expiring.addItem(tr("Nothing runs out in the next 30 days."))
+        for volunteer, credential in summary.expiring:
+            self.expiring.addItem(
+                tr(
+                    "{name}: {item} ({kind}), expires {date}",
+                    name=volunteer.full_name,
+                    item=credential.name,
+                    kind=credential.kind.label.lower(),
+                    date=format_date(credential.expires_on),
+                )
+            )
 
         insight = services.dashboard.recruitment_insight(session)
         if insight is not None:
@@ -185,6 +218,17 @@ class DashboardPage(Page):
                     total=insight.total,
                 ),
             )
+
+    @guarded
+    def _open_reminders(self) -> None:
+        RemindersDialog(self.ctx, self).exec()
+
+    @guarded
+    def _open_kiosk(self) -> None:
+        kiosk = KioskDialog(self.ctx, self)
+        kiosk.showFullScreen()
+        kiosk.exec()
+        self.ctx.changed()
 
     @guarded
     def _open(self, overview: ShiftOverview, *, smart: bool) -> None:

@@ -18,6 +18,9 @@ from servesync.models import Appearance, MessageDuration, Theme
 from servesync.services.base import Service
 from servesync.services.session import Permission, Session
 
+#: Stored with each person's preferences: "1" once they've finished or skipped the tour.
+TOUR_KEY = "tour_seen"
+
 
 class SettingsService(Service):
     # Readable before sign-in (the sign-in screen shows the name and uses the theme).
@@ -87,6 +90,17 @@ class SettingsService(Service):
             self._store.settings.set_device_appearance(updated)
         return updated
 
+    def tour_seen(self, session: Session) -> bool:
+        """Whether this person has finished or skipped the first-run tour."""
+        if not self._store.accounts.exists(session.account_id):
+            return True  # maintenance sessions never see a tour
+        return self._store.preferences.get_all(session.account_id).get(TOUR_KEY) == "1"
+
+    def set_tour_seen(self, session: Session, seen: bool = True) -> None:
+        """Remember that the tour was finished or skipped (False shows it again at next sign-in)."""
+        if self._store.accounts.exists(session.account_id):
+            self._store.preferences.set_many(session.account_id, {TOUR_KEY: "1" if seen else "0"})
+
     def update_organization(self, session: Session, *, name: str, hour_value: object, mission: str = "") -> None:
         """Change the organization's name, mission, and the dollar value of an hour (admins, all-or-nothing)."""
         session.require(Permission.MANAGE_SETTINGS)
@@ -94,3 +108,4 @@ class SettingsService(Service):
             self._store.settings.set_organization_name(name)
             self._store.settings.set_volunteer_hour_value(hour_value)
             self._store.settings.set_mission_statement(mission)
+            self._log(session.username, "CHANGED", "SETTINGS", None, name, "organization")

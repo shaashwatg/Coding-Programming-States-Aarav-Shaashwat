@@ -15,6 +15,7 @@ from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import Opportunity, OpportunityStatus, ShiftOverview
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import AnnounceDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog, ShiftDialog
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.pages.base import Page
@@ -53,7 +54,7 @@ class ProgramsPage(Page):
                     "Pick a program to see its shifts. Open a shift to manage its roster, "
                     "take attendance, or find volunteers with Smart Match."
                 ),
-                [make_button(tr("New program"), kind="primary", on_click=self._new_program)],
+                [make_button(tr("New program"), kind="secondary", on_click=self._new_program)],
             )
         )
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -109,9 +110,11 @@ class ProgramsPage(Page):
         detail.body.addLayout(top)
         lifecycle = QHBoxLayout()
         self.edit_button = make_button(tr("Edit program"), on_click=self._edit_program)
-        self.publish_button = make_button(tr("Publish"), kind="primary", on_click=self._publish)
+        self.publish_button = make_button(tr("Publish"), kind="secondary", on_click=self._publish)
         self.close_button = make_button(tr("Close program"), on_click=self._close)
-        for button in (self.edit_button, self.publish_button, self.close_button):
+        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        self.announce_button.setToolTip(tr("Post a note for everyone signed up for this program"))
+        for button in (self.edit_button, self.publish_button, self.close_button, self.announce_button):
             lifecycle.addWidget(button)
         lifecycle.addStretch(1)
         detail.body.addLayout(lifecycle)
@@ -126,7 +129,7 @@ class ProgramsPage(Page):
         self.when_filter.currentIndexChanged.connect(lambda _i: self._show_shifts())
         shift_filters.addWidget(self.when_filter)
         shift_filters.addStretch(1)
-        self.add_shift_button = make_button(tr("Add shifts"), kind="primary", on_click=self._add_shifts)
+        self.add_shift_button = make_button(tr("Add shifts"), kind="secondary", on_click=self._add_shifts)
         shift_filters.addWidget(self.add_shift_button)
         shifts.body.addLayout(shift_filters)
         self.shifts: RecordTable[ShiftOverview] = RecordTable(
@@ -146,7 +149,7 @@ class ProgramsPage(Page):
                 Column(
                     tr("Open"),
                     lambda o: o.open_spots,
-                    color=lambda o: current_palette().attention if o.open_spots else None,
+                    color=lambda o: current_palette().success if o.open_spots else None,  # open spots: emerald
                     align_right=True,
                 ),
                 Column(tr("Notes"), lambda o: o.shift.notes),
@@ -228,6 +231,7 @@ class ProgramsPage(Page):
         self.publish_button.setVisible(status is not OpportunityStatus.OPEN)
         self.publish_button.setText(tr("Publish") if status is OpportunityStatus.DRAFT else tr("Reopen"))
         self.close_button.setVisible(status is not OpportunityStatus.CLOSED)
+        self.announce_button.setVisible(status is OpportunityStatus.OPEN)
         self.add_shift_button.setEnabled(status is not OpportunityStatus.CLOSED)
         self.add_shift_button.setToolTip(
             "" if status is not OpportunityStatus.CLOSED else tr("Reopen the program to add shifts.")
@@ -280,6 +284,12 @@ class ProgramsPage(Page):
         dialog = OpportunityDialog(self.ctx, program, self)
         if dialog.exec() and dialog.saved is not None:
             self.ctx.changed(tr("Saved {title}.", title=dialog.saved.title))
+
+    @guarded
+    def _announce(self) -> None:
+        program = self.programs.selected()
+        if program is not None:
+            AnnounceDialog(self.ctx, program.title, opportunity_id=program.opportunity_id, parent=self).exec()
 
     @guarded
     def _publish(self) -> None:

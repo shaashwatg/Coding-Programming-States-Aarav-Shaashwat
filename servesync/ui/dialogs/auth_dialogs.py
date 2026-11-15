@@ -23,6 +23,7 @@ from servesync.core.i18n import Language, current_language, tr
 from servesync.data.seed import DEMO_ORGANIZATION_NAME, DEMO_PASSWORD
 from servesync.services import Services, Session
 from servesync.ui import assets
+from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import BusyCursor, Panel, make_button, make_label
 from servesync.ui.widgets.forms import FormDialog
 
@@ -38,13 +39,14 @@ def _password_field(placeholder: str = "") -> QLineEdit:
 def _brand_panel(organization: str, mission: str) -> QFrame:
     """The left half of the welcome screens: logo, name, and the organization's mission."""
     panel = QFrame()
-    panel.setObjectName("TopBar")
+    panel.setObjectName("Sidebar")
+    panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
     panel.setMinimumWidth(320)
     column = QVBoxLayout(panel)
-    column.setContentsMargins(32, 36, 32, 32)
+    column.setContentsMargins(32, 40, 32, 32)
     column.setSpacing(10)
     logo = QLabel()
-    logo.setPixmap(assets.logo_pixmap(56))
+    logo.setPixmap(assets.logo_pixmap(current_palette().brand, 48))
     logo.setAccessibleName(tr("ServeSync logo"))
     column.addWidget(logo)
     brand = QLabel("ServeSync")
@@ -54,7 +56,7 @@ def _brand_panel(organization: str, mission: str) -> QFrame:
     org.setObjectName("OrgName")
     org.setWordWrap(True)
     column.addWidget(org)
-    column.addSpacing(18)
+    column.addSpacing(16)
     if mission:
         statement = make_label(mission, "mission", wrap=True)
         statement.setAccessibleName(tr("Our mission: {mission}", mission=mission))
@@ -140,6 +142,8 @@ class LoginDialog(QDialog):
         self.sign_in_button = make_button(tr("Sign in"), kind="primary", on_click=self._sign_in)
         self.sign_in_button.setDefault(True)
         column.addWidget(self.sign_in_button)
+        self.apply_button = make_button(tr("Become a volunteer"), on_click=self._apply)
+        column.addWidget(self.apply_button)
 
         if organization == DEMO_ORGANIZATION_NAME:
             hint = Panel()
@@ -169,6 +173,11 @@ class LoginDialog(QDialog):
         self._services.settings.set_device_language(language)
         self.chosen_language = language
         self.done(self.LANGUAGE_CHANGED)
+
+    def _apply(self) -> None:
+        from servesync.ui.dialogs.application_dialog import ApplicationDialog  # only needed if someone applies
+
+        ApplicationDialog(self._services, self).exec()
 
     def _sign_in(self) -> None:
         self.error.hide()

@@ -2,7 +2,7 @@
 Pages used by every role: the shift calendar and settings.
 
 The calendar is the app's "event calendar": a month view marked with dots
-(marigold when a day still has open spots), with that day's shifts beside it.
+(amber when a day still has open spots), with that day's shifts beside it.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
@@ -31,19 +32,24 @@ from servesync.models import Appearance, MessageDuration, ShiftOverview, Theme
 from servesync.services import Permission
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog, language_switch
+from servesync.ui.dialogs.coordination_dialogs import ask_save_path
+from servesync.ui.dialogs.data_dialogs import HistoryDialog, PrivacyRequestsPanel
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
+    BusyCursor,
     EnumComboBox,
     PageHeader,
     Panel,
+    confirm,
     from_qdate,
     guarded,
+    inform,
     make_button,
     make_label,
     to_qdate,
 )
-from servesync.ui.widgets.shift_panel import ShiftInfoPanel
+from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
 from servesync.ui.widgets.table import Column, RecordTable
 from servesync.ui.widgets.visuals import ShiftCalendar
 
@@ -66,7 +72,7 @@ class CalendarPage(Page):
         self.layout_.addWidget(
             PageHeader(
                 tr("Calendar"),
-                tr("Dots mark days with shifts; marigold dots still have open spots. Pick a day to see its shifts.")
+                tr("Dots mark days with shifts; amber dots still have open spots. Pick a day to see its shifts.")
                 if leader
                 else tr("Dots mark days with open shifts. Pick a day, then a shift, to see details and sign up."),
             )
@@ -93,7 +99,7 @@ class CalendarPage(Page):
                 Column(
                     tr("Spots open"),
                     lambda o: o.open_spots,
-                    color=lambda o: current_palette().attention if o.open_spots else None,
+                    color=lambda o: current_palette().success if o.open_spots else None,  # open spots: emerald
                     align_right=True,
                 ),
             ],
@@ -105,7 +111,7 @@ class CalendarPage(Page):
         self.day_table.selection_changed.connect(self.info.show_shift)
         left_column.addWidget(self.day_table, 1)
         splitter.addWidget(left)
-        splitter.addWidget(self.info)
+        splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         self.layout_.addWidget(splitter, 1)
@@ -208,12 +214,12 @@ class SettingsPage(Page):
         access.body.addLayout(size_row)
 
         access.body.addWidget(make_label(tr("Reading and motion"), "section"))
-        self.reduce_motion = QCheckBox(tr("Reduce motion — no sliding, fading, or growing animations"))
+        self.reduce_motion = QCheckBox(tr("Reduce motion (no sliding, fading, or growing animations)"))
         self.text_spacing = QCheckBox(
-            tr("Extra letter and word spacing — easier for many readers, including with dyslexia")
+            tr("Extra letter and word spacing (easier for many readers, including people with dyslexia)")
         )
         self.simplified = QCheckBox(
-            tr("Simplified layout — hide extra panels so each screen shows only the essentials")
+            tr("Simplified layout (hide extra panels so each screen shows only the essentials)")
         )
         for box in (self.reduce_motion, self.text_spacing, self.simplified):
             access.body.addWidget(box)
@@ -236,7 +242,7 @@ class SettingsPage(Page):
         access.body.addLayout(timing_row)
 
         buttons = QHBoxLayout()
-        buttons.addWidget(make_button(tr("Save comfort settings"), kind="primary", on_click=self._apply_display))
+        buttons.addWidget(make_button(tr("Save comfort settings"), kind="secondary", on_click=self._apply_display))
         buttons.addWidget(make_button(tr("Restore defaults"), on_click=self._restore_defaults))
         buttons.addStretch(1)
         access.body.addLayout(buttons)
@@ -280,7 +286,7 @@ class SettingsPage(Page):
         org.body.addWidget(self.org_errors)
         if self._admin:
             org.body.addWidget(
-                make_button(tr("Save organization details"), kind="primary", on_click=self._save_org),
+                make_button(tr("Save organization details"), kind="secondary", on_click=self._save_org),
                 0,
                 Qt.AlignmentFlag.AlignLeft,
             )
@@ -301,30 +307,85 @@ class SettingsPage(Page):
         )
         self.layout_.addWidget(account)
 
-        if ctx.session.can(Permission.MANAGE_SETTINGS) and not ctx.services.store.db.is_in_memory:
+        self.privacy: PrivacyRequestsPanel | None = None
+        if ctx.session.can(Permission.MANAGE_SETTINGS):
             data = Panel(tr("Data and backup"))
-            folder = Path(ctx.services.store.db.path).parent
             data.body.addWidget(
                 make_label(
                     tr(
-                        "Everything ServeSync stores — records, photos, and settings — lives "
-                        "in this folder on this computer. To back up, close ServeSync and copy "
-                        "the folder to a USB drive or cloud storage."
+                        "Save a backup to a USB drive or cloud folder now and then. It holds every record, "
+                        "photo and setting in one file. Restoring replaces everything with the backup."
                     ),
                     "muted",
                     wrap=True,
                 )
             )
-            data.body.addWidget(make_label(str(folder), None, wrap=True, selectable=True))
+            if not ctx.services.store.db.is_in_memory:
+                folder = Path(ctx.services.store.db.path).parent
+                data.body.addWidget(
+                    make_label(tr("Data folder: {folder}", folder=str(folder)), "hint", wrap=True, selectable=True)
+                )
+            buttons = QHBoxLayout()
+            buttons.addWidget(make_button(tr("Back up..."), on_click=self._backup))
+            buttons.addWidget(make_button(tr("Restore..."), kind="danger", on_click=self._restore))
+            buttons.addWidget(make_button(tr("Change history..."), on_click=self._history))
+            buttons.addStretch(1)
+            data.body.addLayout(buttons)
             self.layout_.addWidget(data)
+            self.privacy = PrivacyRequestsPanel(ctx)
+            self.layout_.addWidget(self.privacy)
         self.layout_.addStretch(1)
 
     def refresh(self) -> None:
+        if self.privacy is not None:
+            self.privacy.refresh()
         settings = self.ctx.services.settings
         self._show_appearance(settings.appearance(self.ctx.session))
         self.org_name.setText(settings.organization_name())
         self.mission.setPlainText(settings.mission_statement())
         self.hour_value.setValue(settings.volunteer_hour_value())
+
+    @guarded
+    def _backup(self) -> None:
+        name = f"servesync-backup-{self.ctx.services.clock.now():%Y-%m-%d}.zip"
+        path = ask_save_path(self, name, tr("ServeSync backup"), "zip")
+        if path is not None:
+            with BusyCursor():
+                self.ctx.services.data.backup(self.ctx.session, path)
+            self.ctx.changed(
+                tr("Backup saved as {name}. Keep a copy somewhere other than this computer.", name=path.name)
+            )
+
+    @guarded
+    def _restore(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, tr("Choose a ServeSync backup"), str(Path.home()), f"{tr('ServeSync backup')} (*.zip)"
+        )
+        if not chosen or not confirm(
+            self,
+            tr("Restore a backup"),
+            tr(
+                "Replace everything in ServeSync with this backup? Changes made since it was saved will be lost. "
+                "Everyone is signed out afterward."
+            ),
+            tr("Restore"),
+        ):
+            return
+        with BusyCursor():
+            manifest = self.ctx.services.data.restore(self.ctx.session, Path(chosen))
+        inform(
+            self,
+            tr("Backup restored"),
+            tr("Restored the backup from {when}. Please sign in again.", when=manifest.get("created_at", "")),
+        )
+        window = self.window()
+        sign_out = getattr(window, "sign_out", None)
+        if callable(sign_out):
+            sign_out()
+
+    @guarded
+    def _history(self) -> None:
+        HistoryDialog(self.ctx, self).exec()
 
     def _show_appearance(self, appearance: Appearance) -> None:
         for button in self.theme_group.buttons():

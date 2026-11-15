@@ -10,6 +10,7 @@ app in front of the judges.
 from __future__ import annotations
 
 import functools
+import html
 import logging
 from collections.abc import Callable, Sequence
 from datetime import date, datetime, time
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -51,8 +53,47 @@ def set_prop(widget: QWidget, name: str, value: object) -> None:
     widget.update()
 
 
+#: Roles that show a problem. These always get a warning icon as well as red text,
+#: so an error never depends on color alone (WCAG 1.4.1).
+ERROR_ROLES = ("error", "banner-error")
+
+
+class ErrorLabel(QLabel):
+    """
+    A problem message drawn with a warning icon in front of it.
+
+    ``text()`` still returns the plain message, so callers and screen readers
+    deal with words only; the icon is added just for display.
+    """
+
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self._message = ""
+        self.setText(text)
+
+    def setText(self, text: str) -> None:  # noqa: N802 - Qt API
+        self._message = text
+        if not text:
+            super().setText("")
+            return
+        from servesync.ui.theme import current_palette, current_scale, icon_file
+
+        size = round(16 * current_scale())
+        image = icon_file("triangle-alert", current_palette().danger, size)
+        body = html.escape(text).replace("\n", "<br>")
+        super().setText(
+            f'<table cellspacing="0" cellpadding="0"><tr><td valign="top">'
+            f'<img src="{image}" width="{size}" height="{size}">&nbsp;&nbsp;</td><td>{body}</td></tr></table>'
+        )
+        self.setAccessibleName(text)
+
+    def text(self) -> str:
+        return self._message
+
+
 def make_label(text: str = "", role: str | None = None, *, wrap: bool = False, selectable: bool = False) -> QLabel:
-    label = QLabel(text)
+    label = ErrorLabel(text) if role in ERROR_ROLES else QLabel(text)
     if role:
         label.setProperty("role", role)
     label.setWordWrap(wrap)
@@ -81,14 +122,14 @@ def make_button(
 
 
 class Panel(QFrame):
-    """A bordered surface with an optional section title."""
+    """A plain section with an optional heading (cards are only for separate objects)."""
 
     def __init__(self, title: str | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setProperty("panel", True)
         self.body = QVBoxLayout(self)
-        self.body.setContentsMargins(16, 14, 16, 16)
-        self.body.setSpacing(10)
+        self.body.setContentsMargins(0, 8, 0, 8)
+        self.body.setSpacing(8)
         if title:
             heading = make_label(title, "section")
             heading.setAccessibleName(title)
@@ -101,9 +142,9 @@ class PageHeader(QWidget):
     def __init__(self, title: str, instructions: str, actions: Sequence[QWidget] = ()) -> None:
         super().__init__()
         row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 4)
+        row.setContentsMargins(0, 0, 0, 8)
         text = QVBoxLayout()
-        text.setSpacing(2)
+        text.setSpacing(4)
         self.title = make_label(title, "title")
         self.title.setAccessibleName(title)
         self.instructions = make_label(instructions, "subtitle", wrap=True)
@@ -118,43 +159,50 @@ class PageHeader(QWidget):
         self.title.setAccessibleName(title)
 
 
-class ImpactStrip(QFrame):
+class ImpactStrip(QWidget):
     """
-    Key figures in one quiet band separated by thin rules.
+    Key figures in a row, each set off by a hairline on its left.
 
     ``set_figures`` takes (value, label, attention) triples; ``attention``
-    colors the number marigold when it calls for action.
+    swaps the hairline for an amber bar and says so to screen readers, so the
+    figure that needs action stands out by shape and words, not only color.
     """
 
     def __init__(self, count: int) -> None:
         super().__init__()
-        self.setProperty("strip", True)
         row = QHBoxLayout(self)
-        row.setContentsMargins(20, 14, 20, 14)
-        row.setSpacing(20)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(24)
+        self._cards: list[QFrame] = []
         self._values: list[QLabel] = []
         self._labels: list[QLabel] = []
-        for index in range(count):
-            if index:
-                rule = QFrame()
-                rule.setProperty("rule", True)
-                row.addWidget(rule)
-            cell = QVBoxLayout()
-            cell.setSpacing(0)
+        for _ in range(count):
+            card = QFrame()
+            card.setProperty("kpi", True)
+            cell = QVBoxLayout(card)
+            cell.setContentsMargins(16, 4, 8, 4)
+            cell.setSpacing(4)
             value = make_label("-", "figure")
             label = make_label("", "figure-label", wrap=True)
             cell.addWidget(value)
             cell.addWidget(label)
-            row.addLayout(cell, 1)
+            cell.addStretch(1)
+            row.addWidget(card, 1)
+            self._cards.append(card)
             self._values.append(value)
             self._labels.append(label)
 
     def set_figures(self, figures: Sequence[tuple[str, str, bool]]) -> None:
-        for (value, label, attention), value_label, text_label in zip(figures, self._values, self._labels, strict=True):
+        for (value, label, attention), card, value_label, text_label in zip(
+            figures, self._cards, self._values, self._labels, strict=True
+        ):
             value_label.setText(value)
             text_label.setText(label)
+            set_prop(card, "attention", attention)
             set_prop(value_label, "role", "figure-attention" if attention else "figure")
-            value_label.setAccessibleName(f"{label}: {value}")
+            value_label.setAccessibleName(
+                tr("{label}: {value} (needs attention)", label=label, value=value) if attention else f"{label}: {value}"
+            )
 
 
 class EnumComboBox(QComboBox, Generic[E]):
@@ -184,7 +232,7 @@ class EnumComboBox(QComboBox, Generic[E]):
         self.setCurrentIndex(max(index, 0))
 
 
-def clear_layout(layout: QVBoxLayout | QHBoxLayout) -> None:
+def clear_layout(layout: QLayout) -> None:
     """Remove and delete every widget in a layout (used when rebuilding lists)."""
     while layout.count():
         item = layout.takeAt(0)
@@ -195,7 +243,7 @@ def clear_layout(layout: QVBoxLayout | QHBoxLayout) -> None:
             widget.hide()  # hide now: deletion only happens on the next event-loop pass
             widget.deleteLater()
         child = item.layout()
-        if isinstance(child, (QVBoxLayout, QHBoxLayout)):
+        if isinstance(child, QLayout):
             clear_layout(child)
 
 

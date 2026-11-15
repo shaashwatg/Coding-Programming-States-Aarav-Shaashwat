@@ -74,6 +74,10 @@ class AccountRepository(Repository):
 
     # ------------------------------------------------------------------ reads
 
+    def delete_for_volunteer(self, volunteer_id: int) -> None:
+        """Remove a volunteer's sign-in (when their personal details are removed on request)."""
+        self._db.execute("DELETE FROM user_accounts WHERE volunteer_id = ?", (volunteer_id,))
+
     def exists(self, account_id: int) -> bool:
         return self._exists("user_accounts", "account_id", account_id)
 

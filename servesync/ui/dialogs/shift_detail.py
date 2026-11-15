@@ -12,6 +12,7 @@ from functools import partial
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -22,15 +23,19 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from servesync.core.i18n import tr, tr_for, tr_n
-from servesync.models import AssignmentStatus, OpportunityStatus, RosterEntry, Shift, VolunteerStatus
+from servesync.models import AssignmentStatus, OpportunityStatus, RoleOverview, RosterEntry, Shift, VolunteerStatus
+from servesync.models.opportunity import MAX_IMPACT_AMOUNT
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import AnnounceDialog, save_calendar_file, save_sign_in_sheet
+from servesync.ui.dialogs.roles_dialog import RolesDialog
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
     clear_layout,
@@ -185,6 +190,8 @@ class ShiftDetailDialog(QDialog):
         super().__init__(parent)
         self._ctx = ctx
         self._shift_id = shift_id
+        self._roles: list[RoleOverview] = []
+        self._role_order: dict[str, int] = {}
         self.setWindowTitle(tr("Shift"))
         self.resize(940, 700)
 
@@ -204,6 +211,16 @@ class ShiftDetailDialog(QDialog):
         fill_row.addWidget(self.fill)
         fill_row.addWidget(self.state, 1)
         column.addLayout(fill_row)
+        tools = QHBoxLayout()
+        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        self.announce_button.setToolTip(tr("Post a note for everyone signed up for this shift"))
+        self.sheet_button = make_button(tr("Print sign-in sheet..."), on_click=self._sign_in_sheet)
+        self.sheet_button.setToolTip(tr("A paper fallback, saved as a PDF"))
+        self.calendar_button = make_button(tr("Add to calendar..."), on_click=self._add_to_calendar)
+        for button in (self.announce_button, self.sheet_button, self.calendar_button):
+            tools.addWidget(button)
+        tools.addStretch(1)
+        column.addLayout(tools)
 
         self.tabs = QTabWidget()
         column.addWidget(self.tabs, 1)
@@ -212,8 +229,19 @@ class ShiftDetailDialog(QDialog):
         roster_page = QWidget()
         roster_layout = QVBoxLayout(roster_page)
         roster_layout.setContentsMargins(12, 12, 12, 12)
+        self.roles_summary = make_label("", "muted", wrap=True)
+        self.roles_summary.setAccessibleName(tr("Roles on this shift"))
+        roster_layout.addWidget(self.roles_summary)
+        # Role is the first column, so the roster opens grouped by role (in the order the leader set).
         self.roster: RecordTable[RosterEntry] = RecordTable(
             [
+                Column(
+                    tr("Role"),
+                    lambda e: e.role_display,
+                    sort=lambda e: (
+                        f"{self._role_order.get(e.role_name.casefold(), 99):03d} {e.volunteer_name.casefold()}"
+                    ),
+                ),
                 Column(
                     tr("Volunteer"),
                     lambda e: e.volunteer_name,
@@ -239,6 +267,8 @@ class ShiftDetailDialog(QDialog):
         )
         self.roster.selection_changed.connect(lambda _record: self._update_buttons())
         roster_layout.addWidget(self.roster, 1)
+        self.waitlist_label = make_label("", "muted", wrap=True)
+        roster_layout.addWidget(self.waitlist_label)
 
         actions = QHBoxLayout()
         self.sign_up_button = make_button(tr("Sign up a volunteer..."), kind="primary", on_click=self._sign_up)
@@ -247,12 +277,27 @@ class ShiftDetailDialog(QDialog):
         self.no_show_button = make_button(tr("Mark no-show"), on_click=self._no_show)
         self.everyone_button = make_button(tr("Check in everyone"), on_click=self._check_in_everyone)
         self.walk_in_button = make_button(tr("Record walk-in..."), on_click=self._walk_in)
-        for button in (self.sign_up_button, self.cancel_button):
+        self.roles_button = make_button(tr("Edit roles..."), on_click=self._edit_roles)
+        self.change_role_button = make_button(tr("Change role..."), on_click=self._change_role)
+        for button in (self.sign_up_button, self.cancel_button, self.roles_button, self.change_role_button):
             actions.addWidget(button)
         actions.addStretch(1)
         for button in (self.attended_button, self.no_show_button, self.everyone_button, self.walk_in_button):
             actions.addWidget(button)
         roster_layout.addLayout(actions)
+
+        self.impact_row = QWidget()
+        impact = QHBoxLayout(self.impact_row)
+        impact.setContentsMargins(0, 0, 0, 0)
+        self.impact_label = make_label("")
+        self.impact_amount = QSpinBox()
+        self.impact_amount.setRange(0, MAX_IMPACT_AMOUNT)
+        self.save_impact_button = make_button(tr("Save result"), on_click=self._save_impact)
+        impact.addWidget(self.impact_label)
+        impact.addWidget(self.impact_amount)
+        impact.addWidget(self.save_impact_button)
+        impact.addStretch(1)
+        roster_layout.addWidget(self.impact_row)
         self.tabs.addTab(roster_page, tr("Roster and attendance"))
 
         # Smart Match tab ----------------------------------------------------
@@ -315,12 +360,49 @@ class ShiftDetailDialog(QDialog):
             self.state.setText(filled + tr("This shift is under way. You can record attendance now."))
         else:
             self.state.setText(filled + tr_n("{count} spot open.", "{count} spots open.", overview.open_spots))
+        self._roles = services.scheduling.roles(session, self._shift_id)
+        self._role_order = {role.role.name.casefold(): index for index, role in enumerate(self._roles)}
+        self.roles_summary.setText(
+            tr(
+                "Roles: {roles}",
+                roles="; ".join(
+                    tr(
+                        "{role} {filled} of {capacity}",
+                        role=role.role.display_name
+                        + (tr(" (needs {skill})", skill=role.role.required_skill) if role.role.required_skill else ""),
+                        filled=role.filled,
+                        capacity=role.role.capacity,
+                    )
+                    for role in self._roles
+                ),
+            )
+        )
         self.roster.set_records(
             services.attendance.roster(session, self._shift_id, include_cancelled=True),
             keep_selection=lambda e: e.assignment.assignment_id,
         )
+        waiting = services.scheduling.waitlist(session, self._shift_id)
+        self.waitlist_label.setVisible(bool(waiting))
+        self.waitlist_label.setText(
+            tr_n(
+                "Waitlist: {count} person ({names}). The first who qualifies gets the next open spot.",
+                "Waitlist: {count} people ({names}). The first who qualifies gets the next open spot.",
+                len(waiting),
+                names=", ".join(entry.volunteer_name for entry in waiting),
+            )
+        )
         self._update_buttons()
         self._refresh_matches()
+        unit = services.opportunities.get(session, shift.opportunity_id).impact_unit
+        self.impact_row.setVisible(bool(unit) and self._started)
+        self.impact_label.setText(tr("Result ({unit}):", unit=unit))
+        self.impact_amount.setAccessibleName(tr("Result ({unit}):", unit=unit))
+        self.impact_amount.setValue(shift.impact_amount or 0)
+
+    @guarded
+    def _save_impact(self) -> None:
+        self._ctx.services.attendance.record_impact(self._ctx.session, self._shift_id, self.impact_amount.value())
+        self._done(tr("Result saved."))
 
     def _refresh_matches(self) -> None:
         clear_layout(self.match_list)
@@ -342,7 +424,10 @@ class ShiftDetailDialog(QDialog):
         )
         for match in matches:
             volunteer = match.volunteer
-            subtitle = ", ".join(volunteer.sorted_skills()[:4]) or tr("No skills listed yet")
+            skills = ", ".join(volunteer.sorted_skills()[:4]) or tr("No skills listed yet")
+            subtitle = (
+                tr("As {role}. {skills}", role=match.role.role.display_name, skills=skills) if match.role else skills
+            )
             self.match_list.addWidget(
                 MatchCard(
                     title=volunteer.full_name,
@@ -382,6 +467,14 @@ class ShiftDetailDialog(QDialog):
             self.everyone_button, after and anyone_waiting, waiting if before else tr("Everyone is already checked in.")
         )
         self._enable(self.walk_in_button, after, waiting)
+        self._enable(self.roles_button, before, tr("Roles are fixed once the shift starts."))
+        over = self._overview.shift.ends_at <= self._ctx.services.clock.now()
+        self._enable(self.announce_button, not over, tr("This shift is over."))
+        self._enable(
+            self.change_role_button,
+            before and status is AssignmentStatus.SCHEDULED and len(self._roles) > 1,
+            tr("Select a scheduled volunteer on a shift with more than one role."),
+        )
 
     @staticmethod
     def _enable(button: QPushButton, enabled: bool, reason_when_disabled: str) -> None:
@@ -405,6 +498,35 @@ class ShiftDetailDialog(QDialog):
         self._ctx.services.scheduling.sign_up(self._ctx.session, self._shift_id, volunteer_id)
         name = self._ctx.services.volunteers.get(self._ctx.session, volunteer_id).full_name
         self._done(tr("Signed up {name}.", name=name))
+
+    @guarded
+    def _announce(self) -> None:
+        AnnounceDialog(self._ctx, self._overview.opportunity_title, shift_id=self._shift_id, parent=self).exec()
+
+    @guarded
+    def _sign_in_sheet(self) -> None:
+        save_sign_in_sheet(self._ctx, self._shift_id, self)
+
+    @guarded
+    def _add_to_calendar(self) -> None:
+        save_calendar_file(self._ctx, self._shift_id, self)
+
+    @guarded
+    def _edit_roles(self) -> None:
+        if RolesDialog(self._ctx, self._shift_id, self._roles, self).exec():
+            self._done(tr("Roles saved."))
+
+    @guarded
+    def _change_role(self) -> None:
+        entry = self.roster.selected()
+        if entry is None:
+            return
+        dialog = RoleChoiceDialog(self._roles, entry, self)
+        if dialog.exec() and dialog.role_id is not None:
+            self._ctx.services.scheduling.change_role(
+                self._ctx.session, entry.assignment.assignment_id or 0, dialog.role_id
+            )
+            self._done(tr("Moved {volunteer_name} to a new role.", volunteer_name=entry.volunteer_name))
 
     @guarded
     def _cancel(self) -> None:
@@ -471,6 +593,43 @@ class ShiftDetailDialog(QDialog):
                 self._ctx.session, self._shift_id, picker.volunteer_id, dialog.hours.value()
             )
             self._done(tr("Recorded a walk-in for {name}.", name=name))
+
+
+class RoleChoiceDialog(QDialog):
+    """Pick another role for someone already signed up."""
+
+    def __init__(self, roles: list[RoleOverview], entry: RosterEntry, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.role_id: int | None = None
+        self.setWindowTitle(tr("Change role"))
+        column = QVBoxLayout(self)
+        column.setContentsMargins(24, 24, 24, 16)
+        column.setSpacing(16)
+        column.addWidget(make_label(tr("Change role"), "title"))
+        column.addWidget(
+            make_label(tr("Choose a new role for {name}.", name=entry.volunteer_name), "subtitle", wrap=True)
+        )
+        self.choice = QComboBox()
+        self.choice.setAccessibleName(tr("Role"))
+        for role in roles:
+            if role.role.role_id == entry.assignment.role_id:
+                continue
+            label = tr("{role} ({count} open)", role=role.role.display_name, count=role.open_spots)
+            if role.role.required_skill:
+                label += tr(" (needs {skill})", skill=role.role.required_skill)
+            self.choice.addItem(label, role.role.role_id)
+        column.addWidget(self.choice)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok.setText(tr("Move"))
+        ok.setProperty("kind", "primary")
+        buttons.accepted.connect(self._choose)
+        buttons.rejected.connect(self.reject)
+        column.addWidget(buttons)
+
+    def _choose(self) -> None:
+        self.role_id = self.choice.currentData()
+        self.accept()
 
 
 def open_shift(ctx: AppContext, shift_id: int, parent: QWidget | None, *, smart_match: bool = False) -> None:

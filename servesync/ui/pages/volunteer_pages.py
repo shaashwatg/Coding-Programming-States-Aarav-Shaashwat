@@ -13,15 +13,19 @@ each with a note). Nothing is ever blocked because of an access need.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
 from servesync.core.i18n import mark, tr, tr_n
-from servesync.models import AssignmentStatus, OpportunityCategory, ServiceRecord, ShiftOverview
+from servesync.models import Announcement, AssignmentStatus, Notice, OpportunityCategory, ServiceRecord, ShiftOverview
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
+from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
+from servesync.ui.dialogs.data_dialogs import MyPrivacyPanel
+from servesync.ui.dialogs.goal_dialog import HourGoalPanel
 from servesync.ui.dialogs.shift_detail import status_color
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
@@ -41,9 +45,9 @@ from servesync.ui.widgets.common import (
     make_button,
     make_label,
 )
-from servesync.ui.widgets.shift_panel import ShiftInfoPanel
+from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
 from servesync.ui.widgets.table import Column, RecordTable
-from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard
+from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard, UpdatesPanel
 
 
 class HomePage(Page):
@@ -55,10 +59,14 @@ class HomePage(Page):
         super().__init__(ctx, scrollable=True)
         self.header = PageHeader(tr("Welcome"), tr("Here's what's coming up and where you could help next."))
         self.layout_.addWidget(self.header)
+        self.updates = UpdatesPanel()
+        self.layout_.addWidget(self.updates)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
         self.strip = ImpactStrip(4)
         self.layout_.addWidget(self.strip)
+        self.goal_panel = HourGoalPanel(ctx)
+        self.layout_.addWidget(self.goal_panel)
         self.banner = FeaturedBanner()
         self.layout_.addWidget(self.banner)
 
@@ -76,7 +84,12 @@ class HomePage(Page):
         self.upcoming.setMinimumHeight(240)
         upcoming.body.addWidget(self.upcoming)
         self.cancel_button = make_button(tr("Cancel sign-up"), on_click=self._cancel)
-        upcoming.body.addWidget(self.cancel_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.calendar_button = make_button(tr("Add to calendar"), on_click=self._add_to_calendar)
+        upcoming_actions = QHBoxLayout()
+        upcoming_actions.addWidget(self.cancel_button)
+        upcoming_actions.addWidget(self.calendar_button)
+        upcoming_actions.addStretch(1)
+        upcoming.body.addLayout(upcoming_actions)
         grid.addWidget(upcoming, 0, 0)
 
         picks = Panel(tr("Recommended for you"))
@@ -122,6 +135,15 @@ class HomePage(Page):
         mission = services.settings.mission_statement()
         self.mission.setText(tr("Our mission: {mission}", mission=mission) if mission else "")
         self.mission.setVisible(bool(mission))
+        updates: list[tuple[str, Callable[[], object] | None]] = [
+            (describe_notice(notice), partial(self._dismiss, notice.notice_id))
+            for notice in services.scheduling.notices(session, volunteer_id)
+        ]
+        updates += [
+            (describe_announcement(note), None)
+            for note in services.coordination.my_announcements(session, volunteer_id)
+        ]
+        self.updates.set_updates(updates)
         reliability = f"{stats.reliability:.0%}" if stats.reliability is not None else tr("New")
         self.strip.set_figures(
             [
@@ -132,6 +154,7 @@ class HomePage(Page):
             ]
         )
 
+        self.goal_panel.refresh()
         featured = services.dashboard.featured_event(session)
         self.banner.setVisible(featured is not None)
         if featured is not None:
@@ -145,7 +168,7 @@ class HomePage(Page):
                 [
                     make_button(
                         tr("See details"),
-                        kind="primary",
+                        kind="secondary",
                         on_click=lambda: self.ctx.go("calendar", day=overview.shift.starts_at.date()),
                     )
                 ]
@@ -181,6 +204,17 @@ class HomePage(Page):
     def _sign_up(self, shift_id: int, title: str) -> None:
         self.ctx.services.scheduling.sign_up(self.ctx.session, shift_id, self.ctx.session.volunteer_id or 0)
         self.ctx.changed(tr("You're signed up for {title}. Thank you!", title=title))
+
+    @guarded
+    def _add_to_calendar(self) -> None:
+        record = self.upcoming.selected() or next(iter(self.upcoming.records()), None)
+        if record is not None:
+            save_calendar_file(self.ctx, record.assignment.shift_id, self)
+
+    @guarded
+    def _dismiss(self, notice_id: int) -> None:
+        self.ctx.services.scheduling.dismiss_notice(self.ctx.session, notice_id)
+        self.reload()
 
     @guarded
     def _cancel(self) -> None:
@@ -253,10 +287,13 @@ class FindShiftsPage(Page):
         filters.addWidget(self.search_box, 2)
         filters.addWidget(self.category, 1)
         self.layout_.addLayout(filters)
-        toggles = QHBoxLayout()
-        for box in (self.can_join, self.open_only, self.fits_me, self.fits_access):
-            toggles.addWidget(box)
-        toggles.addStretch(1)
+        # Two columns, so the full wording fits even at large text sizes.
+        toggles = QGridLayout()
+        toggles.setHorizontalSpacing(24)
+        toggles.setVerticalSpacing(0)
+        for index, box in enumerate((self.can_join, self.open_only, self.fits_me, self.fits_access)):
+            toggles.addWidget(box, index // 2, index % 2)
+        toggles.setColumnStretch(2, 1)
         self.layout_.addLayout(toggles)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -291,7 +328,7 @@ class FindShiftsPage(Page):
         self.info = ShiftInfoPanel(ctx)
         self.info.changed.connect(self.reload)
         self.table.selection_changed.connect(lambda o: self.info.show_shift(o))
-        splitter.addWidget(self.info)
+        splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         self.layout_.addWidget(splitter, 1)
@@ -356,7 +393,7 @@ class ProfilePage(Page):
                     "can reach you and Smart Match can suggest shifts that fit."
                 ),
                 [
-                    make_button(tr("Edit my profile"), kind="primary", on_click=self._edit),
+                    make_button(tr("Edit my profile"), kind="secondary", on_click=self._edit),
                     make_button(tr("Change password"), on_click=self._password),
                 ],
             )
@@ -391,10 +428,13 @@ class ProfilePage(Page):
         history.body.addWidget(self.history, 1)
         row.addWidget(history, 3)
         self.layout_.addLayout(row, 1)
+        self.privacy = MyPrivacyPanel(ctx)
+        self.layout_.addWidget(self.privacy)
 
     def refresh(self) -> None:
         services, session = self.ctx.services, self.ctx.session
         volunteer_id = session.volunteer_id or 0
+        self.privacy.refresh()
         self.card.show_volunteer(
             services.volunteers.get(session, volunteer_id), services.volunteers.participation(session, volunteer_id)
         )
@@ -410,3 +450,23 @@ class ProfilePage(Page):
     def _password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
             self.ctx.events.status_message.emit(tr("Password changed."))
+
+
+def describe_notice(notice: Notice) -> str:
+    """A notice in the reader's language (stored as a kind and a shift, not as a sentence)."""
+    role = tr(" as {role}", role=notice.role_name) if notice.role_name else ""
+    return tr(
+        "A spot opened on {program}, {when}, and you were next on the waitlist. You're now signed up{role}.",
+        program=notice.opportunity_title,
+        when=format_when(notice.starts_at, notice.ends_at),
+        role=role,
+    )
+
+
+def describe_announcement(note: Announcement) -> str:
+    """'Weekend Food Pantry, Sat, Nov 14: Parking is in the north lot.' (the leader's words, unchanged)."""
+    if note.shift_starts_at is not None:
+        about = tr("{program}, {when}", program=note.opportunity_title, when=format_when(note.shift_starts_at))
+    else:
+        about = note.opportunity_title
+    return tr("{about}: {body} (posted by {who})", about=about, body=note.body, who=note.posted_by)

@@ -21,6 +21,8 @@ finish() {
 
 echo "=== ServeSync app build ($(date '+%Y-%m-%d %H:%M')) ==="
 [ -x .venv/bin/python ] || finish "Run setup_mac.command first (it installs the build tools)." 1
+# macOS can mark files inside hidden folders as hidden, and Qt then can't find its plugins.
+chflags -R nohidden .venv 2>/dev/null
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
@@ -37,5 +39,6 @@ python -m PyInstaller --noconfirm --clean servesync.spec || finish "The build fa
 
 echo "4/4  Checking the result..."
 [ -d dist/ServeSync.app ] || finish "dist/ServeSync.app was not created." 1
+chflags -R nohidden dist/ServeSync.app 2>/dev/null
 du -sh dist/ServeSync.app
 finish "SUCCESS: dist/ServeSync.app is ready. Double-click it to run ServeSync without Python." 0

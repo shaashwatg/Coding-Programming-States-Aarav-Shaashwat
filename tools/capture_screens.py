@@ -2,6 +2,7 @@
 Render every major screen to PNG files (for design review, the README, and slides).
 
     python tools/capture_screens.py OUTPUT_FOLDER [--theme LIGHT|DARK|HIGH_CONTRAST] [--scale 1.0] [--language es]
+        [--date 2026-11-10]
 
 Runs against a throwaway copy of the demo data, so it never touches real records.
 """
@@ -13,6 +14,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Callable
+from datetime import date, datetime, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -23,15 +25,33 @@ from servesync.core.i18n import Language, tr
 from servesync.data import DataStore
 from servesync.data.seed import DEMO_PASSWORD, seed_demo_data
 from servesync.models import Appearance, Theme
-from servesync.services import Services
+from servesync.services import FixedClock, Services
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
+from servesync.ui.dialogs.application_dialog import ApplicationDialog
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
+from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
+from servesync.ui.dialogs.data_dialogs import HistoryDialog, ImportDialog
+from servesync.ui.dialogs.help_dialog import TOPIC_TAB, HelpDialog
+from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
+from servesync.ui.dialogs.roles_dialog import RolesDialog
 from servesync.ui.dialogs.shift_detail import MATCH_TAB, ROSTER_TAB, ShiftDetailDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.main_window import MainWindow
+
+
+def write_import_example(folder: Path) -> Path:
+    """A small CSV with one ready row and one that needs fixing, to show the import preview."""
+    path = folder / "volunteers.csv"
+    path.write_text(
+        "First name,Last name,Email,Phone,Birth date,Skills\n"
+        "Maria,Gomez,maria.gomez@example.org,206-555-0170,03/04/1990,Cooking; Spanish\n"
+        "Sam,Lee,sam.lee@example,911-555-0100,02/30/2001,\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def settle(app: QApplication) -> None:
@@ -60,6 +80,7 @@ def main() -> int:
     parser.add_argument("--theme", default="LIGHT")
     parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--language", default="en", choices=[language.value for language in Language])
+    parser.add_argument("--date", type=date.fromisoformat, help="pretend today is this day (default: real today)")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -68,8 +89,9 @@ def main() -> int:
     theme.set_font_families(*assets.load_fonts())
     with tempfile.TemporaryDirectory() as temp:
         store = DataStore.open(Path(temp) / "servesync.db")
-        seed_demo_data(store, password_iterations=1_000)
-        services = Services.create(store, password_iterations=1_000)
+        seed_demo_data(store, today=args.date, password_iterations=1_000)
+        clock = FixedClock(datetime.combine(args.date, time(9, 0))) if args.date else None
+        services = Services.create(store, clock=clock, password_iterations=1_000)
         language = Language(args.language)
         theme.apply_appearance(app, Appearance(theme=Theme(args.theme), font_scale=args.scale, language=language))
         suffix = "" if args.theme == "LIGHT" and args.scale == 1.0 else f"-{args.theme.lower()}-{args.scale:g}"
@@ -78,6 +100,7 @@ def main() -> int:
         spanish = language is Language.SPANISH
 
         save(app, LoginDialog(services), args.output, f"01-sign-in{suffix}", (900, 560))
+        save(app, ApplicationDialog(services), args.output, f"01-apply{suffix}", (760, 900))
 
         def capture_role(username: str, prefix: str, extra: Callable[[AppContext, MainWindow], None]) -> None:
             session = services.auth.sign_in(username, DEMO_PASSWORD)
@@ -108,6 +131,8 @@ def main() -> int:
                     f"02-9b-roster{suffix}",
                     (980, 700),
                 )
+                roles = services.scheduling.roles(ctx.session, shift_id)
+                save(app, RolesDialog(ctx, shift_id, roles), args.output, f"02-9k-roles{suffix}", (820, 640))
             dialog = VolunteerDialog(ctx, None)
             dialog.first_name.setText("J0rdan")
             dialog.email.setText("jordan@gmial.com")
@@ -129,11 +154,44 @@ def main() -> int:
             reports = window.pages["reports"]
             reports.kind_box.setCurrentIndex(1)  # type: ignore[attr-defined]  # Program impact
             save(app, window, args.output, f"02-9f-report-program{suffix}")
+            box = reports.kind_box  # type: ignore[attr-defined]
+            box.setCurrentIndex(box.findData("IMPACT_SUMMARY"))
+            save(app, window, args.output, f"02-9i-impact-summary{suffix}")
+            box.setCurrentIndex(box.findData("RECRUITMENT"))
+            save(app, window, args.output, f"02-9j-recruitment{suffix}")
             window.ctx.events.status_message.emit(tr("Saved {title}.", title="servesync-program-impact.pdf"))
             save(app, window, args.output, f"02-9g-toast{suffix}")
+            save(app, KioskDialog(ctx), args.output, f"02-9h-kiosk{suffix}", (1360, 860))
+            save(app, RemindersDialog(ctx), args.output, f"02-9l-reminders{suffix}", (1080, 640))
+            importer = ImportDialog(ctx)
+            importer.load(write_import_example(Path(temp)))
+            save(app, importer, args.output, f"02-9m-import{suffix}", (1000, 640))
+
+        def admin_extras(ctx: AppContext, window: MainWindow) -> None:
+            save(app, HistoryDialog(ctx), args.output, f"04-history{suffix}", (1080, 680))
 
         capture_role("coordinator", "02-leader", leader_extras)
-        capture_role("priya.patel", "03-volunteer", lambda _ctx, _window: None)
+
+        def volunteer_extras(ctx: AppContext, window: MainWindow) -> None:
+            window.navigate("home")
+            window.start_tour()
+            if window._tour is not None:
+                window._tour.show_step(2)  # "Find a shift", with its outline
+            save(app, window, args.output, f"03-9a-tour{suffix}")
+            if window._tour is not None:
+                window._tour.finish()
+            save(
+                app, HelpDialog(ctx.session.role, start_tab=TOPIC_TAB), args.output, f"03-9b-topic{suffix}", (760, 680)
+            )
+
+        capture_role("priya.patel", "03-volunteer", volunteer_extras)
+        session = services.auth.sign_in("admin", DEMO_PASSWORD)
+        admin_window = MainWindow(AppContext(services, session, AppEvents()))
+        admin_window.resize(1360, 860)
+        admin_window.navigate("settings")
+        save(app, admin_window, args.output, f"04-admin-settings{suffix}")
+        admin_extras(AppContext(services, session, AppEvents()), admin_window)
+        admin_window.close()
         store.close()
     return 0
 

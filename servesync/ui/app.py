@@ -86,7 +86,7 @@ class ServeSyncApp:
         events = AppEvents()
         ctx = AppContext(self._services, session, events)
         events.appearance_changed.connect(self._apply_appearance)
-        window = MainWindow(ctx)
+        window = MainWindow(ctx, offer_tour=True)  # a first sign-in gets the short tour
         window.signed_out.connect(self._after_sign_out)
         window.setWindowIcon(self._qt.windowIcon())
         window.resize(1360, 860)
@@ -208,7 +208,7 @@ def run(argv: list[str] | None = None, *, data_dir: Path | None = None) -> int:
     qt_app.setApplicationName(__app_name__)
     qt_app.setApplicationVersion(__version__)
     qt_app.setOrganizationName(__app_name__)
-    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(256)))
+    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(theme.INDIGO, 256)))
 
     paths = AppPaths.resolve(data_dir)
     configure_logging(paths.log_dir)
