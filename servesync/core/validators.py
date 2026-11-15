@@ -432,7 +432,7 @@ def validate_birth_date(value: object, *, minimum_age: int, as_of: date) -> date
         raise InvalidInputError(tr("Birth date cannot be after the date the volunteer joined."))
     age = calculate_age(born, as_of)
     if age > 120:
-        raise InvalidInputError(tr("Birth date is more than 120 years ago — please double-check the year."))
+        raise InvalidInputError(tr("Birth date is more than 120 years ago. Please double-check the year."))
     if age < minimum_age:
         raise InvalidInputError(
             tr(

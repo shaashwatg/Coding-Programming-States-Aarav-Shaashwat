@@ -1,15 +1,23 @@
 """
-Ask ServeSync — one box to *ask a question* or *jump anywhere* (Ctrl+K).
+Ask ServeSync: one search box to *ask a question* or *jump anywhere* (Ctrl+K).
 
-    [ Ask a question or type a page name...                   ]
-      > Ask: "who is free saturday"                      Enter
-        Go to Calendar                                   Ctrl+4
+    [ (search) Ask a question or type a page name...            ]
+      Ask: "who is free saturday"                        Enter
+      Go to Calendar                                     Ctrl+4
     ----------------------------------------------------------------
-      You        Who is free Saturday morning?
-      ServeSync  15 active volunteers are usually free on Saturday
-                 mornings: ...                    [ Open Calendar ]
-                 I read this as: who is free on Saturday mornings
-    Try: [Which shifts need volunteers this week?] [How do I ...?]
+    Who is free Saturday morning?                      (question)
+    15 active volunteers are usually free on Saturday
+    mornings: ...                                       (answer)
+    [ Open Calendar ]   I read this as: who is free on Saturday mornings
+    ----------------------------------------------------------------
+    Try asking
+      Which shifts need volunteers this week?
+      How do I ...?
+
+It is styled like a search panel, not a chat: each question and its answer
+form one plain row, newest last, separated by hairlines. A chat look would
+suggest a person or a general chatbot is replying; this is a lookup over the
+organization's own records, and the layout says so.
 
 Keyboard model: focus stays in the text box. Up/Down move through the list,
 Enter runs the highlighted row (asking is always the first row), Esc
@@ -17,7 +25,7 @@ closes. Every answer is announced to screen readers, and the transcript
 can be read with Tab.
 
 Privacy note shown in the dialog: answers come only from this computer's
-records — nothing is sent over the internet.
+records. Nothing is sent over the internet.
 """
 
 from __future__ import annotations
@@ -70,12 +78,9 @@ class AssistantDialog(QDialog):
         self.resize(760, 640)
 
         column = QVBoxLayout(self)
-        column.setContentsMargins(24, 20, 24, 16)
-        column.setSpacing(12)
+        column.setContentsMargins(24, 24, 24, 16)
+        column.setSpacing(16)
         title_row = QHBoxLayout()
-        spark = make_label()
-        spark.setPixmap(assets.pixmap("sparkles", current_palette().primary, 22))
-        title_row.addWidget(spark)
         title_row.addWidget(make_label(tr("Ask ServeSync"), "section"))
         title_row.addStretch(1)
         title_row.addWidget(make_label(tr("Esc to close"), "kbd"))
@@ -108,13 +113,13 @@ class AssistantDialog(QDialog):
         holder = QWidget()
         self.transcript = QVBoxLayout(holder)
         self.transcript.setContentsMargins(0, 0, 8, 0)
-        self.transcript.setSpacing(10)
+        self.transcript.setSpacing(0)
         self.transcript.addStretch(1)
         self.transcript_area.setWidget(holder)
         column.addWidget(self.transcript_area, 1)
 
         self.suggestion_row = QVBoxLayout()
-        self.suggestion_row.setSpacing(6)
+        self.suggestion_row.setSpacing(0)
         column.addLayout(self.suggestion_row)
         self._show_suggestions(ctx.services.assistant.suggestions(ctx.session), tr("Try asking"))
         column.addWidget(
@@ -186,8 +191,7 @@ class AssistantDialog(QDialog):
             return None
         answer = self.ctx.services.assistant.ask(self.ctx.session, text)
         self.answers.append(answer)
-        self._add_bubble("user", text)
-        self._add_answer(answer)
+        self._add_answer(text, answer)
         self.input.clear()
         self.matches.hide()
         self._show_suggestions(answer.follow_ups, tr("Follow up"))
@@ -195,52 +199,42 @@ class AssistantDialog(QDialog):
         QTimer.singleShot(0, self._scroll_to_end)
         return answer
 
-    def _add_bubble(self, who: str, text: str) -> QFrame:
-        bubble = QFrame()
-        bubble.setProperty("bubble", who)
-        body = QVBoxLayout(bubble)
-        body.setContentsMargins(14, 10, 14, 10)
-        body.setSpacing(6)
-        speaker = make_label(tr("You") if who == "user" else "ServeSync", "hint")
-        body.addWidget(speaker)
-        message = make_label(text, None, wrap=True, selectable=True)
-        message.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # Tab reaches each message for screen readers
-        message.setAccessibleName(
-            tr("You said: {text}", text=text) if who == "user" else tr("ServeSync said: {text}", text=text)
-        )
-        body.addWidget(message)
-        row = QHBoxLayout()
-        if who == "user":
-            row.addStretch(1)
-        row.addWidget(bubble, 6)
-        if who != "user":
-            row.addStretch(1)
-        container = QWidget()
-        container.setLayout(row)
-        self.transcript.insertWidget(self.transcript.count() - 1, container)
-        fade_in(container)
-        return bubble
-
-    def _add_answer(self, answer: Answer) -> None:
-        bubble = self._add_bubble("assistant", answer.text)
-        layout = bubble.layout()
-        assert isinstance(layout, QVBoxLayout)
-        if answer.actions:
-            buttons = QHBoxLayout()
+    def _add_answer(self, question: str, answer: Answer) -> QFrame:
+        """One result row: the question, the answer, its page buttons, and how it was understood."""
+        row = QFrame()
+        row.setProperty("answer", True)
+        body = QVBoxLayout(row)
+        body.setContentsMargins(0, 16, 0, 16)
+        body.setSpacing(8)
+        asked = make_label(question, "name", wrap=True, selectable=True)
+        asked.setAccessibleName(tr("You said: {text}", text=question))
+        body.addWidget(asked)
+        reply = make_label(answer.text, None, wrap=True, selectable=True)
+        reply.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # Tab reaches each answer for screen readers
+        reply.setAccessibleName(tr("ServeSync said: {text}", text=answer.text))
+        body.addWidget(reply)
+        if answer.actions or answer.understood:
+            footer = QHBoxLayout()
+            footer.setSpacing(16)
             for action in answer.actions:
-                buttons.addWidget(
+                footer.addWidget(
                     make_button(
                         action.label,
-                        kind="primary",
+                        kind="secondary",
                         on_click=partial(self._open, action.page, dict(action.options)),
                     )
                 )
-            buttons.addStretch(1)
-            layout.addLayout(buttons)
-        if answer.understood:
-            layout.addWidget(
-                make_label(tr("I read this as: {understood}", understood=answer.understood), "hint", wrap=True)
-            )
+            if answer.understood:
+                footer.addWidget(
+                    make_label(tr("I read this as: {understood}", understood=answer.understood), "hint", wrap=True),
+                    1,
+                )
+            else:
+                footer.addStretch(1)
+            body.addLayout(footer)
+        self.transcript.insertWidget(self.transcript.count() - 1, row)
+        fade_in(row)
+        return row
 
     def _open(self, page: str, options: dict[str, object]) -> None:
         self.accept()
@@ -251,15 +245,9 @@ class AssistantDialog(QDialog):
         if not questions:
             return
         self.suggestion_row.addWidget(make_label(heading, "hint"))
-        row = QHBoxLayout()
-        row.setSpacing(8)
+        # Plain rows of text, like a search page's "related searches", rather than chips.
         for question in questions[:4]:
-            chip = make_button(question, kind="chip", on_click=partial(self.ask, question))
-            row.addWidget(chip)
-        row.addStretch(1)
-        holder = QWidget()
-        holder.setLayout(row)
-        self.suggestion_row.addWidget(holder)
+            self.suggestion_row.addWidget(make_button(question, kind="chip", on_click=partial(self.ask, question)))
 
     def _scroll_to_end(self) -> None:
         bar = self.transcript_area.verticalScrollBar()

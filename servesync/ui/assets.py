@@ -5,8 +5,9 @@ Fonts (SIL Open Font License, bundled so every computer looks the same):
 * **Atkinson Hyperlegible** — body and interface text. Designed by the Braille
   Institute so similar letters (I/l/1, O/0, b/d) are easy to tell apart for
   readers with low vision.
-* **Source Serif 4** — page titles and key figures; a warm, editorial serif
-  that gives the organization a trustworthy, annual-report voice.
+* **Manrope** (SemiBold) — page and section titles and key figures. A plain,
+  modern sans with open shapes; it reads as calm and current next to Atkinson
+  without competing with it, and stays legible at the large sizes headings use.
 
 Icons: the open-source **Lucide** set (ISC license). Each area of the app uses
 one icon everywhere (people = "users", shifts = "calendar-days", ...), so
@@ -30,7 +31,7 @@ from servesync.models import OpportunityCategory
 logger = logging.getLogger(__name__)
 
 BODY_FAMILY = "Atkinson Hyperlegible"
-HEADING_FAMILY = "Source Serif 4"
+HEADING_FAMILY = "Manrope"
 
 
 def assets_dir() -> Path:
@@ -110,5 +111,13 @@ def icon(name: str, color: str, size: int = 20) -> QIcon:
     return QIcon(pixmap(name, color, size))
 
 
-def logo_pixmap(size: int = 36) -> QPixmap:
-    return pixmap("logo", "#FFFFFF", size)
+def two_state_icon(name: str, color: str, checked_color: str, size: int = 20) -> QIcon:
+    """An icon drawn in ``color``, and in ``checked_color`` while its button is checked."""
+    result = QIcon(pixmap(name, color, size))
+    result.addPixmap(pixmap(name, checked_color, size), QIcon.Mode.Normal, QIcon.State.On)
+    return result
+
+
+def logo_pixmap(color: str, size: int = 36) -> QPixmap:
+    """The logo mark drawn in ``color`` (the theme's primary), so it matches every theme."""
+    return pixmap("logo", color, size)

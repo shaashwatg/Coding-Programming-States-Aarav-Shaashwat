@@ -98,7 +98,7 @@ class StaffingPage(Page):
         panel.body.addWidget(self.plan_summary)
 
         actions = QHBoxLayout()
-        self.approve_button = make_button(tr("Sign up selected"), kind="primary", on_click=self._approve)
+        self.approve_button = make_button(tr("Sign up selected"), kind="secondary", on_click=self._approve)
         self.undo_button = make_button(tr("Undo last approval"), on_click=self._undo)
         self.undo_button.setEnabled(False)
         actions.addWidget(self.approve_button)
@@ -329,7 +329,7 @@ class StaffingPage(Page):
 
 def _proposal_text(proposal: PlanProposal) -> str:
     shift = proposal.overview.shift
-    reasons = " · ".join(proposal.match.strengths[:2])
+    reasons = "; ".join(proposal.match.strengths[:2])
     return tr(
         "{name} ({score}) for {program}, {when}\n{reasons}",
         name=proposal.volunteer.full_name,

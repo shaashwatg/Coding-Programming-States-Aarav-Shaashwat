@@ -21,6 +21,7 @@ from servesync.ui.widgets.common import (
     guarded,
     make_button,
     make_label,
+    set_prop,
     to_qdate,
 )
 from servesync.ui.widgets.forms import FormDialog
@@ -100,6 +101,7 @@ class HourGoalPanel(Panel):
             )
         )
         self.bar.setValue(round(progress.share * 100))
+        set_prop(self.bar, "complete", progress.reached)  # a finished goal turns emerald
         if progress.reached:
             self.advice.setText(tr("Goal reached. Thank you!"))
         elif progress.days_left == 0:

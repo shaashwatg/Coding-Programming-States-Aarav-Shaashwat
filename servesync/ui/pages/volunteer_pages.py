@@ -42,7 +42,7 @@ from servesync.ui.widgets.common import (
     make_button,
     make_label,
 )
-from servesync.ui.widgets.shift_panel import ShiftInfoPanel
+from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
 from servesync.ui.widgets.table import Column, RecordTable
 from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard
 
@@ -149,7 +149,7 @@ class HomePage(Page):
                 [
                     make_button(
                         tr("See details"),
-                        kind="primary",
+                        kind="secondary",
                         on_click=lambda: self.ctx.go("calendar", day=overview.shift.starts_at.date()),
                     )
                 ]
@@ -257,10 +257,13 @@ class FindShiftsPage(Page):
         filters.addWidget(self.search_box, 2)
         filters.addWidget(self.category, 1)
         self.layout_.addLayout(filters)
-        toggles = QHBoxLayout()
-        for box in (self.can_join, self.open_only, self.fits_me, self.fits_access):
-            toggles.addWidget(box)
-        toggles.addStretch(1)
+        # Two columns, so the full wording fits even at large text sizes.
+        toggles = QGridLayout()
+        toggles.setHorizontalSpacing(24)
+        toggles.setVerticalSpacing(0)
+        for index, box in enumerate((self.can_join, self.open_only, self.fits_me, self.fits_access)):
+            toggles.addWidget(box, index // 2, index % 2)
+        toggles.setColumnStretch(2, 1)
         self.layout_.addLayout(toggles)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -295,7 +298,7 @@ class FindShiftsPage(Page):
         self.info = ShiftInfoPanel(ctx)
         self.info.changed.connect(self.reload)
         self.table.selection_changed.connect(lambda o: self.info.show_shift(o))
-        splitter.addWidget(self.info)
+        splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         self.layout_.addWidget(splitter, 1)
@@ -360,7 +363,7 @@ class ProfilePage(Page):
                     "can reach you and Smart Match can suggest shifts that fit."
                 ),
                 [
-                    make_button(tr("Edit my profile"), kind="primary", on_click=self._edit),
+                    make_button(tr("Edit my profile"), kind="secondary", on_click=self._edit),
                     make_button(tr("Change password"), on_click=self._password),
                 ],
             )

@@ -158,7 +158,7 @@ class DashboardPage(Page):
             self.banner.set_actions(
                 [
                     make_button(
-                        tr("Find volunteers"), kind="primary", on_click=lambda: self._open(overview, smart=True)
+                        tr("Find volunteers"), kind="secondary", on_click=lambda: self._open(overview, smart=True)
                     ),
                     make_button(tr("Open roster"), on_click=lambda: self._open(overview, smart=False)),
                 ]

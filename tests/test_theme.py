@@ -88,3 +88,42 @@ def test_targets_grow_with_text_size() -> None:
     large = build_stylesheet(LIGHT, 26.0)
     assert f"min-height: {MIN_TARGET - 8}px" in normal  # navigation: 44 px target minus padding
     assert f"min-height: {MIN_TARGET * 2 - 8}px" in large
+
+
+def test_brand_colors_are_defined_once_and_used_in_order() -> None:
+    """The three brand colors come from the brief; charts use them as indigo, amber, emerald."""
+    from servesync.ui import theme
+
+    assert (theme.INDIGO, theme.AMBER, theme.EMERALD) == ("#2F3E9E", "#F2A93B", "#0E9F6E")
+    assert LIGHT.chart == (theme.INDIGO, theme.AMBER, theme.EMERALD)
+    assert LIGHT.primary == theme.INDIGO and LIGHT.attention_fill == theme.AMBER
+    assert LIGHT.success_fill == theme.EMERALD
+
+
+def test_amber_is_never_text_on_a_light_background() -> None:
+    from servesync.ui import theme
+
+    text_tokens = {getattr(LIGHT, token) for token in TEXT_TOKENS}
+    assert theme.AMBER not in text_tokens
+    assert contrast(LIGHT.on_attention, LIGHT.attention_fill) >= 7.0  # dark text on amber fills
+
+
+def test_screens_never_hard_code_colors() -> None:
+    """Pages, widgets and dialogs ask the theme for a color by meaning, never by hex value."""
+    import re
+    from pathlib import Path
+
+    ui = Path(__file__).resolve().parents[1] / "servesync" / "ui"
+    offenders = [
+        f"{path.relative_to(ui)}: {match}"
+        for folder in ("pages", "widgets", "dialogs")
+        for path in (ui / folder).glob("*.py")
+        for match in re.findall(r"#[0-9A-Fa-f]{6}\b", path.read_text(encoding="utf-8"))
+    ]
+    assert not offenders, offenders
+
+
+def test_stylesheet_has_no_gradients_or_zebra_stripes() -> None:
+    sheet = build_stylesheet(LIGHT, 13.0)
+    assert "gradient" not in sheet
+    assert "alternate-background-color" not in sheet

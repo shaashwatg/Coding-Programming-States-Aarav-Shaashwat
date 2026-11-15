@@ -20,6 +20,7 @@ from servesync.core.i18n import tr
 from servesync.services import KioskPerson, KioskResult
 from servesync.ui import assets
 from servesync.ui.context import AppContext
+from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label, set_prop
 
 CONTENT_WIDTH = 640
@@ -42,7 +43,7 @@ class KioskDialog(QDialog):
         column.setSpacing(16)
         column.addStretch(1)
         logo = make_label()
-        logo.setPixmap(assets.logo_pixmap(LOGO_SIZE))
+        logo.setPixmap(assets.logo_pixmap(current_palette().brand, LOGO_SIZE))
         logo.setAccessibleName(tr("ServeSync logo"))
         column.addWidget(logo, 0, Qt.AlignmentFlag.AlignHCenter)
         heading = make_label(tr("Welcome! Thanks for coming."), "display", wrap=True)

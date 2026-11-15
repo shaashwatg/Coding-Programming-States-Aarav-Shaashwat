@@ -2,7 +2,7 @@
 Pages used by every role: the shift calendar and settings.
 
 The calendar is the app's "event calendar": a month view marked with dots
-(marigold when a day still has open spots), with that day's shifts beside it.
+(amber when a day still has open spots), with that day's shifts beside it.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from servesync.ui.widgets.common import (
     make_label,
     to_qdate,
 )
-from servesync.ui.widgets.shift_panel import ShiftInfoPanel
+from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
 from servesync.ui.widgets.table import Column, RecordTable
 from servesync.ui.widgets.visuals import ShiftCalendar
 
@@ -66,7 +66,7 @@ class CalendarPage(Page):
         self.layout_.addWidget(
             PageHeader(
                 tr("Calendar"),
-                tr("Dots mark days with shifts; marigold dots still have open spots. Pick a day to see its shifts.")
+                tr("Dots mark days with shifts; amber dots still have open spots. Pick a day to see its shifts.")
                 if leader
                 else tr("Dots mark days with open shifts. Pick a day, then a shift, to see details and sign up."),
             )
@@ -93,7 +93,7 @@ class CalendarPage(Page):
                 Column(
                     tr("Spots open"),
                     lambda o: o.open_spots,
-                    color=lambda o: current_palette().attention if o.open_spots else None,
+                    color=lambda o: current_palette().success if o.open_spots else None,  # open spots: emerald
                     align_right=True,
                 ),
             ],
@@ -105,7 +105,7 @@ class CalendarPage(Page):
         self.day_table.selection_changed.connect(self.info.show_shift)
         left_column.addWidget(self.day_table, 1)
         splitter.addWidget(left)
-        splitter.addWidget(self.info)
+        splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         self.layout_.addWidget(splitter, 1)
@@ -208,12 +208,12 @@ class SettingsPage(Page):
         access.body.addLayout(size_row)
 
         access.body.addWidget(make_label(tr("Reading and motion"), "section"))
-        self.reduce_motion = QCheckBox(tr("Reduce motion — no sliding, fading, or growing animations"))
+        self.reduce_motion = QCheckBox(tr("Reduce motion (no sliding, fading, or growing animations)"))
         self.text_spacing = QCheckBox(
-            tr("Extra letter and word spacing — easier for many readers, including with dyslexia")
+            tr("Extra letter and word spacing (easier for many readers, including people with dyslexia)")
         )
         self.simplified = QCheckBox(
-            tr("Simplified layout — hide extra panels so each screen shows only the essentials")
+            tr("Simplified layout (hide extra panels so each screen shows only the essentials)")
         )
         for box in (self.reduce_motion, self.text_spacing, self.simplified):
             access.body.addWidget(box)
@@ -236,7 +236,7 @@ class SettingsPage(Page):
         access.body.addLayout(timing_row)
 
         buttons = QHBoxLayout()
-        buttons.addWidget(make_button(tr("Save comfort settings"), kind="primary", on_click=self._apply_display))
+        buttons.addWidget(make_button(tr("Save comfort settings"), kind="secondary", on_click=self._apply_display))
         buttons.addWidget(make_button(tr("Restore defaults"), on_click=self._restore_defaults))
         buttons.addStretch(1)
         access.body.addLayout(buttons)
@@ -280,7 +280,7 @@ class SettingsPage(Page):
         org.body.addWidget(self.org_errors)
         if self._admin:
             org.body.addWidget(
-                make_button(tr("Save organization details"), kind="primary", on_click=self._save_org),
+                make_button(tr("Save organization details"), kind="secondary", on_click=self._save_org),
                 0,
                 Qt.AlignmentFlag.AlignLeft,
             )
@@ -307,7 +307,7 @@ class SettingsPage(Page):
             data.body.addWidget(
                 make_label(
                     tr(
-                        "Everything ServeSync stores — records, photos, and settings — lives "
+                        "Everything ServeSync stores (records, photos, and settings) lives "
                         "in this folder on this computer. To back up, close ServeSync and copy "
                         "the folder to a USB drive or cloud storage."
                     ),

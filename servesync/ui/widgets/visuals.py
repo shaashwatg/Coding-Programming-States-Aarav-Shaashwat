@@ -1,15 +1,15 @@
 """
 Distinctive visual components.
 
-* :class:`ScoreAnatomyBar` — the signature element. A Smart Match score drawn
+* :class:`ScoreAnatomyBar`: the signature element. A Smart Match score drawn
   as five colored segments, one per factor, so the algorithm explains itself.
-* :class:`MatchCard` — a recommendation with its bar, reasons, and an action.
-* :class:`ProgramArt` — the organization's own program photo, or consistent
+* :class:`MatchCard`: a recommendation with its bar, reasons, and an action.
+* :class:`ProgramArt`: the organization's own program photo, or consistent
   category artwork when no photo has been added.
-* :class:`FeaturedBanner` — the "Happening next" spotlight (one event, never a carousel).
-* :class:`Callout` — the quiet panel at the bottom of a home screen.
-* :class:`ActivityFeed` — the newest sign-ups, service, and applications.
-* :class:`ShiftCalendar` — a month calendar that marks days with shifts.
+* :class:`FeaturedBanner`: the "Happening next" spotlight (one event, never a carousel).
+* :class:`Callout`: the quiet section at the bottom of a home screen.
+* :class:`ActivityFeed`: the newest sign-ups, service, and applications.
+* :class:`ShiftCalendar`: a month calendar that marks days with shifts.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import date, datetime
 
 from PySide6.QtCore import QDate, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPixmap, QTextCharFormat
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap, QTextCharFormat, QTransform
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QFrame,
@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QSizePolicy,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -100,11 +101,11 @@ class FactorLegend(QWidget):
         super().__init__()
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(14)
+        row.setSpacing(8)
         for name, color in zip(self.NAMES, current_palette().factors, strict=True):
             swatch = QLabel()
             swatch.setFixedSize(12, 12)
-            swatch.setStyleSheet(f"background: {color}; border-radius: 3px;")
+            swatch.setStyleSheet(f"background: {color}; border-radius: 2px;")
             row.addWidget(swatch)
             row.addWidget(make_label(tr(name), "hint"))
         row.addStretch(1)
@@ -127,8 +128,8 @@ class MatchCard(QFrame):
         super().__init__()
         self.setProperty("card", True)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(6)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
 
         top = QHBoxLayout()
         names = QVBoxLayout()
@@ -141,7 +142,8 @@ class MatchCard(QFrame):
         score_label.setAccessibleName(tr("Match score {score} out of 100", score=score))
         score_label.setToolTip(tr("Match score out of 100"))
         top.addWidget(score_label, 0, Qt.AlignmentFlag.AlignTop)
-        action = make_button(action_text, kind="primary", on_click=on_action)
+        # Outlined: a list of cards would otherwise put several filled buttons on one screen.
+        action = make_button(action_text, kind="secondary", on_click=on_action)
         action.setAccessibleName(f"{action_text}: {title}")
         top.addWidget(action, 0, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(top)
@@ -157,7 +159,7 @@ class MatchCard(QFrame):
             line.setAccessibleName((tr("Concern: ") if factor.is_concern else tr("Strength: ")) + factor.explanation)
             layout.addWidget(line)
         for note in access_notes:
-            line = make_label(tr("!  {note} — check before confirming", note=note), "concern", wrap=True)
+            line = make_label(tr("!  {note}. Check before confirming.", note=note), "concern", wrap=True)
             line.setAccessibleName(tr("Access note: {note}", note=note))
             layout.addWidget(line)
 
@@ -191,7 +193,7 @@ class ProgramArt(QLabel):
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         frame = QRectF(0, 0, self._size.width(), self._size.height())
         path = QPainterPath()
-        path.addRoundedRect(frame, 10, 10)
+        path.addRoundedRect(frame, 6, 6)
         painter.setClipPath(path)
 
         image = QPixmap()
@@ -209,7 +211,7 @@ class ProgramArt(QLabel):
             )
             self.setAccessibleName(tr("Photo of {title}", title=title))
         else:
-            painter.fillRect(frame, QColor(palette.banner))
+            painter.fillRect(frame, QColor(palette.surface_alt))
             glyph = assets.pixmap(assets.CATEGORY_ICONS[category], palette.primary, 64)
             painter.drawPixmap(
                 QRectF(frame.center().x() - 32, frame.center().y() - 40, 64, 64), glyph, QRectF(glyph.rect())
@@ -231,17 +233,16 @@ class FeaturedBanner(QFrame):
         super().__init__()
         self.setProperty("banner", True)
         row = QHBoxLayout(self)
-        row.setContentsMargins(16, 16, 20, 16)
-        row.setSpacing(20)
-        self.art = ProgramArt(200, 128)
+        row.setContentsMargins(16, 16, 16, 16)
+        row.setSpacing(24)
+        self.art = ProgramArt(192, 128)
         row.addWidget(self.art)
         text = QVBoxLayout()
-        text.setSpacing(4)
-        self.eyebrow = make_label(tr("Happening next"), "eyebrow")
-        self.title = make_label("", "display", wrap=True)
+        text.setSpacing(8)
+        # One heading that says what this is ("Happening next: ..."), not a small label stacked above it.
+        self.title = make_label("", "section", wrap=True)
         self.when = make_label("", "subtitle", wrap=True)
         self.description = make_label("", wrap=True)
-        text.addWidget(self.eyebrow)
         text.addWidget(self.title)
         text.addWidget(self.when)
         text.addWidget(self.description)
@@ -255,7 +256,7 @@ class FeaturedBanner(QFrame):
     def show_event(self, overview: ShiftOverview, description: str, photo: bytes | None) -> None:
         shift = overview.shift
         self.art.show_program(overview.category, photo, overview.opportunity_title)
-        self.title.setText(overview.opportunity_title)
+        self.title.setText(tr("Happening next: {title}", title=overview.opportunity_title))
         spots = overview.open_spots
         self.when.setText(
             tr_n(
@@ -286,19 +287,19 @@ class FeaturedBanner(QFrame):
 
 
 class Callout(QFrame):
-    """A calm panel near the bottom of a home screen — an invitation, never a pop-up."""
+    """A plain section near the bottom of a home screen: an invitation, never a pop-up."""
 
     def __init__(self, icon_name: str) -> None:
         super().__init__()
         self.setProperty("callout", True)
         row = QHBoxLayout(self)
-        row.setContentsMargins(18, 14, 18, 14)
-        row.setSpacing(14)
+        row.setContentsMargins(0, 24, 0, 8)
+        row.setSpacing(16)
         self.icon = QLabel()
-        self.icon.setPixmap(assets.pixmap(icon_name, current_palette().info, 28))
+        self.icon.setPixmap(assets.pixmap(icon_name, current_palette().primary, 24))
         row.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignTop)
         text = QVBoxLayout()
-        text.setSpacing(2)
+        text.setSpacing(4)
         self.heading = make_label("", "section", wrap=True)
         self.body = make_label("", wrap=True)
         text.addWidget(self.heading)
@@ -351,7 +352,7 @@ def relative_time(moment: datetime, now: datetime) -> str:
         return tr_n("{count} hour ago", "{count} hours ago", hours)
     days = hours // 24
     if days < 7:
-        return "yesterday" if days == 1 else tr("{days} days ago", days=days)
+        return tr("yesterday") if days == 1 else tr("{days} days ago", days=days)
     return format_day_short(moment.date())
 
 
@@ -380,8 +381,9 @@ class ActivityFeed(QListWidget):
 
 class ShiftCalendar(QCalendarWidget):
     """
-    Month calendar that dots each day with shifts: marigold if spots are still
-    open, green if every shift is full, gray for days already past.
+    Month calendar that dots each day with shifts: amber (the "look here" color)
+    if spots are still open, indigo if every shift is full, gray for days
+    already past. The dots are a summary; the day's list says it in words.
     """
 
     def __init__(self) -> None:
@@ -395,10 +397,18 @@ class ShiftCalendar(QCalendarWidget):
 
     def restyle(self) -> None:
         """Weekends in normal text color: red reads as an error, not a weekend."""
+        palette = current_palette()
         text_format = QTextCharFormat()
-        text_format.setForeground(QColor(current_palette().text))
+        text_format.setForeground(QColor(palette.text))
         for day in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
             self.setWeekdayTextFormat(day, text_format)
+        # Month arrows: the same thin chevron used everywhere else, instead of Qt's solid triangles.
+        down = assets.pixmap("chevron-down", palette.text, 18)
+        for name, angle in (("qt_calendar_prevmonth", 90), ("qt_calendar_nextmonth", -90)):
+            button = self.findChild(QToolButton, name)
+            if button is not None:
+                button.setIcon(QIcon(down.transformed(QTransform().rotate(angle))))
+                button.setIconSize(QSize(18, 18))
 
     def set_shifts(self, overviews: Iterable[ShiftOverview], today: date | None = None) -> None:
         self._today = today or date.today()
@@ -422,7 +432,7 @@ class ShiftCalendar(QCalendarWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
         past = day < self._today
-        color = palette.text_muted if past else (palette.attention if spots else palette.primary)
+        color = palette.text_muted if past else (palette.attention_fill if spots else palette.primary)
         painter.setBrush(QColor(color))
         radius = 3.5
         dots = min(count, 3)

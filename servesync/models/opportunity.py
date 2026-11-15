@@ -131,7 +131,7 @@ class Shift:
                 errors.add(
                     "ends_at",
                     tr(
-                        ("A shift cannot be longer than {MAX_SHIFT_HOURS} hours — check AM/PM on the end time."),
+                        ("A shift cannot be longer than {MAX_SHIFT_HOURS} hours. Check AM/PM on the end time."),
                         MAX_SHIFT_HOURS=MAX_SHIFT_HOURS,
                     ),
                 )

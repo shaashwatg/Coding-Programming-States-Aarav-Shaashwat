@@ -137,16 +137,15 @@ class MainWindow(QMainWindow):
         bar.setObjectName("Sidebar")
         bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         column = QVBoxLayout(bar)
-        column.setContentsMargins(12, 16, 12, 12)
+        column.setContentsMargins(16, 16, 16, 16)
         column.setSpacing(4)
 
         heading = QHBoxLayout()
-        heading.setContentsMargins(6, 0, 0, 12)
-        heading.setSpacing(10)
-        logo = QLabel()
-        logo.setPixmap(assets.logo_pixmap(38))
-        logo.setAccessibleName(tr("ServeSync logo"))
-        heading.addWidget(logo)
+        heading.setContentsMargins(0, 0, 0, 16)
+        heading.setSpacing(8)
+        self.logo = QLabel()
+        self.logo.setAccessibleName(tr("ServeSync logo"))
+        heading.addWidget(self.logo)
         self.brand = QWidget()
         names = QVBoxLayout(self.brand)
         names.setContentsMargins(0, 0, 0, 0)
@@ -202,8 +201,8 @@ class MainWindow(QMainWindow):
         bar.setObjectName("TopBar")
         bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         row = QHBoxLayout(bar)
-        row.setContentsMargins(32, 10, 32, 10)
-        row.setSpacing(12)
+        row.setContentsMargins(32, 8, 32, 8)
+        row.setSpacing(16)
 
         self.ask_button = QPushButton()
         self.ask_button.setObjectName("AskButton")
@@ -223,7 +222,7 @@ class MainWindow(QMainWindow):
 
         self.account = QToolButton()
         self.account.setObjectName("UserMenu")
-        self.account.setText(f"{self.ctx.session.username}  ▾")
+        self.account.setText(self.ctx.session.username)  # the stylesheet draws the menu chevron
         self.account.setAccessibleName(tr("Account menu for {username}", username=self.ctx.session.username))
         self.account.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(self.account)
@@ -239,17 +238,21 @@ class MainWindow(QMainWindow):
 
     def _restyle_icons(self) -> None:
         """Recolor and resize icons for the current theme and text size."""
-        color = current_palette().sidebar_text
+        palette = current_palette()
+        color = palette.sidebar_text
         size = round(18 * current_scale())
-        self._nav_icons = {key: assets.icon(self.pages[key].icon_name, color, size) for key in self.nav_buttons}
+        self.logo.setPixmap(assets.logo_pixmap(palette.brand, 32))
+        # The current page's icon turns indigo along with its label (the "On" state of a checked button).
+        self._nav_icons = {
+            key: assets.two_state_icon(self.pages[key].icon_name, color, palette.sidebar_accent, size)
+            for key in self.nav_buttons
+        }
         for button in (*self.nav_buttons.values(), self.help_button):
             button.setIconSize(QSize(size, size))
         self.help_button.setIcon(assets.icon("help", color, size))
-        self.cta.setIcon(
-            assets.icon("user-plus" if self.ctx.session.is_leader else "search", current_palette().on_cta, size)
-        )
+        self.cta.setIcon(assets.icon("user-plus" if self.ctx.session.is_leader else "search", palette.on_cta, size))
         self.cta.setIconSize(QSize(size, size))
-        self.ask_button.setIcon(assets.icon("sparkles", current_palette().primary, size))
+        self.ask_button.setIcon(assets.icon("search", palette.text_muted, size))
         self.ask_button.setIconSize(QSize(size, size))
         self._fit_navigation()
         QTimer.singleShot(0, lambda: self._move_indicator(animated=False))

@@ -28,8 +28,10 @@ from servesync.models import Appearance, Theme
 from servesync.services import FixedClock, Services
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
+from servesync.ui.dialogs.application_dialog import ApplicationDialog
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
+from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
 from servesync.ui.dialogs.shift_detail import MATCH_TAB, ROSTER_TAB, ShiftDetailDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
@@ -82,6 +84,7 @@ def main() -> int:
         spanish = language is Language.SPANISH
 
         save(app, LoginDialog(services), args.output, f"01-sign-in{suffix}", (900, 560))
+        save(app, ApplicationDialog(services), args.output, f"01-apply{suffix}", (760, 900))
 
         def capture_role(username: str, prefix: str, extra: Callable[[AppContext, MainWindow], None]) -> None:
             session = services.auth.sign_in(username, DEMO_PASSWORD)
@@ -133,8 +136,12 @@ def main() -> int:
             reports = window.pages["reports"]
             reports.kind_box.setCurrentIndex(1)  # type: ignore[attr-defined]  # Program impact
             save(app, window, args.output, f"02-9f-report-program{suffix}")
+            box = reports.kind_box  # type: ignore[attr-defined]
+            box.setCurrentIndex(box.findData("IMPACT_SUMMARY"))
+            save(app, window, args.output, f"02-9i-impact-summary{suffix}")
             window.ctx.events.status_message.emit(tr("Saved {title}.", title="servesync-program-impact.pdf"))
             save(app, window, args.output, f"02-9g-toast{suffix}")
+            save(app, KioskDialog(ctx), args.output, f"02-9h-kiosk{suffix}", (1360, 860))
 
         capture_role("coordinator", "02-leader", leader_extras)
         capture_role("priya.patel", "03-volunteer", lambda _ctx, _window: None)

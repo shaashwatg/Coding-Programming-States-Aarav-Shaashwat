@@ -198,7 +198,7 @@ class ChartView(QWidget):
         """A print-quality picture on white (for the PDF), independent of the screen theme."""
         height = max(int(self.sizeHint().height() * width / 620), 200)
         image = QImage(width, height, QImage.Format.Format_ARGB32)
-        image.fill(QColor("#FFFFFF"))
+        image.fill(QColor(LIGHT.surface))  # paper: the light theme's white surface
         painter = QPainter(image)
         try:
             font = QFont(self.font())
@@ -296,7 +296,7 @@ def _paint_bars(
         painter.setBrush(QColor(palette.surface_alt))
         painter.drawRoundedRect(QRectF(left, y + bar * 0.2, right - left, bar * 0.6), 3, 3)
         width = max((right - left) * (value / peak) * min(progress, 1.0), 2.0 if value else 0.0)
-        painter.setBrush(QColor(palette.primary) if index == highlight else fill)
+        painter.setBrush(QColor(palette.chart[1]) if index == highlight else fill)  # active series: amber
         bar_rect = QRectF(left, y + bar * 0.1, width, bar * 0.8)
         painter.drawRoundedRect(bar_rect, 4, 4)
         if index == highlight:
@@ -371,7 +371,7 @@ def _paint_line(
     for index, point in enumerate(points):
         radius = 5.5 if index == highlight else 3.5
         painter.setPen(QPen(QColor(palette.surface), 2))
-        painter.setBrush(QColor(palette.primary if index == highlight else palette.chart[0]))
+        painter.setBrush(QColor(palette.chart[1] if index == highlight else palette.chart[0]))
         painter.drawEllipse(point, radius, radius)
         if index == highlight:
             painter.setPen(QPen(QColor(palette.focus), palette.focus_width))

@@ -8,9 +8,9 @@ buttons to open the roster or run Smart Match instead.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QUrl, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
 
 from servesync.core.i18n import tr
 from servesync.models import AccessNeed, ShiftOverview
@@ -45,7 +45,7 @@ class ShiftInfoPanel(Panel):
         self.body.addWidget(self.verdict)
 
         actions = QHBoxLayout()
-        self.primary = make_button(tr("Sign up"), kind="primary", on_click=self._primary)
+        self.primary = make_button(tr("Sign up"), kind="secondary", on_click=self._primary)
         self.secondary = make_button(tr("Smart Match"), on_click=self._secondary)
         actions.addWidget(self.primary)
         actions.addWidget(self.secondary)
@@ -167,3 +167,18 @@ def stacked(*widgets: QWidget) -> QWidget:
     for widget in widgets:
         column.addWidget(widget)
     return holder
+
+
+def scrollable(panel: QWidget) -> QScrollArea:
+    """
+    Wrap a details panel so it scrolls instead of squeezing. Beside a table in a
+    splitter, a long description at large text sizes would otherwise be pressed
+    into too little height and its lines would overlap.
+    """
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.Shape.NoFrame)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    area.setWidget(panel)
+    area.setMinimumWidth(300)
+    return area

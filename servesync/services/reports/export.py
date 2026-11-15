@@ -21,6 +21,11 @@ from servesync import __app_name__
 from servesync.core.i18n import tr
 from servesync.services.reports.model import Report, ReportColumn, ReportKind, ValueKind, format_value
 
+# Ink for printed reports. Paper is always white, so these don't follow the screen theme;
+# they are the light theme's slate, secondary slate and hairlines (see ui/theme.py).
+PRINT_TEXT, PRINT_MUTED = "#1E2433", "#454D61"
+PRINT_RULE, PRINT_RULE_STRONG = "#E3E6EE", "#7C8496"
+
 _FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -67,20 +72,20 @@ def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Seq
     columns = chosen_columns(report, keys)
     e = escape
     parts = [
-        "<html><body style='font-family: sans-serif; color: #111;'>",
-        f"<p style='color:#444; margin:0'>{e(report.organization_name)}</p>",
+        f"<html><body style='font-family: sans-serif; color: {PRINT_TEXT};'>",
+        f"<p style='color:{PRINT_MUTED}; margin:0'>{e(report.organization_name)}</p>",
         f"<h1 style='margin:2px 0 4px 0'>{e(report.title)}</h1>",
         f"<p style='margin:0 0 2px 0'><b>{e(report.filters.describe())}</b></p>",
     ]
     parts += [f"<p style='margin:0'>{e(line)}</p>" for line in report.context]
     generated = format_value(ValueKind.DATE, report.generated_at)
     prepared = tr("Prepared {date} with {app}", date=generated, app=__app_name__)
-    parts.append(f"<p style='color:#444; margin:4px 0 12px 0'>{e(prepared)}</p>")
+    parts.append(f"<p style='color:{PRINT_MUTED}; margin:4px 0 12px 0'>{e(prepared)}</p>")
     if report.figures:
         cells = "".join(
             f"<td style='padding:6px 14px 6px 0; vertical-align:top'><span style='font-size:16pt'><b>"
             f"{e(f.value)}</b></span><br>{e(f.label)}"
-            f"{'<br><span style=color:#555>' + e(f.note) + '</span>' if f.note else ''}</td>"
+            f"{f'<br><span style=color:{PRINT_MUTED}>' + e(f.note) + '</span>' if f.note else ''}</td>"
             for f in report.figures
         )
         parts.append(f"<table><tr>{cells}</tr></table>")
@@ -96,19 +101,20 @@ def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Seq
         parts.append(f"<p>{e(tr('No records match these filters.'))}</p>")
     else:
         header = "".join(
-            f"<th align='{'right' if c.kind.is_numeric else 'left'}' style='border-bottom:1px solid #333; "
+            f"<th align='{'right' if c.kind.is_numeric else 'left'}' "
+            f"style='border-bottom:1px solid {PRINT_RULE_STRONG}; "
             f"padding:4px 6px'>{e(c.title)}</th>"
             for c in columns
         )
         body = []
-        for index, row in enumerate(report.rows):
-            shade = " style='background:#F2F2F2'" if index % 2 else ""
+        for row in report.rows:  # no zebra stripes: a hairline under each row reads more calmly
             cells = "".join(
-                f"<td align='{'right' if c.kind.is_numeric else 'left'}' style='padding:3px 6px'>"
+                f"<td align='{'right' if c.kind.is_numeric else 'left'}' "
+                f"style='padding:4px 6px; border-bottom:1px solid {PRINT_RULE}'>"
                 f"{e(format_value(c.kind, row.get(c.key)))}</td>"
                 for c in columns
             )
-            body.append(f"<tr{shade}>{cells}</tr>")
+            body.append(f"<tr>{cells}</tr>")
         parts.append(f"<table cellspacing='0' width='100%'><tr>{header}</tr>{''.join(body)}</table>")
 
     if report.kind is ReportKind.SERVICE_RECORD:

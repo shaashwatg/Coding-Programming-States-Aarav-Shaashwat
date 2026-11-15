@@ -23,7 +23,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QResizeEvent
 from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QStackedWidget, QTableView, QVBoxLayout, QWidget
 
 from servesync.ui.widgets.common import make_label
@@ -141,19 +141,18 @@ class RecordTable(QWidget, Generic[T]):
         self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.view.setAlternatingRowColors(True)
+        self.view.setAlternatingRowColors(False)  # hairlines, not stripes, separate rows
         self.view.setShowGrid(False)
         self.view.setSortingEnabled(True)
         self.view.setWordWrap(False)
         self.view.verticalHeader().setVisible(False)
-        self.view.verticalHeader().setDefaultSectionSize(38)
+        self.view.verticalHeader().setDefaultSectionSize(44)  # comfortable rows, also a full touch target
         header = self.view.horizontalHeader()
         header.setHighlightSections(False)
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        for position, column in enumerate(columns):
-            if column.stretch:
-                header.setSectionResizeMode(position, QHeaderView.ResizeMode.Stretch)
-        header.setStretchLastSection(not any(column.stretch for column in columns))
+        self._stretch = [position for position, column in enumerate(columns) if column.stretch]
+        self._stretching = False
+        header.setStretchLastSection(not self._stretch)
         self.sort_by(sort_column, descending)  # Qt would otherwise start with a descending sort
         self.view.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit(self.selected()))
         self.view.doubleClicked.connect(lambda index: self._activate(index))
@@ -173,7 +172,7 @@ class RecordTable(QWidget, Generic[T]):
         previous = self.selected()
         key = keep_selection(previous) if keep_selection and previous is not None else None
         self._model.set_records(records)
-        self.view.resizeColumnsToContents()
+        self._fit_columns()
         self._stack.setCurrentWidget(self.view if records else self._empty)
         if keep_selection and key is not None:
             for row, record in enumerate(self._model.records):
@@ -181,6 +180,28 @@ class RecordTable(QWidget, Generic[T]):
                     self.select_source_row(row)
                     break
         self.selection_changed.emit(self.selected())
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt API
+        super().resizeEvent(event)
+        self._fit_columns()
+
+    def _fit_columns(self) -> None:
+        """
+        Let the main text column (a "stretch" column) fill spare width, but only
+        when everything fits. Qt would otherwise squeeze it to a few letters at
+        large text sizes; instead it keeps its full width and the table scrolls
+        sideways, so no text is cut off.
+        """
+        header = self.view.horizontalHeader()
+        if self._stretching:  # measure natural widths first
+            for position in self._stretch:
+                header.setSectionResizeMode(position, QHeaderView.ResizeMode.Interactive)
+        self.view.resizeColumnsToContents()
+        needed = sum(header.sectionSize(i) for i in range(header.count()))
+        self._stretching = bool(self._stretch) and needed <= self.view.viewport().width()
+        if self._stretching:
+            for position in self._stretch:
+                header.setSectionResizeMode(position, QHeaderView.ResizeMode.Stretch)
 
     def set_empty_message(self, message: str) -> None:
         self._empty.setText(message)

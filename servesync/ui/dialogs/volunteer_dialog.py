@@ -100,7 +100,7 @@ class VolunteerDialog(FormDialog):
         line = self.pronouns.lineEdit()
         if line is not None:
             line.setMaxLength(30)
-            line.setPlaceholderText(tr("Optional — pick or type"))
+            line.setPlaceholderText(tr("Optional: pick or type"))
         self.add_field("pronouns", tr("Pronouns"), self.pronouns, tr("Only shown if shared. ServeSync never guesses."))
 
         self.email = QLineEdit()

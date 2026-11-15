@@ -53,7 +53,7 @@ class ProgramsPage(Page):
                     "Pick a program to see its shifts. Open a shift to manage its roster, "
                     "take attendance, or find volunteers with Smart Match."
                 ),
-                [make_button(tr("New program"), kind="primary", on_click=self._new_program)],
+                [make_button(tr("New program"), kind="secondary", on_click=self._new_program)],
             )
         )
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -109,7 +109,7 @@ class ProgramsPage(Page):
         detail.body.addLayout(top)
         lifecycle = QHBoxLayout()
         self.edit_button = make_button(tr("Edit program"), on_click=self._edit_program)
-        self.publish_button = make_button(tr("Publish"), kind="primary", on_click=self._publish)
+        self.publish_button = make_button(tr("Publish"), kind="secondary", on_click=self._publish)
         self.close_button = make_button(tr("Close program"), on_click=self._close)
         for button in (self.edit_button, self.publish_button, self.close_button):
             lifecycle.addWidget(button)
@@ -126,7 +126,7 @@ class ProgramsPage(Page):
         self.when_filter.currentIndexChanged.connect(lambda _i: self._show_shifts())
         shift_filters.addWidget(self.when_filter)
         shift_filters.addStretch(1)
-        self.add_shift_button = make_button(tr("Add shifts"), kind="primary", on_click=self._add_shifts)
+        self.add_shift_button = make_button(tr("Add shifts"), kind="secondary", on_click=self._add_shifts)
         shift_filters.addWidget(self.add_shift_button)
         shifts.body.addLayout(shift_filters)
         self.shifts: RecordTable[ShiftOverview] = RecordTable(
@@ -146,7 +146,7 @@ class ProgramsPage(Page):
                 Column(
                     tr("Open"),
                     lambda o: o.open_spots,
-                    color=lambda o: current_palette().attention if o.open_spots else None,
+                    color=lambda o: current_palette().success if o.open_spots else None,  # open spots: emerald
                     align_right=True,
                 ),
                 Column(tr("Notes"), lambda o: o.shift.notes),

@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 506 automated tests, including the interface
+python -m pytest          # 511 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -218,7 +218,7 @@ servesync/
 └── ui/
     ├── app.py           Start-up, sign-in/sign-out cycle, last-resort error handler
     ├── main_window.py   Sidebar (logo, pages), header (Ask, call to action), shortcuts
-    ├── theme.py         Design tokens, four themes (AAA contrast), spacing, stylesheet
+    ├── theme.py         Design tokens (3 brand colors), four themes (AAA contrast), 8 px grid, stylesheet
     ├── motion.py        Spring easing; every animation honors Reduce motion
     ├── feedback.py      Screen-reader announcer (live region) and toasts
     ├── report_files.py  Atomic CSV and PDF saving
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   506 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   511 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -257,7 +257,7 @@ devtools.py              Command-line developer and demo tools
 | Model/view                     | `ui/widgets/table.py`         | One sortable, accessible table for every list    |
 | Observer (event hub)           | `ui/context.py`               | Every screen refreshes after any change          |
 | Pure analytics                 | `services/reports/analytics.py` | Every report figure is unit-tested math        |
-| Design tokens                  | `ui/theme.py`                 | One change restyles every screen; contrast tested |
+| Design tokens                  | `ui/theme.py`                 | One change restyles every screen; contrast tested; no hex values in screens |
 
 ---
 
@@ -273,12 +273,15 @@ devtools.py              Command-line developer and demo tools
 
 | Principle | How ServeSync applies it |
 |---|---|
-| **1. A strong design system** | Named color tokens (evergreen, harbor blue, marigold, brick, ink); two complementary fonts — Atkinson Hyperlegible for interface text and Source Serif 4 for titles and figures; one icon set (Lucide), with each idea keeping the same icon everywhere |
-| **2. Visually pleasing, functional choices** | Green for growth and blue for trust; readable fonts; generous whitespace; click targets at least 44 px tall; Gestalt grouping (related items share a panel, icon, and color) |
+| **1. A strong design system** | Three colors with one job each, defined once as tokens: deep indigo for actions and navigation, warm amber only to mark what needs attention, emerald only for good news (success, open spots, the Smart Match score). Two fonts: Atkinson Hyperlegible for text and Manrope for headings. One icon set (Lucide), with each idea keeping the same icon everywhere |
+| **2. Visually pleasing, functional choices** | A calm, flat layout on an 8 px grid: sections separated by space and hairlines, cards only for separate objects, one filled button per screen; readable fonts; click targets at least 44 px tall; Gestalt grouping |
 | **3. Regularly updated content** | A dynamic *Happening next* banner (one featured event, never a carousel), a live activity feed, a shift calendar, and impact figures that update as hours are recorded |
 | **4. Images and video that build empathy** | Each program can show the organization's own photo, automatically resized under 300 kB; story-video links open only when someone chooses to watch (never autoplay); original category artwork when no photo is added |
 | **5. Familiar layout conventions** | Logo top-left, pages in a sidebar that keeps your place visible, one visually distinct call-to-action button in the upper-right (*Add volunteer* for leaders, *Find a shift* for volunteers); the home page leads with the mission statement, impact statistics, and a call to action; a calm callout panel sits at the bottom — no pop-up asks |
 | **6. Easy to scan** | Concise home pages; headings, bullet points, and short sentences; deeper detail on inner pages; master-detail layouts keep your place |
+
+The full reasoning behind the colors, type, layout and accessibility choices is in
+[docs/design-rationale.md](docs/design-rationale.md).
 
 ### User journeys
 
@@ -477,7 +480,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 506 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 511 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |
@@ -511,7 +514,7 @@ Override with the `SERVESYNC_DATA_DIR` environment variable or `--data-dir`. Log
 | SQLite                    | Embedded database engine     | Public domain                             |
 | PySide6 (Qt for Python)   | Desktop user interface       | LGPL v3 (used unmodified, as a library)   |
 | Atkinson Hyperlegible     | Interface font (Braille Institute) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
-| Source Serif 4            | Heading font (Adobe)         | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| Manrope                   | Heading font (The Manrope Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
 | Lucide icons              | Icon set                     | ISC License (`ui/assets/licenses`)        |
 | pytest-qt                 | Interface tests (development only) | MIT                                 |
 | PyInstaller               | Builds the standalone app (development only) | GPL v2 with bootloader exception — the built app may be distributed under any license |

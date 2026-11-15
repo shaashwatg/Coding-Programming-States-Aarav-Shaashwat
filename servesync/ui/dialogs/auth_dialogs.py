@@ -23,6 +23,7 @@ from servesync.core.i18n import Language, current_language, tr
 from servesync.data.seed import DEMO_ORGANIZATION_NAME, DEMO_PASSWORD
 from servesync.services import Services, Session
 from servesync.ui import assets
+from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import BusyCursor, Panel, make_button, make_label
 from servesync.ui.widgets.forms import FormDialog
 
@@ -42,10 +43,10 @@ def _brand_panel(organization: str, mission: str) -> QFrame:
     panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
     panel.setMinimumWidth(320)
     column = QVBoxLayout(panel)
-    column.setContentsMargins(32, 36, 32, 32)
+    column.setContentsMargins(32, 40, 32, 32)
     column.setSpacing(10)
     logo = QLabel()
-    logo.setPixmap(assets.logo_pixmap(56))
+    logo.setPixmap(assets.logo_pixmap(current_palette().brand, 48))
     logo.setAccessibleName(tr("ServeSync logo"))
     column.addWidget(logo)
     brand = QLabel("ServeSync")
@@ -55,7 +56,7 @@ def _brand_panel(organization: str, mission: str) -> QFrame:
     org.setObjectName("OrgName")
     org.setWordWrap(True)
     column.addWidget(org)
-    column.addSpacing(18)
+    column.addSpacing(16)
     if mission:
         statement = make_label(mission, "mission", wrap=True)
         statement.setAccessibleName(tr("Our mission: {mission}", mission=mission))

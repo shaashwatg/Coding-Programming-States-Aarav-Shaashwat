@@ -96,7 +96,7 @@ ARTICLES: tuple[HelpArticle, ...] = (
             "Smart Match scores each eligible person from 0 to 100 using five factors: availability (30), "
             "skills (30), reliability (20), experience (10), and fair share (10).",
             "Anyone too young, not yet approved, already booked, or double-booked is never suggested.",
-            "People whose access needs a program doesn't list are shown last, with the reason — never hidden.",
+            "People whose access needs a program doesn't list are shown last, with the reason, and never hidden.",
         ),
     ),
     HelpArticle(

@@ -184,7 +184,7 @@ class VolunteersPage(Page):
         actions = QHBoxLayout()
         self.edit_button = make_button(tr("Edit profile"), on_click=self._edit)
         self.approve_button = make_button(
-            tr("Approve"), kind="primary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
+            tr("Approve"), kind="secondary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
         )
         self.archive_button = make_button(tr("Archive"), on_click=lambda: self._change(VolunteerStatus.INACTIVE))
         self.delete_button = make_button(tr("Delete"), kind="danger", on_click=self._delete)

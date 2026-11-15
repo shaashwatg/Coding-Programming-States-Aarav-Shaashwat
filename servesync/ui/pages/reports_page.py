@@ -79,7 +79,7 @@ class ReportsPage(Page):
             tr("Export CSV"), tooltip=tr("Save exactly what you see as a spreadsheet file"), on_click=self._export_csv
         )
         self.export_pdf = make_button(
-            tr("Save PDF"), kind="primary", tooltip=tr("Save a printable copy"), on_click=self._export_pdf
+            tr("Save PDF"), kind="secondary", tooltip=tr("Save a printable copy"), on_click=self._export_pdf
         )
         self.columns_button = QToolButton()
         self.columns_button.setText(tr("Columns"))
@@ -153,7 +153,7 @@ class ReportsPage(Page):
 
         # ---------------------------------------------------------- output
         self.figures_row = QHBoxLayout()
-        self.figures_row.setSpacing(12)
+        self.figures_row.setSpacing(24)
         self.layout_.addLayout(self.figures_row)
         self.insights = Panel(tr("What stands out"))
         self.insight_list = QVBoxLayout()
@@ -311,8 +311,9 @@ class ReportsPage(Page):
         clear_layout(self.figures_row)
         for figure in report.figures:
             tile = Panel()
-            tile.setProperty("tile", True)
-            tile.body.setSpacing(2)
+            tile.setProperty("kpi", True)  # a figure set off by a hairline, like the dashboard's
+            tile.body.setContentsMargins(16, 4, 8, 4)
+            tile.body.setSpacing(4)
             value = make_label(figure.value, "figure")
             label = make_label(figure.label, "figure-label", wrap=True)
             tile.body.addWidget(value)

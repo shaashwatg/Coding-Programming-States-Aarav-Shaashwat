@@ -268,7 +268,7 @@ class AssistantService(Service):
         when = period.label if period else tr("in total")
         if hours:
             text = tr(
-                "You've served {hours} {when} — worth about ${value:,.0f} to the community.",
+                "You've served {hours} {when}, worth about ${value:,.0f} to the community.",
                 hours=_hours(hours),
                 when=when,
                 value=value,
@@ -295,7 +295,7 @@ class AssistantService(Service):
         upcoming = self._store.assignments.upcoming_scheduled(after=self._clock.now(), volunteer_id=volunteer_id)
         records = {r.assignment.assignment_id: r for r in self._store.assignments.history(volunteer_id)}
         lines = [
-            f"• {_when(records[a.assignment_id].starts_at)} — {records[a.assignment_id].opportunity_title}"
+            f"• {_when(records[a.assignment_id].starts_at)}, {records[a.assignment_id].opportunity_title}"
             for a in upcoming[:3]
             if a.assignment_id in records
         ]  # a date and a program name: nothing to translate
@@ -344,7 +344,7 @@ class AssistantService(Service):
             )
         lines = [
             tr(
-                "• {program}, {when} — Fit {score}",
+                "• {program}, {when} (fit {score})",
                 program=m.overview.opportunity_title,
                 when=_when(m.overview.shift.starts_at),
                 score=m.score,
@@ -431,7 +431,7 @@ class AssistantService(Service):
         programs = sum(1 for row in report.rows if _number(row, "hours"))
         if hours:
             text = tr(
-                "Volunteers served {hours} {when} — {people} people across {programs} programs, "
+                "Volunteers served {hours} {when}: {people} people across {programs} programs, "
                 "worth about ${value:,.0f}.",
                 hours=_hours(hours),
                 when=period.label,
@@ -519,7 +519,7 @@ class AssistantService(Service):
             )
         lines = [
             tr(
-                "• {when} — {opportunity_title}: {open_spots} of {capacity} spots open",
+                "• {when}, {opportunity_title}: {open_spots} of {capacity} spots open",
                 when=_when(s.shift.starts_at),
                 opportunity_title=s.opportunity_title,
                 open_spots=s.open_spots,
@@ -564,7 +564,7 @@ class AssistantService(Service):
         names = {p.record_id: p.display for p in self._people()}
         top = sorted(hours.items(), key=lambda item: (-item[1], names.get(item[0], "")))[:3]
         lines = [
-            f"{index}. {names.get(vid, tr('Unknown'))} — {_hours(h)}" for index, (vid, h) in enumerate(top, start=1)
+            f"{index}. {names.get(vid, tr('Unknown'))}: {_hours(h)}" for index, (vid, h) in enumerate(top, start=1)
         ]
         return Answer(
             tr("Most hours {label}:", label=period.label) + "\n" + "\n".join(lines),
@@ -605,7 +605,7 @@ class AssistantService(Service):
                 tr("No one is waiting for approval right now."), understood=tr("applicants waiting for review")
             )
         lines = [
-            tr("• {name} — waiting {days}", name=v.full_name, days=_days((today - v.joined_on).days))
+            tr("• {name}, waiting {days}", name=v.full_name, days=_days((today - v.joined_on).days))
             for v in waiting[:LIST_LIMIT]
         ]
         return Answer(
@@ -688,7 +688,7 @@ class AssistantService(Service):
             )
         lines = [
             tr(
-                "{index}. {program} — {hours}, {number:.0f}% of spots filled",
+                "{index}. {program}: {hours}, {number:.0f}% of spots filled",
                 index=index,
                 program=row["program"],
                 hours=_hours(_number(row, "hours")),

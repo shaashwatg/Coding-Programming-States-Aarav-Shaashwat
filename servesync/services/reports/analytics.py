@@ -309,9 +309,9 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if share >= 50:
             insights.append(
                 tr_n(
-                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "The top {count} volunteer (20%) gave {share:.0f}% of all hours. Consider spreading "
                     "shifts around to prevent burnout.",
-                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours — consider spreading "
+                    "The top {count} volunteers (20%) gave {share:.0f}% of all hours. Consider spreading "
                     "shifts around to prevent burnout.",
                     top_count,
                     share=share,
@@ -330,8 +330,8 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if idle and not scoped:
         insights.append(
             tr_n(
-                "{count} active volunteer didn't serve in this period — a friendly check-in could bring them back.",
-                "{count} active volunteers didn't serve in this period — a friendly check-in could bring them back.",
+                "{count} active volunteer didn't serve in this period. A friendly check-in could bring them back.",
+                "{count} active volunteers didn't serve in this period. A friendly check-in could bring them back.",
                 len(idle),
             )
         )
@@ -345,9 +345,9 @@ def volunteer_hours(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if shaky:
         insights.append(
             tr_n(
-                "{count} volunteer kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "{count} volunteer kept fewer than {limit:.0f}% of their commitments. Ask whether their "
                 "schedule has changed.",
-                "{count} volunteers kept fewer than {limit:.0f}% of their commitments — ask whether their "
+                "{count} volunteers kept fewer than {limit:.0f}% of their commitments. Ask whether their "
                 "schedule has changed.",
                 len(shaky),
                 limit=LOW_RELIABILITY_PERCENT,
@@ -460,7 +460,7 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
             insights.append(
                 tr(
                     (
-                        "'{program}' fills only {fill_rate:.0f}% of its spots — try Smart "
+                        "'{program}' fills only {fill_rate:.0f}% of its spots. Try Smart "
                         "Match on its next shifts, or offer fewer spots."
                     ),
                     program=weakest.program,
@@ -471,7 +471,7 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
     for row in flaky[:2]:
         insights.append(
             tr(
-                ("'{program}' has a {value:.0f}% no-show rate — a reminder the day before usually helps."),
+                ("'{program}' has a {value:.0f}% no-show rate. A reminder the day before usually helps."),
                 program=row.program,
                 value=100 - (row.show_up_rate or 0),
             )
@@ -570,9 +570,9 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if to_record:
         insights.append(
             tr_n(
-                "{count} shift already started but still has attendance to record — open it from the "
+                "{count} shift already started but still has attendance to record. Open it from the "
                 "Calendar so the hours count.",
-                "{count} shifts already started but still have attendance to record — open them from the "
+                "{count} shifts already started but still have attendance to record. Open them from the "
                 "Calendar so the hours count.",
                 to_record,
             )
@@ -583,8 +583,8 @@ def shift_attendance(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if weekday_fill[best] > weekday_fill[worst]:
             insights.append(
                 tr(
-                    "{best} fill best ({best_rate:.0f}%) and {worst} least ({worst_rate:.0f}%) — "
-                    "plan big events for {best}.",
+                    "{best} fill best ({best_rate:.0f}%) and {worst} least ({worst_rate:.0f}%). "
+                    "Plan big events for {best}.",
                     best=weekday_plural(best),
                     best_rate=weekday_fill[best],
                     worst=weekday_plural(worst),
@@ -694,7 +694,10 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         if deepest.source != rows[0].source and deepest.hours_each > 0:
             insights.append(
                 tr(
-                    ("Volunteers from {source} serve the most hours each ({hours}) — a channel worth investing in."),
+                    (
+                        "Volunteers from {source} serve the most hours each ({hours}). "
+                        "That channel is worth investing in."
+                    ),
                     source=deepest.source,
                     hours=_hours(deepest.hours_each),
                 )
@@ -704,8 +707,8 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         name, invited = referrers.most_common(1)[0]
         insights.append(
             tr_n(
-                "{name} has referred {count} volunteer — worth a thank-you.",
-                "{name} has referred {count} volunteers — worth a thank-you.",
+                "{name} has referred {count} volunteer. Consider a thank-you note.",
+                "{name} has referred {count} volunteers. Consider a thank-you note.",
                 invited,
                 name=name,
             )
@@ -713,8 +716,8 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
     if waiting:
         insights.append(
             tr_n(
-                "{count} applicant has waited more than {days} days for review — quick replies keep people interested.",
-                "{count} applicants have waited more than {days} days for review — quick replies keep people "
+                "{count} applicant has waited more than {days} days for review. Quick replies keep people interested.",
+                "{count} applicants have waited more than {days} days for review. Quick replies keep people "
                 "interested.",
                 waiting,
                 days=APPLICANT_WAIT_DAYS,
