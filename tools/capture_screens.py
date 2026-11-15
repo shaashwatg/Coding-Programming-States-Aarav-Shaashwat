@@ -33,6 +33,7 @@ from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
+from servesync.ui.dialogs.roles_dialog import RolesDialog
 from servesync.ui.dialogs.shift_detail import MATCH_TAB, ROSTER_TAB, ShiftDetailDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.main_window import MainWindow
@@ -115,6 +116,8 @@ def main() -> int:
                     f"02-9b-roster{suffix}",
                     (980, 700),
                 )
+                roles = services.scheduling.roles(ctx.session, shift_id)
+                save(app, RolesDialog(ctx, shift_id, roles), args.output, f"02-9k-roles{suffix}", (820, 640))
             dialog = VolunteerDialog(ctx, None)
             dialog.first_name.setText("J0rdan")
             dialog.email.setText("jordan@gmial.com")

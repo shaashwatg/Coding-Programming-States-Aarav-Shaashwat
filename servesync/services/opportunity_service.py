@@ -186,7 +186,24 @@ class OpportunityService(Service):
                 )
             if (shift.starts_at, shift.ends_at) != (existing.starts_at, existing.ends_at):
                 self._check_reschedule(shift.shift_id, shift)
-            return self._store.shifts.update(shift)
+            roles = self._store.shifts.roles(shift.shift_id)
+            if shift.capacity != existing.capacity:
+                # Capacity is the total of the roles. With one role, resizing the shift resizes it;
+                # with several, only the leader knows which role should change.
+                if len(roles) > 1:
+                    raise ValidationError.single(
+                        "capacity",
+                        tr_n(
+                            "This shift has {count} role. Change the number of people in each role instead.",
+                            "This shift has {count} roles. Change the number of people in each role instead.",
+                            len(roles),
+                        ),
+                    )
+                self._store.shifts.set_single_role_capacity(shift.shift_id, shift.capacity)
+            saved = self._store.shifts.update(shift)
+            if shift.capacity > existing.capacity:
+                self.on_spots_freed([shift.shift_id])
+            return saved
 
     def delete_shift(self, session: Session, shift_id: int) -> None:
         """Remove a shift nobody has signed up for (otherwise the database refuses)."""

@@ -19,7 +19,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
 from servesync.core.i18n import mark, tr, tr_n
-from servesync.models import AssignmentStatus, OpportunityCategory, ServiceRecord, ShiftOverview
+from servesync.models import AssignmentStatus, Notice, OpportunityCategory, ServiceRecord, ShiftOverview
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
 from servesync.ui.dialogs.goal_dialog import HourGoalPanel
@@ -44,7 +44,7 @@ from servesync.ui.widgets.common import (
 )
 from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
 from servesync.ui.widgets.table import Column, RecordTable
-from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard
+from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard, UpdatesPanel
 
 
 class HomePage(Page):
@@ -56,6 +56,8 @@ class HomePage(Page):
         super().__init__(ctx, scrollable=True)
         self.header = PageHeader(tr("Welcome"), tr("Here's what's coming up and where you could help next."))
         self.layout_.addWidget(self.header)
+        self.updates = UpdatesPanel()
+        self.layout_.addWidget(self.updates)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
         self.strip = ImpactStrip(4)
@@ -125,6 +127,12 @@ class HomePage(Page):
         mission = services.settings.mission_statement()
         self.mission.setText(tr("Our mission: {mission}", mission=mission) if mission else "")
         self.mission.setVisible(bool(mission))
+        self.updates.set_updates(
+            [
+                (describe_notice(notice), partial(self._dismiss, notice.notice_id))
+                for notice in services.scheduling.notices(session, volunteer_id)
+            ]
+        )
         reliability = f"{stats.reliability:.0%}" if stats.reliability is not None else tr("New")
         self.strip.set_figures(
             [
@@ -185,6 +193,11 @@ class HomePage(Page):
     def _sign_up(self, shift_id: int, title: str) -> None:
         self.ctx.services.scheduling.sign_up(self.ctx.session, shift_id, self.ctx.session.volunteer_id or 0)
         self.ctx.changed(tr("You're signed up for {title}. Thank you!", title=title))
+
+    @guarded
+    def _dismiss(self, notice_id: int) -> None:
+        self.ctx.services.scheduling.dismiss_notice(self.ctx.session, notice_id)
+        self.reload()
 
     @guarded
     def _cancel(self) -> None:
@@ -417,3 +430,14 @@ class ProfilePage(Page):
     def _password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
             self.ctx.events.status_message.emit(tr("Password changed."))
+
+
+def describe_notice(notice: Notice) -> str:
+    """A notice in the reader's language (stored as a kind and a shift, not as a sentence)."""
+    role = tr(" as {role}", role=notice.role_name) if notice.role_name else ""
+    return tr(
+        "A spot opened on {program}, {when}, and you were next on the waitlist. You're now signed up{role}.",
+        program=notice.opportunity_title,
+        when=format_when(notice.starts_at, notice.ends_at),
+        role=role,
+    )

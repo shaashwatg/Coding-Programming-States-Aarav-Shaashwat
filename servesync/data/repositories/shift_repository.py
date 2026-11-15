@@ -11,11 +11,18 @@ from servesync.core.errors import RecordInUseError, RecordNotFoundError
 from servesync.core.i18n import mark, tr
 from servesync.data.converters import datetime_from_db, datetime_to_db
 from servesync.data.repositories.base import Repository
-from servesync.models import OpportunityCategory, OpportunityStatus, Shift, ShiftOverview
+from servesync.models import OpportunityCategory, OpportunityStatus, RoleOverview, Shift, ShiftOverview, ShiftRole
 
 _ENTITY = mark("Shift")
 
 _SELECT_SHIFT = "SELECT shift_id, opportunity_id, starts_at, ends_at, capacity, notes, impact_amount FROM shifts"
+
+_SELECT_ROLES = """
+    SELECT r.role_id, r.shift_id, r.name, r.capacity, r.required_skill, r.position,
+           COUNT(a.assignment_id) AS filled
+    FROM shift_roles AS r
+    LEFT JOIN assignments AS a ON a.role_id = r.role_id AND a.status <> 'CANCELLED'
+"""
 
 _SELECT_OVERVIEW = """
     SELECT s.shift_id, s.opportunity_id, s.starts_at, s.ends_at, s.capacity, s.notes, s.impact_amount,
@@ -42,7 +49,12 @@ class ShiftRepository(Repository):
                 """,
                 self._to_params(shift),
             )
-        return dataclasses.replace(shift, shift_id=int(cursor.lastrowid or 0))
+            shift_id = int(cursor.lastrowid or 0)
+            # Every shift has at least one role, so every sign-up has a role to fill.
+            self._db.execute(
+                "INSERT INTO shift_roles (shift_id, name, capacity) VALUES (?, '', ?)", (shift_id, shift.capacity)
+            )
+        return dataclasses.replace(shift, shift_id=shift_id)
 
     def update(self, shift: Shift) -> Shift:
         shift_id = self._require_saved(shift.shift_id, _ENTITY)
@@ -62,6 +74,53 @@ class ShiftRepository(Repository):
             if cursor.rowcount == 0:
                 raise RecordNotFoundError(_ENTITY, shift_id)
         return shift
+
+    def replace_roles(self, shift_id: int, roles: list[ShiftRole]) -> list[RoleOverview]:
+        """
+        Make ``roles`` the shift's roles, in order, and set the shift's capacity to their total.
+
+        Roles with a ``role_id`` are updated, new ones are added, and missing ones are
+        removed. The service has already checked that no current sign-up is in a removed
+        role; cancelled sign-ups that pointed at one move to the first remaining role, so
+        their history is kept.
+        """
+        with self._db.transaction():
+            current = {overview.role.role_id for overview in self.roles(shift_id)}
+            kept: list[int] = []
+            for position, role in enumerate(roles):
+                params = {
+                    "shift_id": shift_id,
+                    "name": role.name,
+                    "capacity": role.capacity,
+                    "required_skill": role.required_skill,
+                    "position": position,
+                }
+                if role.role_id in current:
+                    self._db.execute(
+                        """UPDATE shift_roles SET name = :name, capacity = :capacity,
+                           required_skill = :required_skill, position = :position
+                           WHERE role_id = :role_id AND shift_id = :shift_id""",
+                        params | {"role_id": role.role_id},
+                    )
+                    kept.append(role.role_id or 0)
+                else:
+                    cursor = self._db.execute(
+                        """INSERT INTO shift_roles (shift_id, name, capacity, required_skill, position)
+                           VALUES (:shift_id, :name, :capacity, :required_skill, :position)""",
+                        params,
+                    )
+                    kept.append(int(cursor.lastrowid or 0))
+            for removed in current - set(kept):
+                self._db.execute("UPDATE assignments SET role_id = ? WHERE role_id = ?", (kept[0], removed))
+                self._db.execute("DELETE FROM shift_roles WHERE role_id = ?", (removed,))
+            self._db.execute(
+                "UPDATE shifts SET capacity = ? WHERE shift_id = ?", (sum(role.capacity for role in roles), shift_id)
+            )
+        return self.roles(shift_id)
+
+    def set_single_role_capacity(self, shift_id: int, capacity: int) -> None:
+        """Keep a one-role shift's role the same size as the shift (used when a shift is resized)."""
+        self._db.execute("UPDATE shift_roles SET capacity = ? WHERE shift_id = ?", (capacity, shift_id))
 
     def set_impact(self, shift_id: int, amount: int) -> Shift:
         cursor = self._db.execute("UPDATE shifts SET impact_amount = ? WHERE shift_id = ?", (amount, shift_id))
@@ -97,6 +156,19 @@ class ShiftRepository(Repository):
     def for_opportunity(self, opportunity_id: int) -> list[Shift]:
         rows = self._db.query_all(f"{_SELECT_SHIFT} WHERE opportunity_id = ? ORDER BY starts_at", (opportunity_id,))
         return [self._to_shift(row) for row in rows]
+
+    def roles(self, shift_id: int) -> list[RoleOverview]:
+        """The shift's roles in display order, each with how many spots are taken."""
+        rows = self._db.query_all(
+            f"{_SELECT_ROLES} WHERE r.shift_id = ? GROUP BY r.role_id ORDER BY r.position, r.role_id", (shift_id,)
+        )
+        return [self._to_role(row) for row in rows]
+
+    def get_role(self, role_id: int) -> RoleOverview:
+        row = self._db.query_one(f"{_SELECT_ROLES} WHERE r.role_id = ? GROUP BY r.role_id", (role_id,))
+        if row is None:
+            raise RecordNotFoundError(tr("Role"), role_id)
+        return self._to_role(row)
 
     def count_filled(self, shift_id: int) -> int:
         """Sign-ups currently holding a spot (everything except cancellations)."""
@@ -165,6 +237,18 @@ class ShiftRepository(Repository):
             impact_amount=row["impact_amount"],
             shift_id=row["shift_id"],
         )
+
+    @staticmethod
+    def _to_role(row: sqlite3.Row) -> RoleOverview:
+        role = ShiftRole(
+            name=row["name"],
+            capacity=row["capacity"],
+            required_skill=row["required_skill"],
+            shift_id=row["shift_id"],
+            position=row["position"],
+            role_id=row["role_id"],
+        )
+        return RoleOverview(role, row["filled"])
 
     @classmethod
     def _to_overview(cls, row: sqlite3.Row) -> ShiftOverview:

@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 515 automated tests, including the interface
+python -m pytest          # 557 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   515 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   557 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -336,7 +336,8 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
 
 ### Reports (customizable output and analysis)
 
-Pick a question (*Volunteer hours, Program impact, Shift attendance, Recruitment channels and referrals, Impact summary,* or one
+Pick a question (*Volunteer hours, Program impact, Shift attendance, Recruitment channels and referrals, Impact summary,
+Certification expiry,* or one
 person's *Service hours record*), then a period (presets including *This school year*, or custom
 dates), and optionally a program or category. Each report shows four headline figures,
 **plain-English insights** (for example, which weekday fills best and which fills least,
@@ -387,6 +388,9 @@ volunteers ─┬─< volunteer_skills >── skills ──< opportunity_skills
 | `volunteers.referred_by`, `hour_goal`, `hour_goal_due` | Who invited a volunteer; their personal goal (schema version 4) |
 | `opportunities.impact_unit`, `shifts.impact_amount` | What a program measures; what a shift achieved (schema version 5) |
 | `volunteer_certifications`, `opportunity_certifications` | Certifications held, with expiry dates; certifications a program requires (schema version 5) |
+| `shift_roles`, `assignments.role_id` | Roles within a shift, each with a capacity and optional skill; the role each sign-up fills (schema version 6). A trigger rejects a role from another shift |
+| `waitlist`, `notices` | People waiting for a full shift, oldest first; Home-page notices stored as *what happened*, worded in the reader's language when shown (schema version 6) |
+| `volunteer_certifications.kind`, `issued_on` | Certification or waiver, and its issue date (schema version 6) |
 | `app_settings`           | Organization name, mission statement, value of a volunteer hour, accessibility |
 | `volunteer_participation`| *View:* hours, attendance, no-shows, reliability per volunteer |
 | `shift_fill`             | *View:* spots filled per shift                                 |
@@ -420,7 +424,9 @@ The database repeats the critical rules as `CHECK`, `UNIQUE`, and foreign-key co
 | Pipeline     | Applicant → Active or Inactive; Active ↔ Inactive. Archiving cancels upcoming sign-ups (history kept) |
 | Programs     | Draft → Open → Closed (and back to Open). Never back to Draft. Closing cancels upcoming sign-ups |
 | Shifts       | Start in the future; frozen once started; capacity ≥ current sign-ups; rescheduling re-checks clashes and ages; weekly recurrence up to 52 weeks |
-| Sign-ups     | Volunteer must be Active, old enough on the shift date, and not double-booked; program Open; shift not started or full. Checked under a write lock so the last spot can't be taken twice |
+| Sign-ups     | Volunteer must be Active, old enough on the shift date, and not double-booked; program Open; shift not started or full; an open role must fit their skills; required certifications and waivers must be current on the shift date. Checked under a write lock so the last spot can't be taken twice |
+| Roles        | A shift's capacity is always the total of its roles. One to twelve roles, unique names; a role can't shrink below or lose the people in it; a role's skill is required, not just preferred. With several roles, the shift is resized by resizing its roles |
+| Waitlist     | Only for a full shift, and only for someone kept out by space alone. When a spot frees up (cancellation, archiving, more room), the longest-waiting person who still qualifies is signed up automatically and gets a Home notice; anyone who no longer qualifies keeps their place. Nobody moves up once the shift starts |
 | Attendance   | Only after the shift starts; hours default to and never exceed the shift length; walk-ins allowed (age and clash rules still apply) |
 
 ### Smart Match (intelligent feature)
@@ -448,7 +454,9 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 | **Check-in kiosk** | *Dashboard > Open check-in kiosk* turns a laptop into a welcome desk: type the last 4 digits of your phone | Opens 30 minutes before a shift and closes when it ends. Only people on that shift can match. Shows only a first name and last initial. Only the leader's password closes it. It records the full shift, and a leader can correct the hours on the roster |
 | **Hour goals** | A volunteer sets hours and a date on *Home*, then sees progress and a weekly pace. The kiosk reports progress too | Counts from August 1. The date must be after today. Only that person or a leader can change it |
 | **Results and impact summary** | A program names what it measures (*families served*); each shift records a number; the *Impact summary* report saves as a one-page PDF | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
-| **Required certifications** | A program can require a certification; leaders record each person's, with an expiry date | A hard rule inside the one shared `signup_blockers` check, so manual sign-up, Smart Match, and Autopilot all enforce it; walk-ins and the kiosk check it too. It must still be valid on the day of the shift. Volunteers can't certify themselves. Staffing Studio lists those to renew within 45 days |
+| **Certifications and waivers** | A program can require a certification or a signed waiver; leaders record each person's type, issue date and expiry date | A hard rule inside the one shared `signup_blockers` check, so manual sign-up, Smart Match, and Autopilot all enforce it; walk-ins and the kiosk check it too. It must still be valid on the day of the shift. The issue date can't be in the future or after the expiry. Volunteers can't certify themselves. The Dashboard lists what runs out in 30 days; the *Certification expiry* report covers what has expired or runs out within 90 days |
+| **Roles within a shift** | *Edit roles* splits a shift into jobs (Registration x4, Water station x12, First aid x2 needing First Aid/CPR) | Volunteers pick a role when they sign up; ServeSync suggests the one that uses their skills. Smart Match and Autopilot place people by skill and never overfill a role. The roster is grouped by role |
+| **Waitlist** | *Join waitlist* on a full shift | The next person who qualifies is signed up when a spot opens, and finds a note on Home. Leaders see who is waiting on the roster |
 
 Every result in the demo is sample data calculated from attendance.
 
@@ -481,7 +489,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 515 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 557 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |

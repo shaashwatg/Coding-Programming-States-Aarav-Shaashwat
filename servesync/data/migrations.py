@@ -291,12 +291,75 @@ CREATE TABLE opportunity_certifications (
 ) WITHOUT ROWID;
 """
 
+_V6_ROLES_WAITLIST_CREDENTIALS = """
+-- Roles within a shift (Registration x2, Water station x6), each with its own capacity and an
+-- optional skill. An empty name is the shift's general role, shown as "General" in either language.
+-- A shift's capacity is always the sum of its roles' capacities (kept by the service layer).
+CREATE TABLE shift_roles (
+    role_id        INTEGER PRIMARY KEY,
+    shift_id       INTEGER NOT NULL REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    name           TEXT NOT NULL COLLATE NOCASE CHECK (length(name) <= 40),
+    capacity       INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 500),
+    required_skill TEXT NOT NULL DEFAULT '' CHECK (length(required_skill) <= 40),
+    position       INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+    UNIQUE (shift_id, name)
+);
+CREATE INDEX idx_shift_roles_shift ON shift_roles (shift_id);
+
+-- Every existing shift gets one general role holding its whole capacity.
+INSERT INTO shift_roles (shift_id, name, capacity) SELECT shift_id, '', capacity FROM shifts;
+
+-- Each sign-up fills one role of its shift.
+ALTER TABLE assignments ADD COLUMN role_id INTEGER REFERENCES shift_roles (role_id) ON DELETE RESTRICT;
+UPDATE assignments
+SET role_id = (SELECT r.role_id FROM shift_roles AS r WHERE r.shift_id = assignments.shift_id);
+CREATE INDEX idx_assignments_role ON assignments (role_id);
+
+-- A sign-up's role must belong to the same shift (defense in depth behind the service rules).
+CREATE TRIGGER assignment_role_same_shift_insert BEFORE INSERT ON assignments
+WHEN NEW.role_id IS NOT NULL
+ AND (SELECT shift_id FROM shift_roles WHERE role_id = NEW.role_id) IS NOT NEW.shift_id
+BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: role belongs to another shift'); END;
+CREATE TRIGGER assignment_role_same_shift_update BEFORE UPDATE OF role_id, shift_id ON assignments
+WHEN NEW.role_id IS NOT NULL
+ AND (SELECT shift_id FROM shift_roles WHERE role_id = NEW.role_id) IS NOT NEW.shift_id
+BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: role belongs to another shift'); END;
+
+-- Waitlist for full shifts: oldest first. An entry is removed when the person is signed up or leaves.
+CREATE TABLE waitlist (
+    entry_id     INTEGER PRIMARY KEY,
+    shift_id     INTEGER NOT NULL REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    joined_at    TEXT NOT NULL,
+    UNIQUE (shift_id, volunteer_id)
+);
+CREATE INDEX idx_waitlist_shift ON waitlist (shift_id, joined_at);
+
+-- Messages for a volunteer's Home page. The wording is built when shown, in their language.
+CREATE TABLE notices (
+    notice_id    INTEGER PRIMARY KEY,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    kind         TEXT NOT NULL CHECK (kind IN ('WAITLIST_PROMOTED')),
+    shift_id     INTEGER REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    dismissed    INTEGER NOT NULL DEFAULT 0 CHECK (dismissed IN (0, 1))
+);
+CREATE INDEX idx_notices_volunteer ON notices (volunteer_id, dismissed);
+
+-- Certifications and waivers: what kind of document, and when it was issued.
+ALTER TABLE volunteer_certifications ADD COLUMN kind TEXT NOT NULL DEFAULT 'CERTIFICATION'
+    CHECK (kind IN ('CERTIFICATION', 'WAIVER'));
+ALTER TABLE volunteer_certifications ADD COLUMN issued_on TEXT
+    CHECK (issued_on IS NULL OR issued_on <= expires_on);
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
     Migration(3, "Preferred names, pronouns, access needs, and per-person preferences", _V3_INCLUSION),
     Migration(4, "Who referred each volunteer, and personal hour goals", _V4_REFERRALS_AND_GOALS),
     Migration(5, "Program results and required certifications", _V5_IMPACT_AND_CERTIFICATIONS),
+    Migration(6, "Shift roles, waitlists, notices, and certification types", _V6_ROLES_WAITLIST_CREDENTIALS),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

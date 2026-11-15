@@ -19,6 +19,7 @@ every hard rule (age, status, double-booking, capacity).
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -30,6 +31,7 @@ from servesync.data import DataStore
 from servesync.models import (
     AssignmentStatus,
     OpportunityStatus,
+    RoleOverview,
     ShiftOverview,
     Volunteer,
     VolunteerParticipation,
@@ -38,6 +40,7 @@ from servesync.models import (
 from servesync.services.base import Service
 from servesync.services.clock import Clock
 from servesync.services.matching_service import NEWCOMER_RELIABILITY, MatchingService, ShiftMatch, VolunteerMatch
+from servesync.services.rules import best_role
 from servesync.services.scheduling_service import SchedulingService
 from servesync.services.session import Permission, Session
 
@@ -89,6 +92,7 @@ class PlanProposal:
 
     overview: ShiftOverview
     match: VolunteerMatch
+    role: RoleOverview | None = None  # the role drafted for them, chosen by skill
 
     @property
     def volunteer(self) -> Volunteer:
@@ -140,14 +144,22 @@ def expected_turnout(signed_up: Sequence[int], participation: Mapping[int, Volun
     return round(total, 1)
 
 
-def allocate(needs: Sequence[tuple[ShiftOverview, Sequence[VolunteerMatch]]]) -> list[PlanProposal]:
+def allocate(
+    needs: Sequence[tuple[ShiftOverview, Sequence[VolunteerMatch]]],
+    roles: Mapping[int, Sequence[RoleOverview]] | None = None,
+) -> list[PlanProposal]:
     """
     Share volunteers across shifts (pure: ranked candidates in, drafted sign-ups out).
 
     A greedy heuristic: shifts with the least slack (strong candidates minus open
     spots) choose first; within a shift, the best score after the fair-share penalty
     wins. It respects a limit per person and never drafts overlapping shifts.
+
+    With ``roles`` (each shift's roles), it also keeps count of the spots left in
+    each role, so it never drafts two people into a role's last spot and fills
+    skilled roles with people who have the skill.
     """
+    roles = roles or {}
     strong = [(overview, [m for m in matches if _is_strong(m)]) for overview, matches in needs]
     strong.sort(key=lambda need: (len(need[1]) - need[0].open_spots, need[0].shift.starts_at))
 
@@ -160,14 +172,28 @@ def allocate(needs: Sequence[tuple[ShiftOverview, Sequence[VolunteerMatch]]]) ->
 
     for overview, candidates in strong:
         available = list(candidates)
+        shift_roles = list(roles.get(overview.shift.shift_id or 0, ()))
+
+        def role_for(match: VolunteerMatch, shift_roles: list[RoleOverview] = shift_roles) -> RoleOverview | None:
+            return best_role(shift_roles, match.volunteer.skills) if shift_roles else match.role
+
         for _ in range(overview.open_spots):
-            free = [m for m in available if _can_take(planned.get(m.volunteer.volunteer_id or 0, []), overview)]
+            free = [
+                m
+                for m in available
+                if _can_take(planned.get(m.volunteer.volunteer_id or 0, []), overview)
+                and (role_for(m) is not None or not shift_roles)
+            ]
             if not free:
                 break
             best = max(free, key=adjusted_score)
             available.remove(best)
+            role = role_for(best)
+            if role is not None and shift_roles:  # one fewer spot in that role
+                index = shift_roles.index(role)
+                shift_roles[index] = dataclasses.replace(role, filled=role.filled + 1)
             planned.setdefault(best.volunteer.volunteer_id or 0, []).append(overview)
-            proposals.append(PlanProposal(overview, best))
+            proposals.append(PlanProposal(overview, best, role))
     proposals.sort(key=lambda p: (p.overview.shift.starts_at, -p.match.score))
     return proposals
 
@@ -211,7 +237,11 @@ class StaffingService(Service):
             for overview in self._upcoming(days)
             if not overview.is_full
         ]
-        return StaffingPlan(tuple(allocate(needs)), sum(overview.open_spots for overview, _ in needs))
+        roles = {
+            overview.shift.shift_id or 0: self._store.shifts.roles(overview.shift.shift_id or 0)
+            for overview, _ in needs
+        }
+        return StaffingPlan(tuple(allocate(needs, roles)), sum(overview.open_spots for overview, _ in needs))
 
     def approve(self, session: Session, proposals: Sequence[PlanProposal]) -> PlanResult:
         """
@@ -225,7 +255,10 @@ class StaffingService(Service):
         for proposal in proposals:
             try:
                 saved = self._scheduling.sign_up(
-                    session, proposal.overview.shift.shift_id or 0, proposal.volunteer.volunteer_id or 0
+                    session,
+                    proposal.overview.shift.shift_id or 0,
+                    proposal.volunteer.volunteer_id or 0,
+                    proposal.role.role.role_id if proposal.role else None,
                 )
             except ServeSyncError as error:
                 skipped.append(f"{proposal.volunteer.full_name}: {error.message}")

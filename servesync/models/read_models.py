@@ -13,11 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from servesync.core.i18n import tr
 from servesync.core.validators import format_phone
 from servesync.models.assignment import Assignment
 from servesync.models.enums import (
     ActivityKind,
     AssignmentStatus,
+    NoticeKind,
     OpportunityCategory,
     OpportunityStatus,
     RecruitmentSource,
@@ -58,10 +60,15 @@ class RosterEntry:
     volunteer_name: str
     volunteer_email: str
     volunteer_phone: str
+    role_name: str = ""  # "" is the shift's general role
 
     @property
     def display_phone(self) -> str:
         return format_phone(self.volunteer_phone)
+
+    @property
+    def role_display(self) -> str:
+        return self.role_name or tr("General")
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,3 +151,29 @@ class ServiceFact:
         if self.status is not AssignmentStatus.ATTENDED:
             return 0.0
         return self.hours_served or 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistEntry:
+    """One person waiting for a spot on a full shift (oldest first)."""
+
+    entry_id: int
+    shift_id: int
+    volunteer_id: int
+    volunteer_name: str
+    joined_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Notice:
+    """A message waiting on a volunteer's Home page, with the shift it is about."""
+
+    notice_id: int
+    volunteer_id: int
+    kind: NoticeKind
+    created_at: datetime
+    shift_id: int
+    opportunity_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_name: str = ""

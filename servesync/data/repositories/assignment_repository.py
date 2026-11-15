@@ -36,7 +36,7 @@ _ENTITY = mark("Sign-up")
 
 _V_NAME = display_name_sql("v")
 
-_ASSIGNMENT_COLUMNS = "a.assignment_id, a.shift_id, a.volunteer_id, a.status, a.hours_served, a.signed_up_at"
+_ASSIGNMENT_COLUMNS = "a.assignment_id, a.shift_id, a.volunteer_id, a.status, a.hours_served, a.signed_up_at, a.role_id"
 
 
 class AssignmentRepository(Repository):
@@ -50,11 +50,14 @@ class AssignmentRepository(Repository):
                 raise RecordNotFoundError(tr("Shift"), assignment.shift_id)
             if not self._exists("volunteers", "volunteer_id", assignment.volunteer_id):
                 raise RecordNotFoundError(tr("Volunteer"), assignment.volunteer_id)
+            if assignment.role_id is None:
+                # Services choose the role; anything else (such as demo data) falls back to the shift's first role.
+                assignment = dataclasses.replace(assignment, role_id=self._first_role(assignment.shift_id))
             try:
                 cursor = self._db.execute(
                     """
-                    INSERT INTO assignments (shift_id, volunteer_id, status, hours_served, signed_up_at)
-                    VALUES (:shift_id, :volunteer_id, :status, :hours_served, :signed_up_at)
+                    INSERT INTO assignments (shift_id, volunteer_id, status, hours_served, signed_up_at, role_id)
+                    VALUES (:shift_id, :volunteer_id, :status, :hours_served, :signed_up_at, :role_id)
                     """,
                     self._to_params(assignment),
                 )
@@ -71,6 +74,7 @@ class AssignmentRepository(Repository):
             """
             UPDATE assignments
             SET status = :status, hours_served = :hours_served, signed_up_at = :signed_up_at,
+                role_id = COALESCE(:role_id, role_id),
                 updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime')
             WHERE assignment_id = :assignment_id
             """,
@@ -104,11 +108,13 @@ class AssignmentRepository(Repository):
             f"""
             SELECT {_ASSIGNMENT_COLUMNS},
                    {_V_NAME} AS volunteer_name,
-                   v.email AS volunteer_email, v.phone AS volunteer_phone
+                   v.email AS volunteer_email, v.phone AS volunteer_phone,
+                   COALESCE(r.name, '') AS role_name, COALESCE(r.position, 0) AS role_position
             FROM assignments AS a
             JOIN volunteers AS v ON v.volunteer_id = a.volunteer_id
+            LEFT JOIN shift_roles AS r ON r.role_id = a.role_id
             WHERE a.shift_id = ?{status_filter}
-            ORDER BY v.last_name COLLATE NOCASE, v.first_name COLLATE NOCASE
+            ORDER BY role_position, a.role_id, v.last_name COLLATE NOCASE, v.first_name COLLATE NOCASE
             """,
             (shift_id,),
         )
@@ -118,6 +124,7 @@ class AssignmentRepository(Repository):
                 volunteer_name=row["volunteer_name"],
                 volunteer_email=row["volunteer_email"],
                 volunteer_phone=row["volunteer_phone"],
+                role_name=row["role_name"],
             )
             for row in rows
         ]
@@ -418,7 +425,14 @@ class AssignmentRepository(Repository):
             "status": assignment.status.value,
             "hours_served": assignment.hours_served,
             "signed_up_at": datetime_to_db(assignment.signed_up_at),
+            "role_id": assignment.role_id,
         }
+
+    def _first_role(self, shift_id: int) -> int | None:
+        value = self._db.query_value(
+            "SELECT role_id FROM shift_roles WHERE shift_id = ? ORDER BY position, role_id LIMIT 1", (shift_id,)
+        )
+        return int(value) if value is not None else None
 
     @staticmethod
     def _to_assignment(row: sqlite3.Row) -> Assignment:
@@ -429,4 +443,5 @@ class AssignmentRepository(Repository):
             hours_served=row["hours_served"],
             signed_up_at=datetime_from_db(row["signed_up_at"]),
             assignment_id=row["assignment_id"],
+            role_id=row["role_id"],
         )

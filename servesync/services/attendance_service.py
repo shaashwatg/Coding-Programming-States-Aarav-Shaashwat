@@ -27,6 +27,7 @@ from servesync.services.rules import (
     certification_message,
     hour_goal_progress,
     missing_certifications,
+    walk_in_role,
 )
 from servesync.services.session import Permission, Session
 
@@ -143,6 +144,7 @@ class AttendanceService(Service):
                 status=AssignmentStatus.ATTENDED,
                 hours_served=self._hours_for(shift, hours),
                 signed_up_at=self._clock.now(),
+                role_id=walk_in_role(self._store.shifts.roles(shift_id), volunteer.skills).role.role_id,
             )
         )
         logger.info("Walk-in: volunteer #%s on shift #%s", volunteer_id, shift_id)

@@ -8,10 +8,12 @@ from servesync.data.repositories.settings_repository import SettingKey, Settings
 from servesync.data.repositories.shift_repository import ShiftRepository
 from servesync.data.repositories.skill_repository import SkillRepository, SkillUsage
 from servesync.data.repositories.volunteer_repository import VolunteerRepository
+from servesync.data.repositories.waitlist_repository import NoticeRepository, WaitlistRepository
 
 __all__ = [
     "AccountRepository",
     "AssignmentRepository",
+    "NoticeRepository",
     "OpportunityRepository",
     "PreferenceRepository",
     "SettingKey",
@@ -20,4 +22,5 @@ __all__ = [
     "SkillRepository",
     "SkillUsage",
     "VolunteerRepository",
+    "WaitlistRepository",
 ]

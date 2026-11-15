@@ -16,11 +16,12 @@ from typing import Any
 
 from servesync.core.errors import BusinessRuleError
 from servesync.core.i18n import tr
-from servesync.core.validators import ErrorCollector, parse_date, parse_int
+from servesync.core.validators import ErrorCollector, parse_date, parse_enum, parse_int
 from servesync.models import (
     AssignmentStatus,
     AvailabilitySlot,
     Certification,
+    CredentialKind,
     ServiceRecord,
     Volunteer,
     VolunteerParticipation,
@@ -35,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 MAX_HOUR_GOAL = 2000  # about a full-time year; anything higher is a typo
 CERTIFICATION_WARNING_DAYS = 45
+#: An issue date older than this is almost always a typo in the year.
+MAX_CREDENTIAL_AGE_DAYS = 3653
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +106,8 @@ class VolunteerService(Service):
                     after=self._clock.now(), volunteer_id=volunteer_id
                 )
                 cancelled = self._cancel_signups(upcoming)
+                for shift_id in self._store.waitlist.shifts_for(volunteer_id):  # nor wait for new ones
+                    self._store.waitlist.remove(shift_id, volunteer_id)
         logger.info(
             "Volunteer #%s: %s -> %s (%s sign-ups cancelled)",
             volunteer_id,
@@ -188,16 +193,44 @@ class VolunteerService(Service):
             self._clock.now().date(),
         )
 
-    def add_certification(self, session: Session, volunteer_id: int, name: object, expires_on: object) -> Volunteer:
-        """Record or renew a certification. Leaders only: a volunteer can't vouch for their own."""
+    def add_certification(
+        self,
+        session: Session,
+        volunteer_id: int,
+        name: object,
+        expires_on: object,
+        *,
+        kind: object = CredentialKind.CERTIFICATION,
+        issued_on: object = None,
+    ) -> Volunteer:
+        """
+        Record or renew a certification or waiver. Leaders only: a volunteer can't vouch
+        for their own. Checks: the expiry is after today, the issue date (when given) is
+        not in the future and comes before the expiry, and the issue date isn't more than
+        ten years ago (almost always a typo in the year).
+        """
         session.require(Permission.MANAGE_VOLUNTEERS)
+        today = self._clock.now().date()
         errors = ErrorCollector()
         clean_name = errors.check("certification_name", clean_certification_name, name)
+        clean_kind = errors.check("certification_kind", parse_enum, kind, CredentialKind, tr("Type"))
         day = errors.check("certification_expires", parse_date, expires_on, tr("Expiry date"))
-        if isinstance(day, date) and day <= self._clock.now().date():
+        issued = (
+            None
+            if issued_on in (None, "")
+            else errors.check("certification_issued", parse_date, issued_on, tr("Issue date"))
+        )
+        if isinstance(day, date) and day <= today:
             errors.add("certification_expires", tr("This has already expired. Enter a date after today."))
+        if isinstance(issued, date):
+            if issued > today:
+                errors.add("certification_issued", tr("The issue date can't be in the future."))
+            elif (today - issued).days > MAX_CREDENTIAL_AGE_DAYS:
+                errors.add("certification_issued", tr("The issue date is more than 10 years ago. Check the year."))
+            if isinstance(day, date) and issued >= day:
+                errors.add("certification_expires", tr("The expiry date must be after the issue date."))
         errors.raise_if_any()
-        self._store.volunteers.save_certification(volunteer_id, Certification(clean_name, day))
+        self._store.volunteers.save_certification(volunteer_id, Certification(clean_name, day, clean_kind, issued))
         return self._store.volunteers.get(volunteer_id)
 
     def remove_certification(self, session: Session, volunteer_id: int, name: str) -> Volunteer:

@@ -38,7 +38,7 @@ from servesync.models import ActivityItem, ActivityKind, OpportunityCategory, Sh
 from servesync.services import ScoreFactor
 from servesync.ui import assets
 from servesync.ui.theme import current_palette
-from servesync.ui.widgets.common import format_hours, format_when, make_button, make_label
+from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label
 
 
 class ScoreAnatomyBar(QWidget):
@@ -440,3 +440,43 @@ class ShiftCalendar(QCalendarWidget):
         for index in range(dots):
             painter.drawEllipse(QRectF(start + index * 10 - radius, rect.bottom() - 9 - radius, radius * 2, radius * 2))
         painter.restore()
+
+
+class UpdatesPanel(QFrame):
+    """
+    "Updates for you" on a volunteer's Home page: news that concerns them, such as
+    being moved off a waitlist into a shift. Each line can be dismissed; the panel
+    hides itself when there is nothing to say, so it never adds clutter.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setProperty("card", True)
+        self.setAccessibleName(tr("Updates for you"))
+        column = QVBoxLayout(self)
+        column.setContentsMargins(16, 16, 16, 16)
+        column.setSpacing(8)
+        column.addWidget(make_label(tr("Updates for you"), "section"))
+        self._rows = QVBoxLayout()
+        self._rows.setSpacing(8)
+        column.addLayout(self._rows)
+        self.hide()
+
+    def set_updates(self, updates: Sequence[tuple[str, Callable[[], object] | None]]) -> None:
+        """``updates``: (text, dismiss action or None) pairs, newest first."""
+        clear_layout(self._rows)
+        for text, dismiss in updates:
+            row = QHBoxLayout()
+            row.setSpacing(16)
+            dot = QLabel()
+            dot.setFixedSize(8, 8)
+            dot.setStyleSheet(f"background: {current_palette().attention_fill}; border-radius: 4px;")
+            row.addWidget(dot, 0, Qt.AlignmentFlag.AlignTop)
+            label = make_label(text, None, wrap=True, selectable=True)
+            row.addWidget(label, 1)
+            if dismiss is not None:
+                button = make_button(tr("Dismiss"), kind="link", on_click=dismiss)
+                button.setAccessibleName(tr("Dismiss: {text}", text=text))
+                row.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
+            self._rows.addLayout(row)
+        self.setVisible(bool(updates))

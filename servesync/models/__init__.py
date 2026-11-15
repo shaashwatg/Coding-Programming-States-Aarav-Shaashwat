@@ -12,8 +12,10 @@ from servesync.models.enums import (
     AccessNeed,
     ActivityKind,
     AssignmentStatus,
+    CredentialKind,
     DayPart,
     MessageDuration,
+    NoticeKind,
     OpportunityCategory,
     OpportunityStatus,
     RecruitmentSource,
@@ -26,12 +28,15 @@ from servesync.models.opportunity import Opportunity, Shift
 from servesync.models.preferences import Appearance
 from servesync.models.read_models import (
     ActivityItem,
+    Notice,
     RosterEntry,
     ServiceFact,
     ServiceRecord,
     ShiftOverview,
     VolunteerParticipation,
+    WaitlistEntry,
 )
+from servesync.models.role import RoleOverview, ShiftRole
 from servesync.models.volunteer import AvailabilitySlot, Certification, Volunteer, access_gaps
 
 __all__ = [
@@ -43,23 +48,29 @@ __all__ = [
     "AssignmentStatus",
     "AvailabilitySlot",
     "Certification",
+    "CredentialKind",
     "DayPart",
     "MessageDuration",
+    "Notice",
+    "NoticeKind",
     "Opportunity",
     "OpportunityCategory",
     "OpportunityStatus",
     "RecruitmentSource",
+    "RoleOverview",
     "RosterEntry",
     "ServiceFact",
     "ServiceRecord",
     "Shift",
     "ShiftOverview",
+    "ShiftRole",
     "Theme",
     "UserAccount",
     "UserRole",
     "Volunteer",
     "VolunteerParticipation",
     "VolunteerStatus",
+    "WaitlistEntry",
     "Weekday",
     "access_gaps",
 ]

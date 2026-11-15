@@ -283,6 +283,54 @@ ARTICLES: tuple[HelpArticle, ...] = (
         page="home",
         action_label="Open Home",
     ),
+    HelpArticle(
+        "Split a shift into roles",
+        "role roles job jobs position registration water station split divide skill required capacity",
+        (
+            "Open the shift from the Calendar or Dashboard and choose Edit roles.",
+            "Add each job and how many people it needs. Choose a skill only if the job requires it.",
+            "Save. The shift's size becomes the total, the roster is grouped by role, and Smart Match places "
+            "people by skill.",
+        ),
+        page="calendar",
+        leaders_only=True,
+        action_label="Open Calendar",
+    ),
+    HelpArticle(
+        "Join a waitlist for a full shift",
+        "waitlist wait list full no spots queue line next promoted cancel opening",
+        (
+            "Select the full shift on Find a shift or Calendar and choose Join waitlist.",
+            "If someone cancels, the first person who still qualifies is signed up automatically.",
+            "A note appears on Home. To give up your place, choose Leave waitlist.",
+        ),
+        page="find",
+        action_label="Open Find a shift",
+    ),
+    HelpArticle(
+        "Record a certification or waiver",
+        "certification certificate waiver background check cpr expiry expires expired issue date renew",
+        (
+            "Open the volunteer from Volunteers and choose Edit.",
+            "Under Certifications and waivers, enter the name, type, issue date, and expiry date, then Add or renew.",
+            "A program that requires it blocks sign-ups from anyone without a current one, and says why.",
+        ),
+        page="volunteers",
+        leaders_only=True,
+        action_label="Open Volunteers",
+    ),
+    HelpArticle(
+        "See which certifications are running out",
+        "expiring expire expiry renew renewal soon certifications waivers report dashboard 30 days",
+        (
+            "The Dashboard lists everything that runs out in the next 30 days.",
+            "On Reports, choose Certification expiry for everything expired or running out within 90 days.",
+            "Filter by program to see only what that program requires.",
+        ),
+        page="reports",
+        leaders_only=True,
+        action_label="Open Reports",
+    ),
 )
 
 
@@ -538,6 +586,48 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
             "Inicio muestra su progreso y cuántas horas por semana necesita, aproximadamente.",
         ),
         "Abrir Inicio",
+    ),
+    (
+        "Dividir un turno en funciones",
+        "funcion funciones tarea tareas puesto registro agua dividir habilidad requerida capacidad",
+        (
+            "Abra el turno desde el Calendario o el Panel y elija Editar funciones.",
+            "Agregue cada tarea y cuántas personas necesita. Elija una habilidad solo si la tarea la requiere.",
+            "Guarde. El tamaño del turno será el total, la lista se agrupa por función y Smart Match ubica a "
+            "cada persona según sus habilidades.",
+        ),
+        "Abrir Calendario",
+    ),
+    (
+        "Unirse a la lista de espera de un turno completo",
+        "lista espera completo lleno sin lugares fila siguiente cancelar lugar libre",
+        (
+            "Seleccione el turno completo en Buscar un turno o en el Calendario y elija Unirme a la lista de espera.",
+            "Si alguien cancela, la primera persona que todavía cumple los requisitos queda inscrita automáticamente.",
+            "Verá un aviso en Inicio. Para dejar su lugar, elija Salir de la lista de espera.",
+        ),
+        "Abrir Buscar un turno",
+    ),
+    (
+        "Registrar una certificación o exención",
+        "certificacion certificado exencion antecedentes rcp vencimiento vence vencida emision renovar",
+        (
+            "Abra al voluntario desde Voluntarios y elija Editar.",
+            "En Certificaciones y exenciones, escriba el nombre, el tipo, la fecha de emisión y la de vencimiento, "
+            "y elija Agregar o renovar.",
+            "Un programa que la requiere bloquea la inscripción de quien no tenga una vigente, y explica el motivo.",
+        ),
+        "Abrir Voluntarios",
+    ),
+    (
+        "Ver qué certificaciones están por vencer",
+        "vencen vencimiento renovar renovacion pronto certificaciones exenciones informe panel 30 dias",
+        (
+            "El Panel muestra todo lo que vence en los próximos 30 días.",
+            "En Informes, elija Vencimiento de certificaciones para ver lo vencido o lo que vence en 90 días.",
+            "Filtre por programa para ver solo lo que ese programa requiere.",
+        ),
+        "Abrir Informes",
     ),
 )
 

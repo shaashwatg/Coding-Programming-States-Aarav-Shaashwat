@@ -14,18 +14,21 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from types import MappingProxyType
 
-from servesync.core.errors import BusinessRuleError
-from servesync.core.i18n import tr
+from servesync.core.errors import BusinessRuleError, ValidationError
+from servesync.core.i18n import tr, tr_n
 from servesync.core.validators import calculate_age
 from servesync.models import (
     AccessNeed,
     OpportunityStatus,
+    RoleOverview,
     ServiceRecord,
     ShiftOverview,
+    ShiftRole,
     Volunteer,
     VolunteerStatus,
     access_gaps,
 )
+from servesync.models.role import MAX_ROLES_PER_SHIFT
 
 #: Allowed recruitment-pipeline moves. Applicants are approved (Active) or
 #: declined (Inactive); Active volunteers can be archived and later return.
@@ -84,6 +87,106 @@ def certification_message(volunteer: Volunteer, missing: Sequence[str]) -> str:
     )
 
 
+def best_role(roles: Sequence[RoleOverview], skills: frozenset[str]) -> RoleOverview | None:
+    """
+    The role to give someone who didn't choose one, or None if no open role fits them.
+
+    Roles that need a skill the person has come first, so skilled people fill the
+    skilled jobs and general spots stay free for everyone else. Then the role with
+    the most room, then the order the leader listed the roles in.
+    """
+    fitting = [role for role in roles if not role.is_full and role.role.fits(skills)]
+    if not fitting:
+        return None
+    return min(
+        fitting,
+        key=lambda role: (not role.role.required_skill, -role.open_spots, role.role.position, role.role.role_id or 0),
+    )
+
+
+def walk_in_role(roles: Sequence[RoleOverview], skills: frozenset[str]) -> RoleOverview:
+    """
+    The role to record a walk-in under. Walk-ins may go over capacity (the person is
+    already there helping), so this prefers an open role that fits, then any role
+    that fits, then the first role.
+    """
+    fitting = [role for role in roles if role.role.fits(skills)]
+    return best_role(roles, skills) or (fitting[0] if fitting else roles[0])
+
+
+def role_problems(role: RoleOverview, volunteer: Volunteer) -> list[str]:
+    """Why this particular role can't be given to the volunteer (empty list = it can)."""
+    reasons = []
+    if role.is_full:
+        reasons.append(tr("The {role} role is full.", role=role.role.display_name))
+    if not role.role.fits(volunteer.skills):
+        reasons.append(
+            tr(
+                "The {role} role needs {skill}, which isn't on {full_name}'s profile.",
+                role=role.role.display_name,
+                skill=role.role.required_skill,
+                full_name=volunteer.full_name,
+            )
+        )
+    return reasons
+
+
+def no_fitting_role_message(volunteer: Volunteer, roles: Sequence[RoleOverview]) -> str:
+    """Explains a shift with open spots that are all in roles needing a skill the person lacks."""
+    needs = sorted(
+        {role.role.required_skill for role in roles if not role.is_full and role.role.required_skill}, key=str.casefold
+    )
+    return tr(
+        "The open spots on this shift need {skills}, which isn't on {full_name}'s profile.",
+        skills=describe_names(needs) or tr("a skill"),
+        full_name=volunteer.full_name,
+    )
+
+
+def check_roles(roles: Sequence[ShiftRole], current: Sequence[RoleOverview]) -> None:
+    """
+    Check a leader's edit of a shift's roles before it is saved.
+
+    Every problem is reported at once, keyed by row ("role_2_capacity"), so the
+    form can show each message beside its field. Rules: one to twelve roles;
+    names unique (ignoring case); a role can't shrink below the people already
+    in it; and a role with people in it can't be removed.
+    """
+    errors: dict[str, str] = {}
+    if not roles:
+        errors["roles"] = tr("A shift needs at least one role.")
+    elif len(roles) > MAX_ROLES_PER_SHIFT:
+        errors["roles"] = tr("A shift can have at most {count} roles.", count=MAX_ROLES_PER_SHIFT)
+    seen: set[str] = set()
+    filled = {overview.role.role_id: overview.filled for overview in current}
+    for index, role in enumerate(roles):
+        key = role.name.casefold()
+        if key in seen:
+            errors[f"role_{index}_name"] = tr("Two roles can't have the same name.")
+        seen.add(key)
+        taken = filled.get(role.role_id, 0) if role.role_id is not None else 0
+        if role.capacity < taken:
+            errors[f"role_{index}_capacity"] = tr_n(
+                "{count} person is already in this role, so it needs at least {count} spot.",
+                "{count} people are already in this role, so it needs at least {count} spots.",
+                taken,
+            )
+    kept = {role.role_id for role in roles if role.role_id is not None}
+    for overview in current:
+        if overview.role.role_id not in kept and overview.filled:
+            errors.setdefault(
+                "roles",
+                tr_n(
+                    "{count} person is signed up as {role}. Cancel or move them before removing the role.",
+                    "{count} people are signed up as {role}. Cancel or move them before removing the role.",
+                    overview.filled,
+                    role=overview.role.display_name,
+                ),
+            )
+    if errors:
+        raise ValidationError(errors)
+
+
 def signup_blockers(
     *,
     volunteer: Volunteer,
@@ -93,6 +196,7 @@ def signup_blockers(
     already_signed_up: bool,
     has_conflict: bool,
     required_certifications: Iterable[str],
+    role_reasons: Sequence[str] = (),
 ) -> list[str]:
     """
     Every reason ``volunteer`` cannot sign up for the shift (empty list = allowed).
@@ -142,7 +246,22 @@ def signup_blockers(
         reasons.append(
             tr("{full_name} is already scheduled for another shift at that time.", full_name=volunteer.full_name)
         )
+    if not already_signed_up and not overview.is_full:
+        reasons.extend(role_reasons)  # a full shift already says so; role details would only repeat it
     return reasons
+
+
+def waitlist_blockers(sign_up_reasons: Sequence[str], *, shift_is_open_to_them: bool) -> list[str]:
+    """
+    Whether someone may join a shift's waitlist, given why they can't sign up now.
+
+    The waitlist is only for people kept out by a lack of space: if the shift (or a
+    role that fits them) has room, they should sign up instead, and if something
+    else stops them (age, a missing certification), waiting wouldn't help.
+    """
+    if shift_is_open_to_them:
+        return [tr("There's still a spot for you on this shift. Sign up instead.")]
+    return list(sign_up_reasons)
 
 
 @dataclass(frozen=True, slots=True)

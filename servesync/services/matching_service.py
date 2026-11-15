@@ -43,6 +43,7 @@ from servesync.models import (
     AvailabilitySlot,
     Opportunity,
     OpportunityStatus,
+    RoleOverview,
     Shift,
     ShiftOverview,
     Volunteer,
@@ -51,7 +52,7 @@ from servesync.models import (
 )
 from servesync.models.enums import describe_slot
 from servesync.services.base import Service
-from servesync.services.rules import describe_access_gaps, signup_blockers
+from servesync.services.rules import best_role, describe_access_gaps, signup_blockers
 from servesync.services.session import Permission, Session
 
 AVAILABILITY_POINTS = 30.0
@@ -117,6 +118,7 @@ class VolunteerMatch(_MatchBase):
     volunteer: Volunteer
     recent_hours: float
     access_gaps: tuple[str, ...] = ()
+    role: RoleOverview | None = None  # the role they would fill, picked by skill
 
     def _gaps(self) -> tuple[str, ...]:
         return self.access_gaps
@@ -128,6 +130,7 @@ class ShiftMatch(_MatchBase):
 
     overview: ShiftOverview
     access_gaps: tuple[str, ...] = ()
+    role: RoleOverview | None = None  # the role they would fill, picked by skill
 
     def _gaps(self) -> tuple[str, ...]:
         return self.access_gaps
@@ -321,11 +324,15 @@ class MatchingService(Service):
         participation = self._participation_by_id()
         visits = self._store.assignments.attended_count_by_volunteer(shift.opportunity_id)
         recent = self._recent_hours()
+        roles = self._store.shifts.roles(shift_id)
 
         matches: list[VolunteerMatch] = []
         for volunteer in self._store.volunteers.find_all(status=VolunteerStatus.ACTIVE):
             volunteer_id = volunteer.volunteer_id or 0
-            if signup_blockers(
+            # Roles are filled by skill: each person is matched to the open role that uses their
+            # skills (or a general one). Nobody is suggested for a spot they couldn't take.
+            role = best_role(roles, volunteer.skills)
+            if role is None or signup_blockers(
                 volunteer=volunteer,
                 overview=overview,
                 min_age=opportunity.min_age,
@@ -345,7 +352,9 @@ class MatchingService(Service):
             )
             gaps = describe_access_gaps(volunteer.access_needs, opportunity.access_features, opportunity.title)
             matches.append(
-                VolunteerMatch(total_score(factors), factors, volunteer, recent.get(volunteer_id, 0.0), tuple(gaps))
+                VolunteerMatch(
+                    total_score(factors), factors, volunteer, recent.get(volunteer_id, 0.0), tuple(gaps), role
+                )
             )
 
         # People whose access needs this program meets come first; then score;
@@ -409,7 +418,8 @@ class MatchingService(Service):
                 for record in commitments
                 if record.assignment.shift_id != shift.shift_id
             )
-            if signup_blockers(
+            role = best_role(self._store.shifts.roles(shift.shift_id or 0), volunteer.skills)
+            if role is None or signup_blockers(
                 volunteer=volunteer,
                 overview=overview,
                 min_age=opportunity.min_age,
@@ -430,7 +440,7 @@ class MatchingService(Service):
             gaps = describe_access_gaps(volunteer.access_needs, opportunity.access_features, opportunity.title)
             if gaps and only_fitting_access:
                 continue
-            matches.append(ShiftMatch(total_score(factors), factors, overview, tuple(gaps)))
+            matches.append(ShiftMatch(total_score(factors), factors, overview, tuple(gaps), role))
 
         matches.sort(key=lambda m: (not m.fits_access_needs, -m.score, m.overview.shift.starts_at))
         if not diversify:

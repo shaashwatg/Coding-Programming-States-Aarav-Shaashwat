@@ -30,7 +30,7 @@ from servesync.core.validators import (
     validate_birth_date,
 )
 from servesync.models._common import clean_skill_set, validate_optional_id
-from servesync.models.enums import AccessNeed, DayPart, RecruitmentSource, VolunteerStatus, Weekday
+from servesync.models.enums import AccessNeed, CredentialKind, DayPart, RecruitmentSource, VolunteerStatus, Weekday
 
 NOTES_MAX_LENGTH = 1000
 REFERRER_MAX_LENGTH = 101  # two 50-character names and a space
@@ -108,10 +108,20 @@ def _clean_availability(values: object) -> frozenset[AvailabilitySlot]:
 
 @dataclass(frozen=True, slots=True)
 class Certification:
-    """A credential a leader has verified, such as a background check, and when it runs out."""
+    """
+    A certification or waiver a leader has verified, such as a background check,
+    with when it was issued and when it runs out. ``issued_on`` is None only for
+    records saved before ServeSync tracked issue dates.
+    """
 
     name: str
     expires_on: date
+    kind: CredentialKind = CredentialKind.CERTIFICATION
+    issued_on: date | None = None
+
+    def __post_init__(self) -> None:
+        if self.issued_on is not None and self.issued_on > self.expires_on:
+            raise InvalidInputError(tr("The issue date must be on or before the expiry date."))
 
     def is_valid_on(self, day: date) -> bool:
         return self.expires_on >= day

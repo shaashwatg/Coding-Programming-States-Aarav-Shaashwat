@@ -38,12 +38,15 @@ from servesync.models import (
     AssignmentStatus,
     AvailabilitySlot,
     Certification,
+    CredentialKind,
     DayPart,
+    NoticeKind,
     Opportunity,
     OpportunityCategory,
     OpportunityStatus,
     RecruitmentSource,
     Shift,
+    ShiftRole,
     UserAccount,
     UserRole,
     Volunteer,
@@ -180,6 +183,28 @@ DEMO_CERTIFIED_PROGRAM, DEMO_CERTIFICATION = "After-School Reading Buddies", "Ba
 DEMO_CERTIFIED_SHARE, DEMO_RENEW_SOON_EVERY = 2, 7  # every 2nd person holds one; every 7th renews soon
 DEMO_CERTIFICATION_DAYS, DEMO_RENEW_SOON_DAYS = 300, 20
 
+#: How long a background check is valid; issue dates are worked back from the expiry date.
+DEMO_CREDENTIAL_VALID_DAYS = 365
+#: The one-time event that requires a signed waiver, and has roles.
+DEMO_EVENT_PROGRAM, DEMO_WAIVER, DEMO_FOOD_CARD = "Community 5K Fun Run", "Liability waiver", "Food Handler Card"
+DEMO_WAIVER_SOON_DAYS = 10
+DEMO_WAITLIST_SIZE = 2
+DEMO_WAITLIST_LEAD_DAYS = 3  # the full shift is a few days out, so the demo has time to show it
+#: Roles for upcoming shifts: (name, people, required skill). Totals match each program's capacity.
+DEMO_ROLES: dict[str, tuple[tuple[str, int, str], ...]] = {
+    "Community 5K Fun Run": (
+        ("Registration", 4, "Customer Service"),
+        ("Water station", 12, ""),
+        ("Course marshal", 8, ""),
+        ("Finish line", 4, ""),
+        ("First aid", 2, "First Aid/CPR"),
+    ),
+    "Weekend Food Pantry Distribution": (
+        ("Greeter", 2, "Customer Service"),
+        ("Sorting and packing", 6, ""),
+    ),
+}
+
 #: Which active volunteers stop coming in the demo (fixed positions, so every reset matches).
 LAPSED_START, LAPSED_STEP, LAPSED_COUNT = 5, 9, 3
 
@@ -265,7 +290,10 @@ def seed_demo_data(
         _add_referrals_and_goals(store, volunteers, today)
         _add_impact_results(store, shifts, today)
         _add_certifications(store, volunteers, shifts, today)
+        _add_waivers_and_cards(store, volunteers, shifts, today)
+        _add_roles(store, shifts, today)
         checkin_shifts = _create_todays_checkin_shifts(store, volunteers, shifts, today)
+        _add_waitlists_and_notices(store, volunteers, today)
 
     summary = SeedSummary(
         volunteers=len(volunteers),
@@ -795,8 +823,144 @@ def _add_certifications(
             continue
         renew_soon = position % DEMO_RENEW_SOON_EVERY == 0
         days = DEMO_RENEW_SOON_DAYS if renew_soon else DEMO_CERTIFICATION_DAYS
+        expires = today + timedelta(days=days)
         store.volunteers.save_certification(
-            volunteer_id, Certification(DEMO_CERTIFICATION, today + timedelta(days=days))
+            volunteer_id,
+            Certification(
+                DEMO_CERTIFICATION,
+                expires,
+                CredentialKind.CERTIFICATION,
+                expires - timedelta(days=DEMO_CREDENTIAL_VALID_DAYS),
+            ),
+        )
+
+
+def _add_waivers_and_cards(
+    store: DataStore, volunteers: list[Volunteer], shifts: list[tuple[Shift, Opportunity]], today: date
+) -> None:
+    """
+    The 5K (a Sunday morning race) requires a signed liability waiver. Everyone already on
+    its roster has one, as does everyone usually free on Sunday mornings and every third
+    other active volunteer; two run out within the dashboard's 30 days.
+    Some volunteers also hold a food handler card, and two of those have already expired,
+    so the Certification expiry report has something to show in each group.
+    """
+    event = next(o for _, o in shifts if o.title == DEMO_EVENT_PROGRAM)
+    store.opportunities.update(
+        dataclasses.replace(
+            store.opportunities.get(_saved_id(event.opportunity_id)),
+            required_certifications=frozenset({DEMO_WAIVER}),
+        )
+    )
+    on_event = {
+        entry.assignment.volunteer_id
+        for shift, opportunity in shifts
+        if opportunity.opportunity_id == event.opportunity_id
+        for entry in store.assignments.roster(_saved_id(shift.shift_id))
+    }
+    active = [v for v in volunteers if v.status is VolunteerStatus.ACTIVE]
+    soon = 0
+    for position, volunteer in enumerate(active):
+        volunteer_id = _saved_id(volunteer.volunteer_id)
+        sunday_morning = AvailabilitySlot(Weekday.SUNDAY, DayPart.MORNING) in volunteer.availability
+        if volunteer_id in on_event or sunday_morning or position % 3 == 0:
+            days = DEMO_WAIVER_SOON_DAYS + soon * 3 if soon < 2 and volunteer_id not in on_event else 300
+            soon += days != 300
+            expires = today + timedelta(days=days)
+            store.volunteers.save_certification(
+                volunteer_id,
+                Certification(DEMO_WAIVER, expires, CredentialKind.WAIVER, expires - timedelta(days=365)),
+            )
+    with_cards = [v for v in active if "Food Handling" in v.skills]
+    for position, volunteer in enumerate(with_cards):
+        offset = -15 - position if position < 2 else 120 + position * 20  # the first two have lapsed
+        expires = today + timedelta(days=offset)
+        store.volunteers.save_certification(
+            _saved_id(volunteer.volunteer_id),
+            Certification(DEMO_FOOD_CARD, expires, CredentialKind.CERTIFICATION, expires - timedelta(days=3 * 365)),
+        )
+
+
+def _add_roles(store: DataStore, shifts: list[tuple[Shift, Opportunity]], today: date) -> None:
+    """
+    Upcoming 5K and food pantry shifts are split into roles. Past shifts keep their one
+    general role, as they would have before roles existed. Sign-ups already made move
+    into the role that uses their skills, as Smart Match would have placed them.
+    """
+    for shift, opportunity in shifts:
+        if shift.starts_at.date() < today or opportunity.title not in DEMO_ROLES:
+            continue
+        shift_id = _saved_id(shift.shift_id)
+        (general,) = store.shifts.roles(shift_id)
+        plan = DEMO_ROLES[opportunity.title]
+        # The general role becomes the first unskilled role, so it keeps everyone already in it.
+        roles: list[ShiftRole] = []
+        for position, (name, capacity, skill) in enumerate(plan):
+            is_first_open = not skill and not any(not r.required_skill for r in roles)
+            roles.append(
+                ShiftRole(
+                    name=name,
+                    capacity=max(capacity, general.filled) if is_first_open else capacity,
+                    required_skill=skill,
+                    shift_id=shift_id,
+                    position=position,
+                    role_id=general.role.role_id if is_first_open else None,
+                )
+            )
+        saved = store.shifts.replace_roles(shift_id, roles)
+        skilled = [role for role in saved if role.role.required_skill]
+        for entry in store.assignments.roster(shift_id):
+            volunteer = store.volunteers.get(entry.assignment.volunteer_id)
+            for role in skilled:
+                current = store.shifts.get_role(_saved_id(role.role.role_id))
+                if not current.is_full and role.role.fits(volunteer.skills):
+                    store.assignments.update(dataclasses.replace(entry.assignment, role_id=role.role.role_id))
+                    break
+
+
+def _add_waitlists_and_notices(store: DataStore, volunteers: list[Volunteer], today: date) -> None:
+    """
+    Two people wait for a full upcoming shift, and Priya (a demo sign-in) finds a note on
+    Home saying she was moved off a waitlist into one of her shifts.
+    """
+    now = datetime.combine(today, time(8))
+    priya = volunteers[1]
+    upcoming = store.shifts.overviews(
+        starts_after=now + timedelta(days=DEMO_WAITLIST_LEAD_DAYS), opportunity_status=OpportunityStatus.OPEN
+    )
+    # The smallest upcoming shift of a program anyone may join (no certification needed) fills up.
+    candidates = [
+        o
+        for o in upcoming
+        if not store.opportunities.get(o.shift.opportunity_id).required_certifications
+        and len(store.shifts.roles(_saved_id(o.shift.shift_id))) == 1
+    ]
+    if candidates:
+        target = min(candidates, key=lambda o: (o.shift.capacity, o.shift.starts_at))
+        shift = target.shift
+        shift_id = _saved_id(shift.shift_id)
+        min_age = store.opportunities.get(shift.opportunity_id).min_age
+        people = [v for v in volunteers[2:] if v.status is VolunteerStatus.ACTIVE]
+        waiting = 0
+        for offset, volunteer in enumerate(people):
+            volunteer_id = _saved_id(volunteer.volunteer_id)
+            if (
+                volunteer_id in store.assignments.volunteer_ids_on_shift(shift_id)
+                or calculate_age(volunteer.birth_date, shift.starts_at.date()) < min_age
+                or store.assignments.conflicting_shifts(volunteer_id, shift.starts_at, shift.ends_at)
+            ):
+                continue
+            if not store.shifts.get_overview(shift_id).is_full:
+                store.assignments.add(Assignment(shift_id, volunteer_id, signed_up_at=now - timedelta(days=5)))
+            elif waiting < DEMO_WAITLIST_SIZE:
+                store.waitlist.add(shift_id, volunteer_id, now - timedelta(days=3, hours=offset))
+                waiting += 1
+            else:
+                break
+    mine = store.assignments.upcoming_scheduled(after=now, volunteer_id=_saved_id(priya.volunteer_id))
+    if mine:
+        store.notices.add(
+            _saved_id(priya.volunteer_id), NoticeKind.WAITLIST_PROMOTED, mine[-1].shift_id, now - timedelta(days=1)
         )
 
 

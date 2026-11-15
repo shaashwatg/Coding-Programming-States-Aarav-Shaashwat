@@ -8,12 +8,14 @@ Gathering these here keeps the screens free of database logic.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 
 from servesync.models import (
     ActivityItem,
     AssignmentStatus,
+    Certification,
     Opportunity,
     OpportunityStatus,
     RecruitmentSource,
@@ -51,6 +53,28 @@ class RecruitmentInsight:
         return 0.0 if self.total == 0 else self.top_count / self.total
 
 
+#: The dashboard warns about certifications and waivers this many days before they run out.
+EXPIRY_NOTICE_DAYS = 30
+
+
+def expiring_soon(
+    volunteers: Iterable[Volunteer], today: date, days: int = EXPIRY_NOTICE_DAYS
+) -> list[tuple[Volunteer, Certification]]:
+    """
+    Items that are still valid today but run out within ``days`` (pure). Already
+    expired ones belong in the Certification expiry report: the dashboard is for
+    what a leader can still renew in time.
+    """
+    cutoff = today + timedelta(days=days)
+    found = [
+        (volunteer, item)
+        for volunteer in volunteers
+        for item in volunteer.certifications
+        if today <= item.expires_on <= cutoff
+    ]
+    return sorted(found, key=lambda pair: (pair[1].expires_on, pair[0].last_name.casefold(), pair[1].name.casefold()))
+
+
 @dataclass(frozen=True, slots=True)
 class LeaderSummary:
     organization_name: str
@@ -59,6 +83,8 @@ class LeaderSummary:
     understaffed: tuple[ShiftOverview, ...]  # next 7 days, soonest first
     hours_this_month: float
     hour_value: float
+    #: Active volunteers' certifications and waivers that run out within EXPIRY_NOTICE_DAYS, soonest first.
+    expiring: tuple[tuple[Volunteer, Certification], ...] = ()
 
     @property
     def open_spots(self) -> int:
@@ -104,6 +130,7 @@ class DashboardService(Service):
             understaffed=tuple(understaffed),
             hours_this_month=self._store.assignments.total_hours(start=today.replace(day=1), end=today),
             hour_value=self._store.settings.volunteer_hour_value(),
+            expiring=tuple(expiring_soon(self._store.volunteers.find_all(status=VolunteerStatus.ACTIVE), today)),
         )
 
     def featured_event(self, session: Session) -> FeaturedEvent | None:

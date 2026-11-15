@@ -79,7 +79,13 @@ def test_translations_keep_every_placeholder() -> None:
 def test_translations_are_real_translations() -> None:
     entries = messages.load_catalog()
     assert all(value.strip() for value in entries.values())
-    same_in_both = {"Error: {message}", "Smart Match", "{program}: {result} {unit}."}  # genuinely identical in Spanish
+    same_in_both = {  # genuinely identical in Spanish
+        "Error: {message}",
+        "Smart Match",
+        "{program}: {result} {unit}.",
+        "General",
+        "{role}: {message}",
+    }
     untouched = [k for k, v in entries.items() if k == v and len(k) > 4 and k not in same_in_both]
     assert untouched == []  # copied English would slip through the missing-message check
 

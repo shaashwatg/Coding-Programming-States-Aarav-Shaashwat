@@ -60,8 +60,18 @@ check in, starting 30 minutes before a shift. Only your password closes it.</li>
 <ul>
 <li>Edit a program to name <b>What this program measures</b>, then enter a result on each shift's roster. The
 <b>Impact summary</b> report turns these into a one-page PDF.</li>
-<li>Edit a program to add <b>Required certifications</b>, and edit a volunteer to record theirs. Nobody can be
-scheduled without a current one.</li>
+<li>Edit a program to add <b>Required certifications</b> (a certification or a signed waiver), and edit a volunteer to
+record theirs with its type, issue date, and expiry date. Nobody can be scheduled without a current one, and the
+reason is shown.</li>
+<li>The <b>Dashboard</b> lists everything that runs out in the next 30 days. The <b>Certification expiry</b> report
+lists what has expired or runs out within 90 days, and which programs need it.</li>
+</ul>
+<h3>Roles and waitlists</h3>
+<ul>
+<li>Open a shift and choose <b>Edit roles</b> to split it into jobs (for example Registration x2, Water station x6).
+A role can require one skill. The roster is grouped by role, and Smart Match places people by skill.</li>
+<li>When a shift is full, volunteers can <b>Join waitlist</b>. If someone cancels, the first person who still
+qualifies is signed up automatically and sees a note on their Home page. The roster shows who is waiting.</li>
 </ul>
 <h3>Staffing Studio</h3>
 <ul>
@@ -89,6 +99,10 @@ VOLUNTEER_GUIDE = """
 <li>Choose <b>Find a shift</b> (top right) to browse everything that's open. Select a shift to see details,
 then choose <b>Sign up</b>. If you can't sign up, ServeSync tells you why.</li>
 <li><b>Calendar</b> shows every open shift by date.</li>
+<li>Some shifts have roles, such as Registration or Water station. When you sign up you can choose one; ServeSync
+suggests the one that fits your skills.</li>
+<li>Shift full? Choose <b>Join waitlist</b>. If a spot opens, you're signed up automatically and a note appears on
+<b>Home</b>.</li>
 <li>Need to cancel? Select the shift on <b>Home</b> and choose <b>Cancel sign-up</b>, any time before it starts.</li>
 <li>Keep your availability and skills current on <b>My profile</b> so recommendations fit your life.
 You can also add the name you go by, your pronouns, and any access needs (step-free entry, seated tasks,
@@ -196,8 +210,20 @@ teléfono para registrarse, desde 30 minutos antes del turno. Solo su contraseñ
 <ul>
 <li>Edite un programa para indicar <b>Qué mide este programa</b> y luego escriba un resultado en la lista de cada
 turno. El informe <b>Resumen de impacto</b> los convierte en un PDF de una página.</li>
-<li>Edite un programa para agregar <b>Certificaciones requeridas</b> y edite a un voluntario para registrar las suyas.
-Nadie puede programarse sin una vigente.</li>
+<li>Edite un programa para agregar <b>Certificaciones requeridas</b> (una certificación o una exención firmada) y
+edite a un voluntario para registrar las suyas con su tipo, fecha de emisión y fecha de vencimiento. Nadie puede
+programarse sin una vigente, y se muestra el motivo.</li>
+<li>El <b>Panel</b> muestra todo lo que vence en los próximos 30 días. El informe <b>Vencimiento de
+certificaciones</b> muestra lo que ya venció o vence en 90 días, y qué programas lo requieren.</li>
+</ul>
+<h3>Funciones y listas de espera</h3>
+<ul>
+<li>Abra un turno y elija <b>Editar funciones</b> para dividirlo en tareas (por ejemplo, Registro x2, Puesto de agua
+x6). Una función puede requerir una habilidad. La lista se agrupa por función, y Smart Match ubica a cada persona
+según sus habilidades.</li>
+<li>Cuando un turno está completo, los voluntarios pueden <b>Unirse a la lista de espera</b>. Si alguien cancela, la
+primera persona que todavía cumple los requisitos queda inscrita automáticamente y ve un aviso en su página de
+Inicio. La lista del turno muestra quién espera.</li>
 </ul>
 <h3>Estudio de personal</h3>
 <ul>
@@ -230,6 +256,10 @@ VOLUNTEER_GUIDE_ES = """
 <li>Elija <b>Buscar un turno</b> (arriba a la derecha) para ver todo lo que está abierto. Seleccione un turno para ver
 los detalles y luego elija <b>Inscribirme</b>. Si no puede inscribirse, ServeSync le dice por qué.</li>
 <li><b>Calendario</b> muestra cada turno abierto por fecha.</li>
+<li>Algunos turnos tienen funciones, como Registro o Puesto de agua. Al inscribirse puede elegir una; ServeSync le
+sugiere la que encaja con sus habilidades.</li>
+<li>¿El turno está completo? Elija <b>Unirme a la lista de espera</b>. Si se libera un lugar, quedará inscrito
+automáticamente y verá un aviso en <b>Inicio</b>.</li>
 <li>¿Necesita cancelar? Seleccione el turno en <b>Inicio</b> y elija <b>Cancelar inscripción</b> en cualquier
 momento antes de que empiece.</li>
 <li>Mantenga al día su disponibilidad y sus habilidades en <b>Mi perfil</b> para que las recomendaciones se ajusten a

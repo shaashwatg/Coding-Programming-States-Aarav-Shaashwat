@@ -211,6 +211,8 @@ class ReportsPage(Page):
         for edit in (self.start, self.end):
             edit.setEnabled(False)
         self._resolve_dates()
+        for widget in (self.period_box, self.start, self.end):  # some reports always look ahead from today
+            self._set_visible(widget, kind.uses_period)
         if self.leader:
             self._set_visible(self.volunteer_box, is_record)
             self._set_visible(self.program_box, not is_record)

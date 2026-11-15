@@ -29,6 +29,7 @@ from servesync.models import (
     AccessNeed,
     AvailabilitySlot,
     Certification,
+    CredentialKind,
     DayPart,
     RecruitmentSource,
     Volunteer,
@@ -146,8 +147,15 @@ class VolunteerRepository(Repository):
                 (volunteer_id, certification.name),
             )
             self._db.execute(
-                "INSERT INTO volunteer_certifications (volunteer_id, name, expires_on) VALUES (?, ?, ?)",
-                (volunteer_id, certification.name, date_to_db(certification.expires_on)),
+                """INSERT INTO volunteer_certifications (volunteer_id, name, expires_on, kind, issued_on)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    volunteer_id,
+                    certification.name,
+                    date_to_db(certification.expires_on),
+                    certification.kind.value,
+                    date_to_db(certification.issued_on) if certification.issued_on else None,
+                ),
             )
 
     def remove_certification(self, volunteer_id: int, name: str) -> None:
@@ -358,11 +366,18 @@ class VolunteerRepository(Repository):
         for batch in chunked(ids):
             marks = placeholders(batch)
             for certification_row in self._db.query_all(
-                f"SELECT volunteer_id, name, expires_on FROM volunteer_certifications WHERE volunteer_id IN ({marks})",
+                f"""SELECT volunteer_id, name, expires_on, kind, issued_on FROM volunteer_certifications
+                    WHERE volunteer_id IN ({marks})""",
                 tuple(batch),
             ):
+                issued = certification_row["issued_on"]
                 certifications[certification_row["volunteer_id"]].add(
-                    Certification(certification_row["name"], date_from_db(certification_row["expires_on"]))
+                    Certification(
+                        certification_row["name"],
+                        date_from_db(certification_row["expires_on"]),
+                        CredentialKind(certification_row["kind"]),
+                        date_from_db(issued) if issued else None,
+                    )
                 )
             for skill_row in self._db.query_all(
                 f"""SELECT vs.volunteer_id, sk.name FROM volunteer_skills AS vs

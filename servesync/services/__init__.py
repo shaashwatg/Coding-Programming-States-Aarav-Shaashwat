@@ -77,12 +77,17 @@ class Services:
         matching = MatchingService(store, clock)
         reports = ReportService(store, clock)
         scheduling = SchedulingService(store, clock)
+        volunteers = VolunteerService(store, clock)
+        opportunities = OpportunityService(store, clock)
+        # When a spot frees up anywhere (an archived volunteer, a bigger shift), the waitlist moves up.
+        for service in (scheduling, volunteers, opportunities):
+            service.on_spots_freed = scheduling.fill_from_waitlists
         return cls(
             store=store,
             clock=clock,
             auth=AuthService(store, clock, password_iterations=password_iterations),
-            volunteers=VolunteerService(store, clock),
-            opportunities=OpportunityService(store, clock),
+            volunteers=volunteers,
+            opportunities=opportunities,
             scheduling=scheduling,
             attendance=AttendanceService(store, clock),
             matching=matching,

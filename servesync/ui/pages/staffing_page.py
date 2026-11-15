@@ -330,6 +330,8 @@ class StaffingPage(Page):
 def _proposal_text(proposal: PlanProposal) -> str:
     shift = proposal.overview.shift
     reasons = "; ".join(proposal.match.strengths[:2])
+    if proposal.role is not None and not proposal.role.role.is_general:
+        reasons = tr("As {role}. {reasons}", role=proposal.role.role.display_name, reasons=reasons)
     return tr(
         "{name} ({score}) for {program}, {when}\n{reasons}",
         name=proposal.volunteer.full_name,

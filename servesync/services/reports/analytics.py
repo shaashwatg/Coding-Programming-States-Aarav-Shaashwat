@@ -869,6 +869,144 @@ def impact_summary(inputs: ReportInputs, filters: ReportFilters) -> Report:
     return _report(ReportKind.IMPACT_SUMMARY, inputs, filters, IMPACT_COLUMNS, rows, figures, insights, (chart,))
 
 
+# ------------------------------------------------------ certification expiry
+
+#: The expiry report covers what has run out and what runs out within this many days.
+EXPIRY_REPORT_DAYS = 90
+EXPIRY_SOON_DAYS = 30
+
+EXPIRY_COLUMNS = (
+    ReportColumn("volunteer", mark("Volunteer")),
+    ReportColumn("item", mark("Certification or waiver")),
+    ReportColumn("kind", mark("Type")),
+    ReportColumn("issued", mark("Issued"), ValueKind.DATE),
+    ReportColumn("expires", mark("Expires"), ValueKind.DATE),
+    ReportColumn("state", mark("Status")),
+    ReportColumn("days_left", mark("Days left"), ValueKind.COUNT, shown_by_default=False),
+    ReportColumn("needed_by", mark("Required by")),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ExpiryRow:
+    volunteer: str
+    item: str
+    kind: str
+    issued: date | None
+    expires: date
+    state: str
+    days_left: int  # negative once expired
+    needed_by: str
+
+
+def certification_expiry(inputs: ReportInputs, filters: ReportFilters) -> Report:
+    """
+    Active volunteers' certifications and waivers that have expired or will within
+    EXPIRY_REPORT_DAYS, soonest first, with the programs that require each one. A
+    program or category filter keeps only items those programs require.
+    """
+    today = inputs.now.date()
+    cutoff = today + timedelta(days=EXPIRY_REPORT_DAYS)
+    programs = [
+        o
+        for o in inputs.opportunities.values()
+        if (filters.opportunity_id is None or o.opportunity_id == filters.opportunity_id)
+        and (filters.category is None or o.category is filters.category)
+    ]
+    required_by: defaultdict[str, list[str]] = defaultdict(list)
+    for program in programs:
+        for name in program.required_certifications:
+            required_by[name.casefold()].append(program.title)
+    scoped = filters.opportunity_id is not None or filters.category is not None
+
+    rows: list[_ExpiryRow] = []
+    for volunteer in inputs.volunteers:
+        if volunteer.status is not VolunteerStatus.ACTIVE:
+            continue
+        for item in volunteer.certifications:
+            needed = sorted(required_by.get(item.name.casefold(), []), key=str.casefold)
+            if item.expires_on > cutoff or (scoped and not needed):
+                continue
+            days_left = (item.expires_on - today).days
+            if days_left < 0:
+                state = tr_n("Expired {count} day ago", "Expired {count} days ago", -days_left)
+            elif days_left == 0:
+                state = tr("Expires today")
+            else:
+                state = tr_n("Expires in {count} day", "Expires in {count} days", days_left)
+            rows.append(
+                _ExpiryRow(
+                    volunteer=volunteer.full_name,
+                    item=item.name,
+                    kind=item.kind.label,
+                    issued=item.issued_on,
+                    expires=item.expires_on,
+                    state=state,
+                    days_left=days_left,
+                    needed_by=", ".join(needed),
+                )
+            )
+    rows.sort(key=lambda row: (row.expires, row.volunteer.casefold(), row.item.casefold()))
+
+    expired = [row for row in rows if row.days_left < 0]
+    soon = [row for row in rows if 0 <= row.days_left <= EXPIRY_SOON_DAYS]
+    later = [row for row in rows if row.days_left > EXPIRY_SOON_DAYS]
+    figures = (
+        Figure(tr("Expired"), str(len(expired)), tr("renew before scheduling")),
+        Figure(tr("Expire within 30 days"), str(len(soon))),
+        Figure(tr("Expire in 31 to 90 days"), str(len(later))),
+        Figure(tr("People to contact"), str(len({row.volunteer for row in rows}))),
+    )
+    insights: list[str] = []
+    if expired:
+        insights.append(
+            tr_n(
+                "{count} item has already expired. Those volunteers can't be scheduled for programs that need it.",
+                "{count} items have already expired. Those volunteers can't be scheduled for programs that need them.",
+                len(expired),
+            )
+        )
+    if soon:
+        first = soon[0]
+        insights.append(
+            tr(
+                "Next to run out: {volunteer}'s {item}, on {day}.",
+                volunteer=first.volunteer,
+                item=first.item,
+                day=format_value(ValueKind.DATE, first.expires),
+            )
+        )
+    by_item = Counter(row.item for row in rows)
+    if by_item:
+        busiest, count = max(by_item.items(), key=lambda pair: (pair[1], pair[0]))
+        if count > 1:
+            insights.append(
+                tr(
+                    "{item} needs the most renewals ({count}). One group session could cover them.",
+                    item=busiest,
+                    count=count,
+                )
+            )
+    by_month: Counter[date] = Counter(row.expires.replace(day=1) for row in rows if row.days_left >= 0)
+    months = sorted(by_month)
+    chart = ChartSeries(
+        tr("Items running out, by month"),
+        tuple(format_month_year(month) for month in months),
+        tuple(float(by_month[month]) for month in months),
+        ValueKind.COUNT,
+    )
+    context = (
+        tr(
+            "Expired, or running out by {day} ({count} days from today).",
+            day=format_value(ValueKind.DATE, cutoff),
+            count=EXPIRY_REPORT_DAYS,
+        ),
+    )
+    return _report(
+        ReportKind.CERTIFICATION_EXPIRY, inputs, filters, EXPIRY_COLUMNS, rows, figures, insights, (chart,), context
+    )
+
+
 SERVICE_RECORD_COLUMNS = (
     ReportColumn("date", mark("Date"), ValueKind.DATE),
     ReportColumn("program", mark("Program")),

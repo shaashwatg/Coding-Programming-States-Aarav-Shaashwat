@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from servesync.core.errors import ValidationError
 from servesync.core.i18n import tr
 from servesync.core.validators import suggest_email_correction
-from servesync.models import RecruitmentSource, Volunteer, VolunteerStatus
+from servesync.models import CredentialKind, RecruitmentSource, Volunteer, VolunteerStatus
 from servesync.services import Permission, Services, Session
 from servesync.ui.context import AppContext
 from servesync.ui.widgets.common import (
@@ -187,12 +187,22 @@ class VolunteerDialog(FormDialog):
                 )
             self.add_field("notes", tr("Staff notes"), self.notes, tr("Visible to leaders only."))
             if volunteer is not None:
-                self.add_section(tr("Certifications (leaders only)"))
+                self.add_section(tr("Certifications and waivers (leaders only)"))
                 self.certification_name = QComboBox()
                 self.certification_name.setEditable(True)
                 self.certification_name.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
                 self.certification_name.addItems(ctx.services.volunteers.certification_names())
-                self.add_field("certification_name", tr("Certification"), self.certification_name)
+                self.add_field(
+                    "certification_name",
+                    tr("Name"),
+                    self.certification_name,
+                    tr("For example, Food Handler Card or Liability waiver."),
+                )
+                self.certification_kind: EnumComboBox[CredentialKind] = EnumComboBox(CredentialKind)
+                self.add_field("certification_kind", tr("Type"), self.certification_kind)
+                self.certification_issued = _date_edit(today)
+                self.certification_issued.setDate(today)
+                self.add_field("certification_issued", tr("Issue date"), self.certification_issued)
                 self.certification_expires = _date_edit(QDate(2100, 1, 1))
                 self.certification_expires.setDate(today.addYears(1))
                 self.add_field("certification_expires", tr("Expiry date"), self.certification_expires)
@@ -217,7 +227,16 @@ class VolunteerDialog(FormDialog):
     def _show_certifications(self, volunteer: Volunteer) -> None:
         held = sorted(volunteer.certifications, key=lambda c: c.name.casefold())
         self.certification_list.setText(
-            "\n".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held)
+            "\n".join(
+                tr(
+                    "{name}, {kind}: issued {issued}, expires {day}",
+                    name=c.name,
+                    kind=c.kind.label.lower(),
+                    issued=format_date(c.issued_on) if c.issued_on else tr("date not recorded"),
+                    day=format_date(c.expires_on),
+                )
+                for c in held
+            )
             or tr("None recorded yet.")
         )
 
@@ -228,6 +247,8 @@ class VolunteerDialog(FormDialog):
                 volunteer_id,
                 self.certification_name.currentText(),
                 from_qdate(self.certification_expires.date()),
+                kind=self.certification_kind.value() or CredentialKind.CERTIFICATION,
+                issued_on=from_qdate(self.certification_issued.date()),
             )
         )
 

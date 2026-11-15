@@ -30,6 +30,7 @@ class ReportKind(Enum):
     SHIFT_ATTENDANCE = "SHIFT_ATTENDANCE"
     RECRUITMENT = "RECRUITMENT"
     IMPACT_SUMMARY = "IMPACT_SUMMARY"
+    CERTIFICATION_EXPIRY = "CERTIFICATION_EXPIRY"
     SERVICE_RECORD = "SERVICE_RECORD"
 
     @property
@@ -44,6 +45,11 @@ class ReportKind(Enum):
     @property
     def for_leaders(self) -> bool:
         return self is not ReportKind.SERVICE_RECORD
+
+    @property
+    def uses_period(self) -> bool:
+        """False for reports that always look ahead from today (the period picker is hidden)."""
+        return self is not ReportKind.CERTIFICATION_EXPIRY
 
 
 _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
@@ -66,6 +72,10 @@ _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
     ReportKind.IMPACT_SUMMARY: (
         mark("Impact summary"),
         mark("What did our volunteers achieve? One page for donors, grants, or the board."),
+    ),
+    ReportKind.CERTIFICATION_EXPIRY: (
+        mark("Certification expiry"),
+        mark("Whose certifications and waivers have run out or will soon, and which programs need them?"),
     ),
     ReportKind.SERVICE_RECORD: (
         mark("Service hours record"),
