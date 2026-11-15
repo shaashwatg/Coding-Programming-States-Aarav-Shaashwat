@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 0 automated tests, including the interface
+python -m pytest          # 594 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   0 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   594 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -391,6 +391,7 @@ volunteers ─┬─< volunteer_skills >── skills ──< opportunity_skills
 | `shift_roles`, `assignments.role_id` | Roles within a shift, each with a capacity and optional skill; the role each sign-up fills (schema version 6). A trigger rejects a role from another shift |
 | `waitlist`, `notices` | People waiting for a full shift, oldest first; Home-page notices stored as *what happened*, worded in the reader's language when shown (schema version 6) |
 | `volunteer_certifications.kind`, `issued_on` | Certification or waiver, and its issue date (schema version 6) |
+| `issued_documents` | Every service record and certificate saved as a PDF, by its verification code (schema version 8) |
 | `announcements` | A leader's note to one program or one shift (exactly one, enforced by a `CHECK`) (schema version 7) |
 | `assignments.checked_in_at`, `checked_out_at` | Kiosk arrival and departure; check-out can't come before check-in (schema version 7) |
 | `app_settings`           | Organization name, mission statement, value of a volunteer hour, accessibility |
@@ -458,8 +459,10 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 | **Tomorrow's reminders** | *Dashboard > Tomorrow's reminders*: everyone on the next day's shifts with phone, email, program, role and time | Any day can be chosen. *Export CSV* is protected against spreadsheet formula injection |
 | **Add to calendar** | Saves any shift as a standard `.ics` file (RFC 5545) for Apple, Google or Outlook calendars | Text is escaped and long lines folded at 75 bytes, as the standard requires; times are local to where the shift happens |
 | **Paper sign-in sheet** | *Print sign-in sheet* saves a PDF with each person's name, role and phone, columns for time in, time out and signature, and empty rows for walk-ins | The fallback for a day without the laptop |
-| **Hour goals** | A volunteer sets hours and a date on *Home*, then sees progress and a weekly pace. The kiosk reports progress too | Counts from August 1. The date must be after today. Only that person or a leader can change it |
-| **Results and impact summary** | A program names what it measures (*families served*); each shift records a number; the *Impact summary* report saves as a one-page PDF | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
+| **Hour goals** | A volunteer sets hours and a date on *Home*, then sees a progress bar, the weekly pace needed, and a projected finish date. The kiosk reports progress too | Counts from August 1. The projection uses the pace so far (hours per day since August 1); with no hours yet, it says so instead of guessing. The date must be after today. Only that person or a leader can change it. A finished goal turns emerald |
+| **Milestone certificates** | At 25, 50 and 100 hours, *My hours* offers a one-page certificate PDF | Dated by the shift that crossed the milestone. Only reached milestones can be printed |
+| **Verification codes** | Every service-hours PDF and certificate carries a code such as `K7Q2-9XFM`; leaders type it into *Reports > Verify a record* | Codes are random (not derived from the data), 8 characters from an alphabet without 0/O/1/I/L, stored with what the document said. Verification shows the person, the hours as issued, and whether that period has since been corrected. Try the demo codes **RVBD-7K2M** (Priya's service record) and **HQ5M-TZPA** (her 50-hour certificate) |
+| **Results and impact summary** | A program names what it measures (*families served*); leaders enter the number on the roster when recording attendance; the *Program impact* report shows each program's result, and the *Impact summary* report saves as a one-page PDF for any date range, with *Sections* to choose what it includes | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
 | **Certifications and waivers** | A program can require a certification or a signed waiver; leaders record each person's type, issue date and expiry date | A hard rule inside the one shared `signup_blockers` check, so manual sign-up, Smart Match, and Autopilot all enforce it; walk-ins and the kiosk check it too. It must still be valid on the day of the shift. The issue date can't be in the future or after the expiry. Volunteers can't certify themselves. The Dashboard lists what runs out in 30 days; the *Certification expiry* report covers what has expired or runs out within 90 days |
 | **Roles within a shift** | *Edit roles* splits a shift into jobs (Registration x4, Water station x12, First aid x2 needing First Aid/CPR) | Volunteers pick a role when they sign up; ServeSync suggests the one that uses their skills. Smart Match and Autopilot place people by skill and never overfill a role. The roster is grouped by role |
 | **Waitlist** | *Join waitlist* on a full shift | The next person who qualifies is signed up when a spot opens, and finds a note on Home. Leaders see who is waiting on the roster |
@@ -495,7 +498,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 0 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 594 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |

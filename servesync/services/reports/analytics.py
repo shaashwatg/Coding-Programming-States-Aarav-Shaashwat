@@ -376,6 +376,8 @@ PROGRAM_COLUMNS = (
     ReportColumn("hours", mark("Hours"), ValueKind.HOURS),
     ReportColumn("volunteers", mark("Volunteers"), ValueKind.COUNT),
     ReportColumn("value", mark("Community value"), ValueKind.MONEY),
+    ReportColumn("result", mark("Result"), ValueKind.COUNT),
+    ReportColumn("unit", mark("Measured in")),
 )
 
 
@@ -393,6 +395,8 @@ class _ProgramRow:
     hours: float
     volunteers: int
     value: float
+    result: int | None  # what finished shifts achieved, in the program's own unit (None = not measured)
+    unit: str
 
 
 def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
@@ -400,9 +404,12 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
     tallies = tally_by(facts, lambda f: f.opportunity_id, inputs.now)
     shift_count: defaultdict[int, int] = defaultdict(int)
     capacity: defaultdict[int, int] = defaultdict(int)
+    results: defaultdict[int, int] = defaultdict(int)
     for overview in shifts:
         shift_count[overview.shift.opportunity_id] += 1
         capacity[overview.shift.opportunity_id] += overview.shift.capacity
+        if overview.shift.impact_amount is not None and overview.shift.ends_at <= inputs.now:
+            results[overview.shift.opportunity_id] += overview.shift.impact_amount
 
     rows: list[_ProgramRow] = []
     for program_id in sorted(set(shift_count) | set(tallies)):
@@ -424,6 +431,8 @@ def program_impact(inputs: ReportInputs, filters: ReportFilters) -> Report:
                 hours=round(tally.hours, 2),
                 volunteers=len(tally.volunteers),
                 value=round(tally.hours * inputs.hour_value, 2),
+                result=results[program_id] if opportunity.impact_unit else None,
+                unit=opportunity.impact_unit,
             )
         )
     rows.sort(key=lambda row: (-row.hours, row.program))

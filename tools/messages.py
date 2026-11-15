@@ -49,13 +49,14 @@ def runtime_messages() -> set[str]:
     """Messages built from code rather than written out: enum labels and date presets."""
     sys.path.insert(0, str(ROOT))
     from servesync.models import enums
-    from servesync.services.reports.model import DatePreset
+    from servesync.services.reports.model import DatePreset, ReportSection
 
     found: set[str] = set()
     for value in vars(enums).values():
         if isinstance(value, type) and issubclass(value, enums.DisplayEnum) and value is not enums.DisplayEnum:
             found.update(member.english_label for member in value)
     found.update(preset.value for preset in DatePreset)
+    found.update(section.value for section in ReportSection)
     return found
 
 

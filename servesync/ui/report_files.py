@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 
 from PySide6.QtCore import QMarginsF, QSizeF, QUrl
@@ -18,7 +18,7 @@ from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocum
 
 from servesync.core.errors import DataStoreError
 from servesync.core.i18n import tr
-from servesync.services.reports import Report
+from servesync.services.reports import Report, ReportSection
 from servesync.services.reports.export import to_csv, to_html
 
 
@@ -48,7 +48,14 @@ def save_text(text: str, path: Path, *, excel: bool = False) -> None:
     _atomic_write(path, text.encode("utf-8-sig" if excel else "utf-8"))
 
 
-def save_pdf(report: Report, path: Path, columns: Sequence[str] | None, charts: Sequence[QImage]) -> None:
+def save_pdf(
+    report: Report,
+    path: Path,
+    columns: Sequence[str] | None,
+    charts: Sequence[QImage],
+    verification_code: str = "",
+    sections: Collection[ReportSection] | None = None,
+) -> None:
     """Letter-size PDF: title block, figures, insights, charts, then the table."""
     document = QTextDocument()
     names = []
@@ -56,7 +63,7 @@ def save_pdf(report: Report, path: Path, columns: Sequence[str] | None, charts: 
         name = f"chart-{index}.png"
         document.addResource(QTextDocument.ResourceType.ImageResource, QUrl(name), image)
         names.append(name)
-    document.setHtml(to_html(report, columns, names))
+    document.setHtml(to_html(report, columns, names, verification_code, sections))
     _print_pdf(document, path, f"{report.title} - {report.organization_name}")
 
 

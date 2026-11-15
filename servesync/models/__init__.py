@@ -29,6 +29,7 @@ from servesync.models.preferences import Appearance
 from servesync.models.read_models import (
     ActivityItem,
     Announcement,
+    IssuedDocument,
     Notice,
     RosterEntry,
     ServiceFact,
@@ -52,6 +53,7 @@ __all__ = [
     "Certification",
     "CredentialKind",
     "DayPart",
+    "IssuedDocument",
     "MessageDuration",
     "Notice",
     "NoticeKind",

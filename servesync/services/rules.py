@@ -9,9 +9,10 @@ Services gather the facts, call these rules, and act on the answer.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from types import MappingProxyType
 
 from servesync.core.errors import BusinessRuleError, ValidationError
@@ -273,6 +274,8 @@ class HourGoalProgress:
     served: float
     expected_by_now: float
     days_left: int
+    today: date | None = None
+    elapsed_days: int = 0  # days counted so far (from Aug 1 to today)
 
     @property
     def remaining(self) -> float:
@@ -295,6 +298,24 @@ class HourGoalProgress:
         """What it takes from here; the whole remainder when there are no full weeks left."""
         return round(self.remaining / max(self.days_left / 7, 1.0), 1)
 
+    @property
+    def projected_finish(self) -> date | None:
+        """
+        When the goal will be reached at the pace so far (hours since Aug 1 per day),
+        or None if there's no pace to project from yet. Already reached: the day it was.
+        """
+        if self.today is None or self.served <= 0 or self.elapsed_days <= 0:
+            return None
+        if self.reached:
+            return self.today
+        per_day = self.served / self.elapsed_days
+        return self.today + timedelta(days=math.ceil(self.remaining / per_day))
+
+    @property
+    def finishes_in_time(self) -> bool:
+        projected = self.projected_finish
+        return projected is not None and projected <= self.due
+
 
 def school_year_start(today: date) -> date:
     return date(today.year if today.month >= 8 else today.year - 1, 8, 1)
@@ -314,6 +335,8 @@ def hour_goal_progress(volunteer: Volunteer, records: Iterable[ServiceRecord], t
         served=round(served, 2),
         expected_by_now=round(volunteer.hour_goal * elapsed / span, 2),
         days_left=max((volunteer.hour_goal_due - today).days, 0),
+        today=today,
+        elapsed_days=max((today - start).days + 1, 0),
     )
 
 

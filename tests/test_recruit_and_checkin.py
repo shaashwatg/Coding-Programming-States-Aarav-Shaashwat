@@ -301,6 +301,14 @@ def test_goal_progress_counts_this_school_year_and_judges_pace() -> None:
     assert progress.expected_by_now == pytest.approx(100 * 92 / 304, abs=0.01)
     assert not progress.on_pace  # 30 served, just under the 30.26 expected by now
     assert progress.hours_per_week == pytest.approx(70 / (212 / 7), abs=0.1)
+    # 30 hours in 93 days: the other 70 take 217 more days at that pace, a few days late.
+    assert progress.projected_finish == date(2027, 6, 6) and not progress.finishes_in_time
+
+
+def test_no_pace_means_no_projection() -> None:
+    volunteer = make_volunteer(hour_goal=40, hour_goal_due=date(2027, 5, 30))
+    progress = hour_goal_progress(volunteer, [], date(2026, 11, 1))
+    assert progress is not None and progress.projected_finish is None
 
 
 def test_no_goal_means_no_progress() -> None:

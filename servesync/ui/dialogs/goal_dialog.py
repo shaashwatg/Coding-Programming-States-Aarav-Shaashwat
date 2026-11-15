@@ -117,6 +117,17 @@ class HourGoalPanel(Panel):
                     rate=format_hours(progress.hours_per_week),
                 )
             )
+        projected = progress.projected_finish
+        if not progress.reached and progress.days_left > 0:
+            self.advice.setText(
+                self.advice.text()
+                + " "
+                + (
+                    tr("At your pace so far, you'll finish around {day}.", day=format_date(projected))
+                    if projected is not None
+                    else tr("Once you've served some hours, you'll see when you're likely to finish.")
+                )
+            )
 
     @guarded
     def _set_goal(self) -> None:

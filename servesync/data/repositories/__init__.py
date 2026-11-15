@@ -3,6 +3,7 @@
 from servesync.data.repositories.account_repository import AccountRepository
 from servesync.data.repositories.announcement_repository import AnnouncementRepository
 from servesync.data.repositories.assignment_repository import AssignmentRepository
+from servesync.data.repositories.document_repository import DocumentRepository
 from servesync.data.repositories.opportunity_repository import OpportunityRepository
 from servesync.data.repositories.preference_repository import PreferenceRepository
 from servesync.data.repositories.settings_repository import SettingKey, SettingsRepository
@@ -15,6 +16,7 @@ __all__ = [
     "AccountRepository",
     "AnnouncementRepository",
     "AssignmentRepository",
+    "DocumentRepository",
     "NoticeRepository",
     "OpportunityRepository",
     "PreferenceRepository",

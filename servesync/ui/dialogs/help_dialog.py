@@ -43,6 +43,9 @@ charts who brings in the most volunteers, so you know whom to thank.</li>
 or one person's service record), a period, and optionally a program or category.</li>
 <li>Read <i>What stands out</i> for plain-English findings, choose <b>Columns</b> to show more detail,
 then <b>Export CSV</b> or <b>Save PDF</b>. Exports contain exactly what you see.</li>
+<li>For the one-page <b>Impact summary</b>, choose <b>Sections</b> to leave out parts you don't need.</li>
+<li>Every service-hours PDF and certificate carries a verification code. Choose <b>Verify a record</b> and type it to
+confirm a document someone sends you is genuine.</li>
 </ul>
 <h3>Ask ServeSync</h3>
 <ul>
@@ -117,7 +120,9 @@ appear on <b>Home</b>.</li>
 <li>Keep your availability and skills current on <b>My profile</b> so recommendations fit your life.
 You can also add the name you go by, your pronouns, and any access needs (step-free entry, seated tasks,
 public transit, a quiet space, no cost, or remote).</li>
-<li><b>My hours</b> lists your verified service. Choose <b>Save PDF</b> for school, scholarships, or employers.</li>
+<li><b>My hours</b> lists your verified service. Choose <b>Save PDF</b> for school, scholarships, or employers. At
+25, 50, and 100 hours you can save a certificate. Each PDF has a code the organization can confirm.</li>
+<li>Set an <b>hour goal</b> on Home to see your progress and the date you're likely to finish.</li>
 <li>Press <b>Ctrl+K</b> and ask things like <i>When is my next shift?</i> or <i>What should I sign up for?</i></li>
 </ul>
 """
@@ -202,6 +207,9 @@ inscribirse.</li>
 reclutamiento o el historial de servicio de una persona), un período y, si quiere, un programa o una categoría.</li>
 <li>Lea <i>Lo más destacado</i> para ver los hallazgos en lenguaje sencillo, elija <b>Columnas</b> para ver más
 detalle y luego <b>Exportar CSV</b> o <b>Guardar PDF</b>. Lo que exporta es exactamente lo que ve.</li>
+<li>En el <b>Resumen de impacto</b> de una página, elija <b>Secciones</b> para quitar las partes que no necesite.</li>
+<li>Cada PDF de horas de servicio y cada certificado lleva un código de verificación. Elija <b>Verificar un
+documento</b> y escríbalo para confirmar que un documento que le envían es auténtico.</li>
 </ul>
 <h3>Pregúntale a ServeSync</h3>
 <ul>
@@ -287,7 +295,10 @@ momento antes de que empiece.</li>
 <li>Mantenga al día su disponibilidad y sus habilidades en <b>Mi perfil</b> para que las recomendaciones se ajusten a
 su vida. También puede agregar el nombre que usa, sus pronombres y cualquier necesidad de acceso (entrada sin
 escalones, tareas sentado, transporte público, un espacio tranquilo, sin costo o a distancia).</li>
-<li><b>Mis horas</b> enumera su servicio verificado. Elija <b>Guardar PDF</b> para la escuela, becas o empleadores.</li>
+<li><b>Mis horas</b> enumera su servicio verificado. Elija <b>Guardar PDF</b> para la escuela, becas o empleadores. Al
+llegar a 25, 50 y 100 horas puede guardar un certificado. Cada PDF tiene un código que la organización puede
+confirmar.</li>
+<li>Defina una <b>meta de horas</b> en Inicio para ver su progreso y la fecha en que probablemente terminará.</li>
 <li>Presione <b>Ctrl+K</b> y pregunte cosas como <i>¿Cuándo es mi próximo turno?</i> o
 <i>¿En qué debería inscribirme?</i></li>
 </ul>

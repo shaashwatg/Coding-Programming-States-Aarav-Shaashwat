@@ -191,3 +191,19 @@ class Announcement:
     opportunity_id: int | None = None  # set when it is for the whole program
     shift_id: int | None = None  # set when it is for one shift
     shift_starts_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IssuedDocument:
+    """A service record or certificate that left the building, by its verification code."""
+
+    code: str
+    kind: str  # "SERVICE_RECORD" or "MILESTONE"
+    volunteer_id: int
+    volunteer_name: str  # the legal name, as printed on the document
+    hours: float
+    issued_at: datetime
+    issued_by: str
+    period_start: date | None = None
+    period_end: date | None = None
+    milestone: int | None = None

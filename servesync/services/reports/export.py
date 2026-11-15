@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 from html import escape
 
 from servesync import __app_name__
 from servesync.core.i18n import tr
-from servesync.services.reports.model import Report, ReportColumn, ReportKind, ValueKind, format_value
+from servesync.services.reports.model import Report, ReportColumn, ReportKind, ReportSection, ValueKind, format_value
 
 # Ink for printed reports. Paper is always white, so these don't follow the screen theme;
 # they are the light theme's slate, secondary slate and hairlines (see ui/theme.py).
@@ -64,11 +64,19 @@ def suggested_filename(report: Report, extension: str) -> str:
     return f"servesync-{safe}-{report.filters.start:%Y%m%d}-{report.filters.end:%Y%m%d}.{extension}"
 
 
-def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Sequence[str] = ()) -> str:
+def to_html(
+    report: Report,
+    keys: Sequence[str] | None = None,
+    chart_images: Sequence[str] = (),
+    verification_code: str = "",
+    sections: Collection[ReportSection] | None = None,
+) -> str:
     """
     A print-ready page for the PDF writer. ``chart_images`` are resource names
-    of chart pictures already registered with the document.
+    of chart pictures already registered with the document. ``sections`` leaves
+    out the parts a leader switched off (None = everything).
     """
+    shown = set(ReportSection) if sections is None else set(sections)
     columns = chosen_columns(report, keys)
     e = escape
     parts = [
@@ -81,7 +89,7 @@ def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Seq
     generated = format_value(ValueKind.DATE, report.generated_at)
     prepared = tr("Prepared {date} with {app}", date=generated, app=__app_name__)
     parts.append(f"<p style='color:{PRINT_MUTED}; margin:4px 0 12px 0'>{e(prepared)}</p>")
-    if report.figures:
+    if report.figures and ReportSection.FIGURES in shown:
         cells = "".join(
             f"<td style='padding:6px 14px 6px 0; vertical-align:top'><span style='font-size:16pt'><b>"
             f"{e(f.value)}</b></span><br>{e(f.label)}"
@@ -89,17 +97,20 @@ def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Seq
             for f in report.figures
         )
         parts.append(f"<table><tr>{cells}</tr></table>")
-    if report.insights:
+    if report.insights and ReportSection.INSIGHTS in shown:
         parts.append(f"<h3>{e(tr('What stands out'))}</h3><ul>")
         parts += [f"<li>{e(insight)}</li>" for insight in report.insights]
         parts.append("</ul>")
-    for name, chart in zip(chart_images, report.charts, strict=False):
+    for name, chart in zip(chart_images if ReportSection.CHARTS in shown else (), report.charts, strict=False):
         parts.append(f"<h3>{e(chart.title)}</h3><p><img src='{e(name)}' width='620'></p>")
 
-    parts.append(f"<h3>{e(tr('Details'))}</h3>")
-    if report.is_empty:
+    if ReportSection.TABLE not in shown:
+        pass
+    elif report.is_empty:
+        parts.append(f"<h3>{e(tr('Details'))}</h3>")
         parts.append(f"<p>{e(tr('No records match these filters.'))}</p>")
     else:
+        parts.append(f"<h3>{e(tr('Details'))}</h3>")
         header = "".join(
             f"<th align='{'right' if c.kind.is_numeric else 'left'}' "
             f"style='border-bottom:1px solid {PRINT_RULE_STRONG}; "
@@ -124,5 +135,11 @@ def to_html(report: Report, keys: Sequence[str] | None = None, chart_images: Seq
             f"<p style='margin-top:30px'>{e(tr('Coordinator signature:'))} ______________________________"
             f"&nbsp;&nbsp;&nbsp; {e(tr('Date:'))} ______________</p>"
         )
+        if verification_code:
+            parts.append(
+                f"<p style='margin-top:18px; color:{PRINT_MUTED}'>"
+                f"{e(tr('Verification code: {code}', code=verification_code))}<br>"
+                f"{e(tr('The organization can confirm this record with this code.'))}</p>"
+            )
     parts.append("</body></html>")
     return "".join(parts)

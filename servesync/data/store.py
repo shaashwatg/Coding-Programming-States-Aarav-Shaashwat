@@ -22,6 +22,7 @@ from servesync.data.repositories import (
     AccountRepository,
     AnnouncementRepository,
     AssignmentRepository,
+    DocumentRepository,
     NoticeRepository,
     OpportunityRepository,
     PreferenceRepository,
@@ -50,6 +51,7 @@ class DataStore:
         self.waitlist = WaitlistRepository(db)
         self.notices = NoticeRepository(db)
         self.announcements = AnnouncementRepository(db)
+        self.documents = DocumentRepository(db)
 
     @classmethod
     def open(cls, path: Path | str) -> DataStore:

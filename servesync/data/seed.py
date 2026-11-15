@@ -189,6 +189,8 @@ DEMO_CREDENTIAL_VALID_DAYS = 365
 DEMO_EVENT_PROGRAM, DEMO_WAIVER, DEMO_FOOD_CARD = "Community 5K Fun Run", "Liability waiver", "Food Handler Card"
 DEMO_WAIVER_SOON_DAYS = 10
 DEMO_WAITLIST_SIZE = 2
+#: Fixed verification codes for the demo (documented in the README), so "Verify a record" can be shown.
+DEMO_RECORD_CODE, DEMO_CERTIFICATE_CODE, DEMO_CERTIFICATE_HOURS = "RVBD7K2M", "HQ5MTZPA", 50
 DEMO_EVENT_ANNOUNCEMENT = (
     "Thank you for helping with the 5K! Please arrive 30 minutes early for a short briefing at the "
     "registration tent. Parking is in the north lot."
@@ -300,6 +302,7 @@ def seed_demo_data(
         checkin_shifts = _create_todays_checkin_shifts(store, volunteers, shifts, today)
         _add_waitlists_and_notices(store, volunteers, today)
         _add_announcements_and_kiosk_times(store, volunteers, today)
+        _add_issued_documents(store, volunteers, today)
 
     summary = SeedSummary(
         volunteers=len(volunteers),
@@ -1004,6 +1007,36 @@ def _add_announcements_and_kiosk_times(store: DataStore, volunteers: list[Volunt
             arrived = shift.starts_at - timedelta(minutes=5) + timedelta(minutes=3 * index)
             left = max(arrived, shift.starts_at) + timedelta(hours=served)
             store.assignments.update(dataclasses.replace(entry.assignment, checked_in_at=arrived, checked_out_at=left))
+
+
+def _add_issued_documents(store: DataStore, volunteers: list[Volunteer], today: date) -> None:
+    """
+    Two documents Priya has already saved, with fixed codes so the demo of *Verify a record*
+    always works: her service record for this school year, and her 50-hour certificate.
+    """
+    priya_id = _saved_id(volunteers[1].volunteer_id)
+    start = date(today.year if today.month >= 8 else today.year - 1, 8, 1)
+    issued_at = datetime.combine(today - timedelta(days=3), time(16))
+    store.documents.add(
+        code=DEMO_RECORD_CODE,
+        kind="SERVICE_RECORD",
+        volunteer_id=priya_id,
+        hours=round(store.assignments.total_hours(volunteer_id=priya_id, start=start, end=issued_at.date()), 2),
+        issued_at=issued_at,
+        issued_by="priya.patel",
+        period_start=start,
+        period_end=issued_at.date(),
+    )
+    if store.assignments.total_hours(volunteer_id=priya_id) >= DEMO_CERTIFICATE_HOURS:
+        store.documents.add(
+            code=DEMO_CERTIFICATE_CODE,
+            kind="MILESTONE",
+            volunteer_id=priya_id,
+            hours=float(DEMO_CERTIFICATE_HOURS),
+            issued_at=issued_at,
+            issued_by="priya.patel",
+            milestone=DEMO_CERTIFICATE_HOURS,
+        )
 
 
 def _create_todays_checkin_shifts(

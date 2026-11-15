@@ -30,6 +30,7 @@ from servesync.services.dashboard_service import (
 )
 from servesync.services.matching_service import MatchingService, ScoreFactor, ShiftMatch, VolunteerMatch
 from servesync.services.opportunity_service import OpportunityService
+from servesync.services.records_service import Milestone, RecordsService, Verification
 from servesync.services.reports import ReportService
 from servesync.services.scheduling_service import SchedulingService
 from servesync.services.session import Permission, Session
@@ -66,6 +67,7 @@ class Services:
     setup: SetupService
     staffing: StaffingService
     coordination: CoordinationService
+    records: RecordsService
 
     @classmethod
     def create(
@@ -100,6 +102,7 @@ class Services:
             setup=SetupService(store, clock, password_iterations=password_iterations),
             staffing=StaffingService(store, clock, matching=matching, scheduling=scheduling),
             coordination=CoordinationService(store, clock),
+            records=RecordsService(store, clock),
         )
 
 
@@ -119,10 +122,12 @@ __all__ = [
     "KioskState",
     "LeaderSummary",
     "MatchingService",
+    "Milestone",
     "OpportunityService",
     "Permission",
     "PlanProposal",
     "PlanResult",
+    "RecordsService",
     "RecruitmentInsight",
     "ReminderRow",
     "ReportService",
@@ -139,6 +144,7 @@ __all__ = [
     "StatusChange",
     "SystemClock",
     "TurnoutOutlook",
+    "Verification",
     "VolunteerMatch",
     "VolunteerService",
     "VolunteerSummary",

@@ -378,6 +378,29 @@ ARTICLES: tuple[HelpArticle, ...] = (
         leaders_only=True,
         action_label="Open Calendar",
     ),
+    HelpArticle(
+        "Verify a service record or certificate",
+        "verify verification code genuine real fake check confirm record certificate school employer",
+        (
+            "On Reports, choose Verify a record.",
+            "Type the code printed at the bottom of the PDF, like K7Q2-9XFM.",
+            "ServeSync says whether it's genuine, whose it is, and the hours it showed.",
+        ),
+        page="reports",
+        leaders_only=True,
+        action_label="Open Reports",
+    ),
+    HelpArticle(
+        "Save a milestone certificate",
+        "certificate milestone 25 50 100 hours award save pdf",
+        (
+            "Open My hours.",
+            "Under Milestone certificates, choose Save certificate next to a milestone you've reached.",
+            "The certificate has a code the organization can confirm.",
+        ),
+        page="hours",
+        action_label="Open My hours",
+    ),
 )
 
 
@@ -714,6 +737,26 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
             "Después, registre las horas de la hoja en la lista del turno.",
         ),
         "Abrir Calendario",
+    ),
+    (
+        "Verificar un historial o un certificado",
+        "verificar verificacion codigo autentico falso comprobar confirmar historial certificado escuela empleador",
+        (
+            "En Informes, elija Verificar un documento.",
+            "Escriba el código impreso al final del PDF, como K7Q2-9XFM.",
+            "ServeSync indica si es auténtico, de quién es y cuántas horas mostraba.",
+        ),
+        "Abrir Informes",
+    ),
+    (
+        "Guardar un certificado por logros",
+        "certificado logro 25 50 100 horas reconocimiento guardar pdf",
+        (
+            "Abra Mis horas.",
+            "En Certificados por logros, elija Guardar certificado junto a un logro que haya alcanzado.",
+            "El certificado tiene un código que la organización puede confirmar.",
+        ),
+        "Abrir Mis horas",
     ),
 )
 

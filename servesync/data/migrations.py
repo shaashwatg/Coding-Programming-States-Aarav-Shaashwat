@@ -373,6 +373,24 @@ ALTER TABLE assignments ADD COLUMN checked_out_at TEXT
     CHECK (checked_out_at IS NULL OR (checked_in_at IS NOT NULL AND checked_out_at >= checked_in_at));
 """
 
+_V8_ISSUED_DOCUMENTS = """
+-- Every service-hours record and milestone certificate saved as a PDF gets a short code,
+-- so a school or employer can ask the organization to confirm it is genuine.
+CREATE TABLE issued_documents (
+    code         TEXT PRIMARY KEY CHECK (length(code) = 8),
+    kind         TEXT NOT NULL CHECK (kind IN ('SERVICE_RECORD', 'MILESTONE')),
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    period_start TEXT,
+    period_end   TEXT,
+    hours        REAL NOT NULL CHECK (hours >= 0),
+    milestone    INTEGER CHECK (milestone IS NULL OR milestone IN (25, 50, 100)),
+    issued_at    TEXT NOT NULL,
+    issued_by    TEXT NOT NULL CHECK (length(issued_by) BETWEEN 1 AND 80),
+    CHECK ((kind = 'MILESTONE') = (milestone IS NOT NULL))
+) WITHOUT ROWID;
+CREATE INDEX idx_issued_documents_volunteer ON issued_documents (volunteer_id);
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
@@ -381,6 +399,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(5, "Program results and required certifications", _V5_IMPACT_AND_CERTIFICATIONS),
     Migration(6, "Shift roles, waitlists, notices, and certification types", _V6_ROLES_WAITLIST_CREDENTIALS),
     Migration(7, "Announcements, and kiosk check-in and check-out times", _V7_ANNOUNCEMENTS_AND_CHECK_OUT),
+    Migration(8, "Verification codes for service records and certificates", _V8_ISSUED_DOCUMENTS),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

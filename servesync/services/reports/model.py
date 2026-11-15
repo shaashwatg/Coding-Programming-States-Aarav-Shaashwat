@@ -84,6 +84,19 @@ _KIND_TEXT: dict[ReportKind, tuple[str, str]] = {
 }
 
 
+class ReportSection(Enum):
+    """Parts of a report a leader can leave out (used by the one-page Impact summary)."""
+
+    FIGURES = "Headline figures"
+    INSIGHTS = "What stands out"
+    CHARTS = "Charts"
+    TABLE = "Details table"
+
+    @property
+    def label(self) -> str:
+        return tr(self.value)
+
+
 class DatePreset(Enum):
     """Common reporting periods, resolved against "today"."""
 
