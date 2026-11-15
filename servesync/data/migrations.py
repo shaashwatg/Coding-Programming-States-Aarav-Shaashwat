@@ -391,6 +391,37 @@ CREATE TABLE issued_documents (
 CREATE INDEX idx_issued_documents_volunteer ON issued_documents (volunteer_id);
 """
 
+_V9_CHANGE_LOG_AND_PRIVACY = """
+-- Who changed what, and when. Stored as codes (action, record type, field names), so the
+-- history reads in either language. Rows are only ever added.
+CREATE TABLE change_log (
+    change_id  INTEGER PRIMARY KEY,
+    changed_at TEXT NOT NULL,
+    changed_by TEXT NOT NULL CHECK (length(changed_by) BETWEEN 1 AND 80),
+    action     TEXT NOT NULL CHECK (action IN ('ADDED', 'CHANGED', 'REMOVED', 'STATUS', 'IMPORTED',
+                                               'RESTORED', 'ANONYMIZED', 'REQUESTED')),
+    entity     TEXT NOT NULL CHECK (entity IN ('VOLUNTEER', 'PROGRAM', 'SHIFT', 'SIGN_UP', 'ACCOUNT',
+                                               'SETTINGS', 'DATA')),
+    entity_id  INTEGER,
+    label      TEXT NOT NULL DEFAULT '' CHECK (length(label) <= 160),
+    details    TEXT NOT NULL DEFAULT '' CHECK (length(details) <= 500)
+);
+CREATE INDEX idx_change_log_time ON change_log (changed_at);
+
+-- A volunteer's request to have their personal details removed.
+CREATE TABLE deletion_requests (
+    request_id   INTEGER PRIMARY KEY,
+    volunteer_id INTEGER NOT NULL REFERENCES volunteers (volunteer_id) ON DELETE CASCADE,
+    requested_at TEXT NOT NULL,
+    reason       TEXT NOT NULL DEFAULT '' CHECK (length(reason) <= 500),
+    status       TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COMPLETED', 'DECLINED')),
+    handled_by   TEXT,
+    handled_at   TEXT,
+    response     TEXT NOT NULL DEFAULT '' CHECK (length(response) <= 500)
+);
+CREATE UNIQUE INDEX idx_one_open_request ON deletion_requests (volunteer_id) WHERE status = 'PENDING';
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
@@ -400,6 +431,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(6, "Shift roles, waitlists, notices, and certification types", _V6_ROLES_WAITLIST_CREDENTIALS),
     Migration(7, "Announcements, and kiosk check-in and check-out times", _V7_ANNOUNCEMENTS_AND_CHECK_OUT),
     Migration(8, "Verification codes for service records and certificates", _V8_ISSUED_DOCUMENTS),
+    Migration(9, "Change history and privacy requests", _V9_CHANGE_LOG_AND_PRIVACY),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 594 automated tests, including the interface
+python -m pytest          # 618 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   594 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   618 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -391,6 +391,7 @@ volunteers ─┬─< volunteer_skills >── skills ──< opportunity_skills
 | `shift_roles`, `assignments.role_id` | Roles within a shift, each with a capacity and optional skill; the role each sign-up fills (schema version 6). A trigger rejects a role from another shift |
 | `waitlist`, `notices` | People waiting for a full shift, oldest first; Home-page notices stored as *what happened*, worded in the reader's language when shown (schema version 6) |
 | `volunteer_certifications.kind`, `issued_on` | Certification or waiver, and its issue date (schema version 6) |
+| `change_log`, `deletion_requests` | Who changed what and when (codes, not values); volunteers' requests to remove their details, one open request each (schema version 9) |
 | `issued_documents` | Every service record and certificate saved as a PDF, by its verification code (schema version 8) |
 | `announcements` | A leader's note to one program or one shift (exactly one, enforced by a `CHECK`) (schema version 7) |
 | `assignments.checked_in_at`, `checked_out_at` | Kiosk arrival and departure; check-out can't come before check-in (schema version 7) |
@@ -469,6 +470,15 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 
 Every result in the demo is sample data calculated from attendance.
 
+### Data and trust
+
+| Feature | What it does | Rules worth explaining |
+|---|---|---|
+| **Import from CSV** | *Volunteers > Import* reads a spreadsheet saved as CSV and previews every row with exactly what to fix (line number and field) | Each row passes the same checks as the volunteer form, plus: no two rows share an email, and nobody already on file is added twice. Nothing is saved until every row is ready; then all rows are saved in one transaction. English or Spanish headings, extra columns skipped (and listed), UTF-8 or Excel's Windows encoding. *Save template* gives the headings |
+| **Backup and Restore** | *Settings > Back up* writes one `.zip` with a consistent snapshot of the database (SQLite's online backup), every program photo, and a manifest | *Restore* checks the file first: a ServeSync backup, intact (`PRAGMA integrity_check`), not from a newer version, with the core tables and an active administrator. Older backups are upgraded by the normal migrations. Everyone is signed out afterward |
+| **Change history** | *Settings > Change history* (administrators): who changed what, and when, searchable by name or user and filterable by kind of record | Stored as codes (action, record type, field names), so it reads in either language. It names changed fields but never copies their values, so it isn't a second copy of personal data |
+| **Privacy** | Volunteers: *My profile > Download my data* (a readable JSON file of everything held about them) and *Request deletion*. Administrators complete or decline requests in *Settings* | Someone with no service history is deleted outright. For anyone else, every personal detail is removed (name, contact, birthday reduced to the year, skills, availability, certifications, sign-in, and their name in the change history) but the hours stay, so totals still add up. One open request per person (a database index) |
+
 ### Staffing Studio (look ahead, then act)
 
 Smart Match answers "who is best for this shift?" Staffing Studio answers the coordinator's bigger
@@ -498,7 +508,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 594 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 618 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |

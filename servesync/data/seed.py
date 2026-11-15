@@ -189,6 +189,7 @@ DEMO_CREDENTIAL_VALID_DAYS = 365
 DEMO_EVENT_PROGRAM, DEMO_WAIVER, DEMO_FOOD_CARD = "Community 5K Fun Run", "Liability waiver", "Food Handler Card"
 DEMO_WAIVER_SOON_DAYS = 10
 DEMO_WAITLIST_SIZE = 2
+DEMO_DELETION_REASON = "I moved out of state. Please remove my details."
 #: Fixed verification codes for the demo (documented in the README), so "Verify a record" can be shown.
 DEMO_RECORD_CODE, DEMO_CERTIFICATE_CODE, DEMO_CERTIFICATE_HOURS = "RVBD7K2M", "HQ5MTZPA", 50
 DEMO_EVENT_ANNOUNCEMENT = (
@@ -303,6 +304,7 @@ def seed_demo_data(
         _add_waitlists_and_notices(store, volunteers, today)
         _add_announcements_and_kiosk_times(store, volunteers, today)
         _add_issued_documents(store, volunteers, today)
+        _add_history_and_privacy_request(store, volunteers, today)
 
     summary = SeedSummary(
         volunteers=len(volunteers),
@@ -1036,6 +1038,45 @@ def _add_issued_documents(store: DataStore, volunteers: list[Volunteer], today: 
             issued_at=issued_at,
             issued_by="priya.patel",
             milestone=DEMO_CERTIFICATE_HOURS,
+        )
+
+
+def _add_history_and_privacy_request(store: DataStore, volunteers: list[Volunteer], today: date) -> None:
+    """
+    A week of believable history (approvals, edits, a new program, a backup) so the change
+    history has something to show, and one waiting deletion request from an archived volunteer.
+    """
+    start = datetime.combine(today - timedelta(days=7), time(9))
+    active = [v for v in volunteers[2:] if v.status is VolunteerStatus.ACTIVE]
+    archived = [v for v in volunteers[2:] if v.status is VolunteerStatus.INACTIVE]
+    program = next(o for o in store.opportunities.find_all() if o.status is OpportunityStatus.DRAFT)
+    events = [
+        ("coordinator", "STATUS", "VOLUNTEER", active[0], "APPLICANT>ACTIVE"),
+        ("coordinator", "CHANGED", "VOLUNTEER", active[1], "phone, availability"),
+        ("admin", "ADDED", "PROGRAM", None, ""),
+        ("coordinator", "CHANGED", "VOLUNTEER", active[2], "certifications: Background Check"),
+        ("admin", "ADDED", "DATA", None, "backup"),
+    ]
+    for day, (who, action, entity, volunteer, details) in enumerate(events):
+        if entity == "PROGRAM":
+            entity_id, label = program.opportunity_id, program.title
+        elif entity == "DATA":
+            entity_id, label = None, f"servesync-backup-{(start + timedelta(days=day)):%Y-%m-%d}.zip"
+        else:
+            assert volunteer is not None
+            entity_id, label = volunteer.volunteer_id, volunteer.full_name
+        store.changes.add(
+            changed_at=start + timedelta(days=day, hours=day),
+            changed_by=who,
+            action=action,
+            entity=entity,
+            entity_id=entity_id,
+            label=label,
+            details=details,
+        )
+    if archived:
+        store.deletion_requests.add(
+            _saved_id(archived[0].volunteer_id), start + timedelta(days=5), DEMO_DELETION_REASON
         )
 
 

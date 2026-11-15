@@ -85,6 +85,7 @@ def test_translations_are_real_translations() -> None:
         "{program}: {result} {unit}.",
         "General",
         "{role}: {message}",
+        "{column}: {message}",
         "{program} ({organization})",
         "{program}, {when}",
     }

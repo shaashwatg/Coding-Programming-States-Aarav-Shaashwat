@@ -88,6 +88,14 @@ class AttendanceService(Service):
             signup, status=AssignmentStatus.ATTENDED, hours_served=self._hours_for(shift, hours)
         )
         saved = self._store.assignments.update(attended)
+        self._log(
+            session.username,
+            "STATUS",
+            "SIGN_UP",
+            assignment_id,
+            self._signup_label(saved),
+            f"{signup.status.value}>ATTENDED",
+        )
         logger.info("Sign-up #%s marked attended (%s h)", assignment_id, saved.hours_served)
         return saved
 
@@ -97,9 +105,18 @@ class AttendanceService(Service):
         if signup.status is AssignmentStatus.CANCELLED:
             raise BusinessRuleError(tr("This sign-up was cancelled in advance, so it isn't a no-show."))
         self._started_shift(signup.shift_id)
-        return self._store.assignments.update(
+        saved = self._store.assignments.update(
             dataclasses.replace(signup, status=AssignmentStatus.NO_SHOW, hours_served=None)
         )
+        self._log(
+            session.username,
+            "STATUS",
+            "SIGN_UP",
+            assignment_id,
+            self._signup_label(saved),
+            f"{signup.status.value}>NO_SHOW",
+        )
+        return saved
 
     def check_in_everyone(self, session: Session, shift_id: int) -> int:
         """Mark every still-scheduled volunteer on a shift as attended for the full shift."""
@@ -116,8 +133,16 @@ class AttendanceService(Service):
                         if arrived
                         else shift.duration_hours
                     )
-                    self._store.assignments.update(
+                    saved = self._store.assignments.update(
                         dataclasses.replace(entry.assignment, status=AssignmentStatus.ATTENDED, hours_served=hours)
+                    )
+                    self._log(
+                        session.username,
+                        "STATUS",
+                        "SIGN_UP",
+                        saved.assignment_id,
+                        self._signup_label(saved),
+                        "SCHEDULED>ATTENDED",
                     )
                     count += 1
         logger.info("Checked in %s volunteers on shift #%s", count, shift_id)
@@ -168,6 +193,7 @@ class AttendanceService(Service):
                 role_id=walk_in_role(self._store.shifts.roles(shift_id), volunteer.skills).role.role_id,
             )
         )
+        self._log(session.username, "ADDED", "SIGN_UP", saved.assignment_id, self._signup_label(saved), "walk-in")
         logger.info("Walk-in: volunteer #%s on shift #%s", volunteer_id, shift_id)
         return saved
 
@@ -245,6 +271,7 @@ class AttendanceService(Service):
         saved = self._store.assignments.update(
             dataclasses.replace(signup, checked_out_at=now, status=AssignmentStatus.ATTENDED, hours_served=hours)
         )
+        self._log(session.username, "STATUS", "SIGN_UP", assignment_id, self._signup_label(saved), "SCHEDULED>ATTENDED")
         logger.info("Kiosk check-out: sign-up #%s (%s h)", assignment_id, hours)
         return KioskResult(
             volunteer.given_name,

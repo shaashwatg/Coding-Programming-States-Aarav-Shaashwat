@@ -33,7 +33,7 @@ from servesync.models import (
     Volunteer,
     WaitlistEntry,
 )
-from servesync.services.base import Service
+from servesync.services.base import WAITLIST, Service
 from servesync.services.rules import (
     best_role,
     check_roles,
@@ -79,6 +79,7 @@ class SchedulingService(Service):
         session.require_self_or(Permission.MANAGE_SCHEDULE, volunteer_id)
         with self._store.transaction():  # write lock held from check to insert
             saved = self._sign_up_locked(shift_id, volunteer_id, role_id)
+            self._log(session.username, "ADDED", "SIGN_UP", saved.assignment_id, self._signup_label(saved))
         logger.info("Volunteer #%s signed up for shift #%s by account #%s", volunteer_id, shift_id, session.account_id)
         return saved
 
@@ -96,6 +97,9 @@ class SchedulingService(Service):
         with self._store.transaction():
             cancelled = self._store.assignments.update(
                 dataclasses.replace(signup, status=AssignmentStatus.CANCELLED, hours_served=None)
+            )
+            self._log(
+                session.username, "STATUS", "SIGN_UP", assignment_id, self._signup_label(signup), "SCHEDULED>CANCELLED"
             )
             self.fill_from_waitlist(signup.shift_id)
         logger.info("Sign-up #%s cancelled by account #%s", assignment_id, session.account_id)
@@ -116,7 +120,9 @@ class SchedulingService(Service):
             problems = role_problems(role, self._store.volunteers.get(signup.volunteer_id))
             if problems:
                 raise BusinessRuleError(" ".join(problems))
-            return self._store.assignments.update(dataclasses.replace(signup, role_id=role_id))
+            saved = self._store.assignments.update(dataclasses.replace(signup, role_id=role_id))
+            self._log(session.username, "CHANGED", "SIGN_UP", assignment_id, self._signup_label(saved), "role")
+            return saved
 
     # --------------------------------------------------------------- roles
 
@@ -132,6 +138,8 @@ class SchedulingService(Service):
             current = self._store.shifts.roles(shift_id)
             check_roles(roles, current)
             saved = self._store.shifts.replace_roles(shift_id, list(roles))
+            label = self._store.shifts.get_overview(shift_id).opportunity_title
+            self._log(session.username, "CHANGED", "SHIFT", shift_id, label, "roles")
             self.fill_from_waitlist(shift_id)
         logger.info("Roles for shift #%s set by account #%s", shift_id, session.account_id)
         return saved
@@ -191,6 +199,7 @@ class SchedulingService(Service):
             if self._blockers(volunteer, current, self._store.shifts.roles(shift_id), None):
                 continue  # can't take this spot (e.g. no fitting role, or now busy then); keeps their place
             promoted.append(self._sign_up_locked(shift_id, entry.volunteer_id, None))
+            self._log(WAITLIST, "ADDED", "SIGN_UP", promoted[-1].assignment_id, self._signup_label(promoted[-1]))
             self._store.waitlist.remove(shift_id, entry.volunteer_id)
             self._store.notices.add(entry.volunteer_id, NoticeKind.WAITLIST_PROMOTED, shift_id, now)
             logger.info("Volunteer #%s moved from the waitlist into shift #%s", entry.volunteer_id, shift_id)

@@ -401,6 +401,53 @@ ARTICLES: tuple[HelpArticle, ...] = (
         page="hours",
         action_label="Open My hours",
     ),
+    HelpArticle(
+        "Import volunteers from a spreadsheet",
+        "import csv spreadsheet excel upload many bulk list file template",
+        (
+            "On Volunteers, choose Import. Choose Save template for the right column headings.",
+            "Choose your CSV file. ServeSync checks every row and lists exactly what to fix.",
+            "When every row is ready, choose Import. All rows are saved together.",
+        ),
+        page="volunteers",
+        leaders_only=True,
+        action_label="Open Volunteers",
+    ),
+    HelpArticle(
+        "Back up and restore",
+        "backup back up restore copy save usb cloud lost computer recover",
+        (
+            "Administrators: on Settings, choose Back up and save the file somewhere safe.",
+            "To go back to a backup, choose Restore. It replaces everything and signs everyone out.",
+            "ServeSync checks the file first and refuses anything damaged or from a newer version.",
+        ),
+        page="settings",
+        leaders_only=True,
+        action_label="Open Settings",
+    ),
+    HelpArticle(
+        "See who changed a record",
+        "history audit change changed who when log edit record trail",
+        (
+            "Administrators: on Settings, choose Change history.",
+            "Search for a name or username, or choose a kind of record.",
+            "Each line shows who, when, and which details changed (never the values themselves).",
+        ),
+        page="settings",
+        leaders_only=True,
+        action_label="Open Settings",
+    ),
+    HelpArticle(
+        "Download or delete my data",
+        "privacy my data download export delete deletion remove forget personal",
+        (
+            "Open My profile.",
+            "Download my data saves everything ServeSync holds about you as a file.",
+            "Request deletion asks an administrator to remove your personal details. Your hours stay in the totals.",
+        ),
+        page="profile",
+        action_label="Open My profile",
+    ),
 )
 
 
@@ -757,6 +804,47 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
             "El certificado tiene un código que la organización puede confirmar.",
         ),
         "Abrir Mis horas",
+    ),
+    (
+        "Importar voluntarios desde una hoja de cálculo",
+        "importar csv hoja calculo excel subir muchos lista archivo plantilla",
+        (
+            "En Voluntarios, elija Importar. Elija Guardar plantilla para obtener los encabezados correctos.",
+            "Elija su archivo CSV. ServeSync revisa cada fila y muestra exactamente qué corregir.",
+            "Cuando todas las filas estén listas, elija Importar. Todas se guardan juntas.",
+        ),
+        "Abrir Voluntarios",
+    ),
+    (
+        "Hacer y restaurar copias de seguridad",
+        "copia seguridad respaldo restaurar guardar usb nube perder computadora recuperar",
+        (
+            "Administradores: en Configuración, elija Hacer copia de seguridad y guarde el archivo en un lugar seguro.",
+            "Para volver a una copia, elija Restaurar. Reemplaza todo y cierra la sesión de todos.",
+            "ServeSync revisa el archivo primero y rechaza lo que esté dañado o sea de una versión más reciente.",
+        ),
+        "Abrir Configuración",
+    ),
+    (
+        "Ver quién cambió un registro",
+        "historial auditoria cambio cambio quien cuando registro editar",
+        (
+            "Administradores: en Configuración, elija Historial de cambios.",
+            "Busque un nombre o usuario, o elija un tipo de registro.",
+            "Cada línea muestra quién, cuándo y qué datos cambiaron (nunca los valores).",
+        ),
+        "Abrir Configuración",
+    ),
+    (
+        "Descargar o eliminar mis datos",
+        "privacidad mis datos descargar exportar eliminar borrar personales olvidar",
+        (
+            "Abra Mi perfil.",
+            "Descargar mis datos guarda en un archivo todo lo que ServeSync tiene sobre usted.",
+            "Pedir la eliminación solicita a un administrador que elimine sus datos personales. Sus horas siguen en "
+            "los totales.",
+        ),
+        "Abrir Mi perfil",
     ),
 )
 

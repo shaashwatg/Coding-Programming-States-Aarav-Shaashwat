@@ -32,12 +32,25 @@ from servesync.ui.dialogs.application_dialog import ApplicationDialog
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
 from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
+from servesync.ui.dialogs.data_dialogs import HistoryDialog, ImportDialog
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
 from servesync.ui.dialogs.roles_dialog import RolesDialog
 from servesync.ui.dialogs.shift_detail import MATCH_TAB, ROSTER_TAB, ShiftDetailDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.main_window import MainWindow
+
+
+def write_import_example(folder: Path) -> Path:
+    """A small CSV with one ready row and one that needs fixing, to show the import preview."""
+    path = folder / "volunteers.csv"
+    path.write_text(
+        "First name,Last name,Email,Phone,Birth date,Skills\n"
+        "Maria,Gomez,maria.gomez@example.org,206-555-0170,03/04/1990,Cooking; Spanish\n"
+        "Sam,Lee,sam.lee@example,911-555-0100,02/30/2001,\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def settle(app: QApplication) -> None:
@@ -149,9 +162,22 @@ def main() -> int:
             save(app, window, args.output, f"02-9g-toast{suffix}")
             save(app, KioskDialog(ctx), args.output, f"02-9h-kiosk{suffix}", (1360, 860))
             save(app, RemindersDialog(ctx), args.output, f"02-9l-reminders{suffix}", (1080, 640))
+            importer = ImportDialog(ctx)
+            importer.load(write_import_example(Path(temp)))
+            save(app, importer, args.output, f"02-9m-import{suffix}", (1000, 640))
+
+        def admin_extras(ctx: AppContext, window: MainWindow) -> None:
+            save(app, HistoryDialog(ctx), args.output, f"04-history{suffix}", (1080, 680))
 
         capture_role("coordinator", "02-leader", leader_extras)
         capture_role("priya.patel", "03-volunteer", lambda _ctx, _window: None)
+        session = services.auth.sign_in("admin", DEMO_PASSWORD)
+        admin_window = MainWindow(AppContext(services, session, AppEvents()))
+        admin_window.resize(1360, 860)
+        admin_window.navigate("settings")
+        save(app, admin_window, args.output, f"04-admin-settings{suffix}")
+        admin_extras(AppContext(services, session, AppEvents()), admin_window)
+        admin_window.close()
         store.close()
     return 0
 

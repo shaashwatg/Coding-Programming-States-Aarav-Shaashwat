@@ -28,7 +28,7 @@ from servesync.models import (
     VolunteerStatus,
 )
 from servesync.models.volunteer import clean_certification_name
-from servesync.services.base import Service
+from servesync.services.base import PUBLIC_FORM, Service, changed_fields
 from servesync.services.rules import HourGoalProgress, check_volunteer_transition, hour_goal_progress
 from servesync.services.session import Permission, Session
 
@@ -36,6 +36,24 @@ logger = logging.getLogger(__name__)
 
 MAX_HOUR_GOAL = 2000  # about a full-time year; anything higher is a typo
 CERTIFICATION_WARNING_DAYS = 45
+#: Profile fields named in the change history when they change (values are never logged).
+VOLUNTEER_FIELDS = (
+    "first_name",
+    "last_name",
+    "preferred_name",
+    "pronouns",
+    "email",
+    "phone",
+    "birth_date",
+    "recruitment_source",
+    "skills",
+    "availability",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+    "notes",
+    "access_needs",
+    "referred_by",
+)
 #: An issue date older than this is almost always a typo in the year.
 MAX_CREDENTIAL_AGE_DAYS = 3653
 
@@ -59,6 +77,7 @@ class VolunteerService(Service):
         if volunteer.status is VolunteerStatus.INACTIVE:
             raise BusinessRuleError(tr("New volunteers start as Applicant or Active."))
         saved = self._store.volunteers.add(volunteer)
+        self._log(session.username, "ADDED", "VOLUNTEER", saved.volunteer_id, saved.full_name)
         logger.info("Volunteer #%s registered by account #%s", saved.volunteer_id, session.account_id)
         return saved
 
@@ -80,6 +99,7 @@ class VolunteerService(Service):
             volunteer_id=None,
         )
         saved = self._store.volunteers.add(application)
+        self._log(PUBLIC_FORM, "ADDED", "VOLUNTEER", saved.volunteer_id, saved.full_name)
         logger.info("Volunteer #%s applied from the sign-in screen", saved.volunteer_id)
         return saved
 
@@ -108,6 +128,8 @@ class VolunteerService(Service):
                 cancelled = self._cancel_signups(upcoming)
                 for shift_id in self._store.waitlist.shifts_for(volunteer_id):  # nor wait for new ones
                     self._store.waitlist.remove(shift_id, volunteer_id)
+            details = f"{volunteer.status.value}>{new_status.value}"
+            self._log(session.username, "STATUS", "VOLUNTEER", volunteer_id, volunteer.full_name, details)
         logger.info(
             "Volunteer #%s: %s -> %s (%s sign-ups cancelled)",
             volunteer_id,
@@ -137,7 +159,9 @@ class VolunteerService(Service):
     def delete(self, session: Session, volunteer_id: int) -> None:
         """Permanently remove a record with no history (administrators only)."""
         session.require(Permission.DELETE_RECORDS)
+        name = self._store.volunteers.get(volunteer_id).full_name
         self._store.volunteers.delete(volunteer_id)
+        self._log(session.username, "REMOVED", "VOLUNTEER", volunteer_id, name)
         logger.info("Volunteer #%s deleted by account #%s", volunteer_id, session.account_id)
 
     # ------------------------------------------------ leaders or self-service
@@ -165,7 +189,11 @@ class VolunteerService(Service):
                 "notes": existing.notes,
                 "referred_by": existing.referred_by,
             }
-        return self._store.volunteers.update(dataclasses.replace(volunteer, **protected))
+        saved = self._store.volunteers.update(dataclasses.replace(volunteer, **protected))
+        details = changed_fields(existing, saved, VOLUNTEER_FIELDS)
+        if details:
+            self._log(session.username, "CHANGED", "VOLUNTEER", saved.volunteer_id, saved.full_name, details)
+        return saved
 
     def set_hour_goal(self, session: Session, volunteer_id: int, hours: object, due: object) -> Volunteer:
         """Set a personal hour goal (format: a whole number and a date; meaning: the date is ahead of us)."""
@@ -231,11 +259,15 @@ class VolunteerService(Service):
                 errors.add("certification_expires", tr("The expiry date must be after the issue date."))
         errors.raise_if_any()
         self._store.volunteers.save_certification(volunteer_id, Certification(clean_name, day, clean_kind, issued))
+        person = self._store.volunteers.get(volunteer_id).full_name
+        self._log(session.username, "CHANGED", "VOLUNTEER", volunteer_id, person, f"certifications: {clean_name}")
         return self._store.volunteers.get(volunteer_id)
 
     def remove_certification(self, session: Session, volunteer_id: int, name: str) -> Volunteer:
         session.require(Permission.MANAGE_VOLUNTEERS)
         self._store.volunteers.remove_certification(volunteer_id, name)
+        person = self._store.volunteers.get(volunteer_id).full_name
+        self._log(session.username, "CHANGED", "VOLUNTEER", volunteer_id, person, f"certifications: {name}")
         return self._store.volunteers.get(volunteer_id)
 
     def certification_names(self) -> list[str]:

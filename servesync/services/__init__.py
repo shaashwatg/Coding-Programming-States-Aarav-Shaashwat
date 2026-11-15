@@ -28,6 +28,7 @@ from servesync.services.dashboard_service import (
     RecruitmentInsight,
     VolunteerSummary,
 )
+from servesync.services.data_service import DataService, ImportPreview, ImportRow
 from servesync.services.matching_service import MatchingService, ScoreFactor, ShiftMatch, VolunteerMatch
 from servesync.services.opportunity_service import OpportunityService
 from servesync.services.records_service import Milestone, RecordsService, Verification
@@ -68,6 +69,7 @@ class Services:
     staffing: StaffingService
     coordination: CoordinationService
     records: RecordsService
+    data: DataService
 
     @classmethod
     def create(
@@ -103,6 +105,7 @@ class Services:
             staffing=StaffingService(store, clock, matching=matching, scheduling=scheduling),
             coordination=CoordinationService(store, clock),
             records=RecordsService(store, clock),
+            data=DataService(store, clock),
         )
 
 
@@ -114,9 +117,12 @@ __all__ = [
     "Clock",
     "CoordinationService",
     "DashboardService",
+    "DataService",
     "DriftAlert",
     "FeaturedEvent",
     "FixedClock",
+    "ImportPreview",
+    "ImportRow",
     "KioskPerson",
     "KioskResult",
     "KioskState",

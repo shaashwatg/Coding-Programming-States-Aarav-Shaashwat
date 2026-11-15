@@ -24,6 +24,7 @@ from servesync.models import Announcement, AssignmentStatus, Notice, Opportunity
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
 from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
+from servesync.ui.dialogs.data_dialogs import MyPrivacyPanel
 from servesync.ui.dialogs.goal_dialog import HourGoalPanel
 from servesync.ui.dialogs.shift_detail import status_color
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
@@ -427,10 +428,13 @@ class ProfilePage(Page):
         history.body.addWidget(self.history, 1)
         row.addWidget(history, 3)
         self.layout_.addLayout(row, 1)
+        self.privacy = MyPrivacyPanel(ctx)
+        self.layout_.addWidget(self.privacy)
 
     def refresh(self) -> None:
         services, session = self.ctx.services, self.ctx.session
         volunteer_id = session.volunteer_id or 0
+        self.privacy.refresh()
         self.card.show_volunteer(
             services.volunteers.get(session, volunteer_id), services.volunteers.participation(session, volunteer_id)
         )

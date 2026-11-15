@@ -28,7 +28,7 @@ from servesync.models import (
     Shift,
     ShiftOverview,
 )
-from servesync.services.base import Service
+from servesync.services.base import Service, changed_fields
 from servesync.services.rules import check_opportunity_transition, describe_names
 from servesync.services.session import Permission, Session
 
@@ -37,7 +37,28 @@ logger = logging.getLogger(__name__)
 MAX_WEEKLY_OCCURRENCES = 52
 
 
+#: Program fields named in the change history when they change.
+PROGRAM_FIELDS = (
+    "title",
+    "description",
+    "category",
+    "location",
+    "coordinator_name",
+    "min_age",
+    "required_skills",
+    "story_video_url",
+    "access_features",
+    "impact_unit",
+    "required_certifications",
+)
+
+
 class OpportunityService(Service):
+    def _shift_label(self, shift: Shift) -> str:
+        """'Food Pantry, 2026-11-07 09:00': stored with each history line, so it reads well later."""
+        title = self._store.opportunities.get(shift.opportunity_id).title
+        return f"{title}, {shift.starts_at:%Y-%m-%d %H:%M}"
+
     # ---------------------------------------------------------- opportunities
 
     def create(self, session: Session, opportunity: Opportunity) -> Opportunity:
@@ -45,6 +66,7 @@ class OpportunityService(Service):
         if opportunity.opportunity_id is not None:
             raise BusinessRuleError(tr("This opportunity already exists."))
         saved = self._store.opportunities.add(opportunity)
+        self._log(session.username, "ADDED", "PROGRAM", saved.opportunity_id, saved.title)
         logger.info("Opportunity #%s created by account #%s", saved.opportunity_id, session.account_id)
         return saved
 
@@ -57,7 +79,11 @@ class OpportunityService(Service):
             existing = self._store.opportunities.get(opportunity.opportunity_id)
             if opportunity.min_age > existing.min_age:
                 self._check_age_increase(opportunity.opportunity_id, opportunity.min_age)
-            return self._store.opportunities.update(dataclasses.replace(opportunity, status=existing.status))
+            saved = self._store.opportunities.update(dataclasses.replace(opportunity, status=existing.status))
+            details = changed_fields(existing, saved, PROGRAM_FIELDS)
+            if details:
+                self._log(session.username, "CHANGED", "PROGRAM", saved.opportunity_id, saved.title, details)
+            return saved
 
     def change_status(self, session: Session, opportunity_id: int, new_status: OpportunityStatus) -> int:
         """Publish, close, or reopen a program. Returns how many upcoming sign-ups were cancelled."""
@@ -66,6 +92,8 @@ class OpportunityService(Service):
             existing = self._store.opportunities.get(opportunity_id)
             check_opportunity_transition(existing.status, new_status)
             self._store.opportunities.set_status(opportunity_id, new_status)
+            details = f"{existing.status.value}>{new_status.value}"
+            self._log(session.username, "STATUS", "PROGRAM", opportunity_id, existing.title, details)
             cancelled = 0
             if new_status is OpportunityStatus.CLOSED:
                 upcoming = self._store.assignments.upcoming_scheduled(
@@ -77,7 +105,9 @@ class OpportunityService(Service):
 
     def delete(self, session: Session, opportunity_id: int) -> None:
         session.require(Permission.DELETE_RECORDS)
+        title = self._store.opportunities.get(opportunity_id).title
         self._store.opportunities.delete(opportunity_id)
+        self._log(session.username, "REMOVED", "PROGRAM", opportunity_id, title)
 
     def get(self, session: Session, opportunity_id: int) -> Opportunity:
         opportunity = self._store.opportunities.get(opportunity_id)
@@ -125,6 +155,7 @@ class OpportunityService(Service):
             raise BusinessRuleError(tr("This shift already exists."))
         self._check_new_shift(shift)
         saved = self._store.shifts.add(shift)
+        self._log(session.username, "ADDED", "SHIFT", saved.shift_id, self._shift_label(saved))
         logger.info("Shift #%s added to opportunity #%s", saved.shift_id, shift.opportunity_id)
         return saved
 
@@ -154,6 +185,8 @@ class OpportunityService(Service):
                         )
                     )
                 )
+        for shift in created:
+            self._log(session.username, "ADDED", "SHIFT", shift.shift_id, self._shift_label(shift))
         logger.info("%s weekly shifts added to opportunity #%s", count, first.opportunity_id)
         return created
 
@@ -201,6 +234,9 @@ class OpportunityService(Service):
                     )
                 self._store.shifts.set_single_role_capacity(shift.shift_id, shift.capacity)
             saved = self._store.shifts.update(shift)
+            details = changed_fields(existing, saved, ("starts_at", "ends_at", "capacity", "notes"))
+            if details:
+                self._log(session.username, "CHANGED", "SHIFT", shift.shift_id, self._shift_label(saved), details)
             if shift.capacity > existing.capacity:
                 self.on_spots_freed([shift.shift_id])
             return saved
@@ -208,7 +244,9 @@ class OpportunityService(Service):
     def delete_shift(self, session: Session, shift_id: int) -> None:
         """Remove a shift nobody has signed up for (otherwise the database refuses)."""
         session.require(Permission.MANAGE_OPPORTUNITIES)
+        label = self._shift_label(self._store.shifts.get(shift_id))
         self._store.shifts.delete(shift_id)
+        self._log(session.username, "REMOVED", "SHIFT", shift_id, label)
 
     def schedule(
         self,

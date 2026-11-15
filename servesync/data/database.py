@@ -28,7 +28,7 @@ import logging
 import re
 import sqlite3
 from collections.abc import Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from types import TracebackType
 from typing import Any
@@ -137,6 +137,25 @@ class Database:
         self._connection = connection
         logger.info("Opened database %s", self._path)
         return connection
+
+    def backup_to(self, path: Path) -> None:
+        """
+        Copy the whole database to ``path`` with SQLite's online backup, which takes a
+        consistent snapshot even while the app is open (copying the file could catch
+        it half-written).
+        """
+        if self.in_transaction:
+            raise RuntimeError("Finish the current transaction before backing up.")
+        with translate_sqlite_errors(), closing(sqlite3.connect(str(path))) as target:
+            self.connect().backup(target)
+
+    def restore_from(self, path: Path) -> None:
+        """Replace this database's contents with the database at ``path`` (already checked by the caller)."""
+        if self.in_transaction:
+            raise RuntimeError("Finish the current transaction before restoring.")
+        with translate_sqlite_errors(), closing(sqlite3.connect(str(path))) as source:
+            source.backup(self.connect())
+        self.connect().execute("PRAGMA foreign_keys = ON")
 
     def close(self) -> None:
         if self._connection is not None:

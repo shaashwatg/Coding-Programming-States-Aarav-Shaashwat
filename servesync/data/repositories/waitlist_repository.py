@@ -105,5 +105,8 @@ class NoticeRepository(Repository):
         value = self._db.query_value("SELECT volunteer_id FROM notices WHERE notice_id = ?", (notice_id,))
         return int(value) if value is not None else None
 
+    def delete_for_volunteer(self, volunteer_id: int) -> None:
+        self._db.execute("DELETE FROM notices WHERE volunteer_id = ?", (volunteer_id,))
+
     def dismiss(self, notice_id: int) -> None:
         self._db.execute("UPDATE notices SET dismissed = 1 WHERE notice_id = ?", (notice_id,))

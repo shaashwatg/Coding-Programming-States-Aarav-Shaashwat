@@ -77,6 +77,14 @@ reason is shown.</li>
 <li>The <b>Dashboard</b> lists everything that runs out in the next 30 days. The <b>Certification expiry</b> report
 lists what has expired or runs out within 90 days, and which programs need it.</li>
 </ul>
+<h3>Data and trust</h3>
+<ul>
+<li>On <b>Volunteers</b>, choose <b>Import</b> to add many people from a spreadsheet saved as CSV. ServeSync checks
+every row and lists what to fix; nothing is saved until every row is ready. <b>Save template</b> gives the right
+headings.</li>
+<li>Administrators: <b>Settings</b> has <b>Back up</b> and <b>Restore</b> (one file with every record and photo), the
+<b>Change history</b> (who changed what, and when), and <b>Privacy requests</b> from volunteers.</li>
+</ul>
 <h3>Roles and waitlists</h3>
 <ul>
 <li>Open a shift and choose <b>Edit roles</b> to split it into jobs (for example Registration x2, Water station x6).
@@ -114,6 +122,8 @@ then choose <b>Sign up</b>. If you can't sign up, ServeSync tells you why.</li>
 suggests the one that fits your skills.</li>
 <li>Choose <b>Add to calendar</b> on any shift to save it to your phone or email calendar. Notes from coordinators
 appear on <b>Home</b>.</li>
+<li>On <b>My profile</b>, <b>Download my data</b> saves everything ServeSync holds about you, and <b>Request
+deletion</b> asks for your personal details to be removed.</li>
 <li>Shift full? Choose <b>Join waitlist</b>. If a spot opens, you're signed up automatically and a note appears on
 <b>Home</b>.</li>
 <li>Need to cancel? Select the shift on <b>Home</b> and choose <b>Cancel sign-up</b>, any time before it starts.</li>
@@ -244,6 +254,15 @@ programarse sin una vigente, y se muestra el motivo.</li>
 <li>El <b>Panel</b> muestra todo lo que vence en los próximos 30 días. El informe <b>Vencimiento de
 certificaciones</b> muestra lo que ya venció o vence en 90 días, y qué programas lo requieren.</li>
 </ul>
+<h3>Datos y confianza</h3>
+<ul>
+<li>En <b>Voluntarios</b>, elija <b>Importar</b> para agregar a muchas personas desde una hoja de cálculo guardada como
+CSV. ServeSync revisa cada fila y muestra qué corregir; no se guarda nada hasta que todas estén listas. <b>Guardar
+plantilla</b> le da los encabezados correctos.</li>
+<li>Administradores: <b>Configuración</b> tiene <b>Hacer copia de seguridad</b> y <b>Restaurar</b> (un solo archivo con
+todos los registros y fotos), el <b>Historial de cambios</b> (quién cambió qué y cuándo) y las <b>Solicitudes de
+privacidad</b> de los voluntarios.</li>
+</ul>
 <h3>Funciones y listas de espera</h3>
 <ul>
 <li>Abra un turno y elija <b>Editar funciones</b> para dividirlo en tareas (por ejemplo, Registro x2, Puesto de agua
@@ -288,6 +307,8 @@ los detalles y luego elija <b>Inscribirme</b>. Si no puede inscribirse, ServeSyn
 sugiere la que encaja con sus habilidades.</li>
 <li>Elija <b>Agregar al calendario</b> en cualquier turno para guardarlo en el calendario de su teléfono o correo.
 Las notas de los coordinadores aparecen en <b>Inicio</b>.</li>
+<li>En <b>Mi perfil</b>, <b>Descargar mis datos</b> guarda todo lo que ServeSync tiene sobre usted, y <b>Pedir la
+eliminación</b> solicita que se eliminen sus datos personales.</li>
 <li>¿El turno está completo? Elija <b>Unirme a la lista de espera</b>. Si se libera un lugar, quedará inscrito
 automáticamente y verá un aviso en <b>Inicio</b>.</li>
 <li>¿Necesita cancelar? Seleccione el turno en <b>Inicio</b> y elija <b>Cancelar inscripción</b> en cualquier

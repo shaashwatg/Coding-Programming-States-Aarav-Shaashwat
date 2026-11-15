@@ -17,6 +17,7 @@ from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AccessNeed, AssignmentStatus, Volunteer, VolunteerParticipation, VolunteerStatus
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.data_dialogs import ImportDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_palette
@@ -135,6 +136,11 @@ class VolunteersPage(Page):
                     "Search everyone, approve applicants, and keep contact details "
                     "current. Double-click a person to edit their profile."
                 ),
+                [
+                    make_button(
+                        tr("Import..."), tooltip=tr("Add many volunteers from a CSV file"), on_click=self._import
+                    )
+                ],
             )
         )
         filters = QHBoxLayout()
@@ -211,6 +217,11 @@ class VolunteersPage(Page):
         status = options.get("status")
         if status:
             self.status_filter.set_value(VolunteerStatus(status))
+
+    @guarded
+    def _import(self) -> None:
+        dialog = ImportDialog(self.ctx, self)
+        dialog.exec()
 
     def refresh(self) -> None:
         services, session = self.ctx.services, self.ctx.session

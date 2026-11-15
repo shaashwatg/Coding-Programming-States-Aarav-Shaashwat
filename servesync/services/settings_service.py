@@ -94,3 +94,4 @@ class SettingsService(Service):
             self._store.settings.set_organization_name(name)
             self._store.settings.set_volunteer_hour_value(hour_value)
             self._store.settings.set_mission_statement(mission)
+            self._log(session.username, "CHANGED", "SETTINGS", None, name, "organization")

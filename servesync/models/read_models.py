@@ -207,3 +207,32 @@ class IssuedDocument:
     period_start: date | None = None
     period_end: date | None = None
     milestone: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeEntry:
+    """One line of the change history (codes; worded when shown)."""
+
+    change_id: int
+    changed_at: datetime
+    changed_by: str
+    action: str  # ADDED, CHANGED, REMOVED, STATUS, IMPORTED, RESTORED, ANONYMIZED, REQUESTED
+    entity: str  # VOLUNTEER, PROGRAM, SHIFT, SIGN_UP, ACCOUNT, SETTINGS, DATA
+    entity_id: int | None
+    label: str  # the record's name at the time, e.g. "Priya Patel"
+    details: str  # changed field names, or "OLD>NEW" for a status change
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionRequest:
+    """A volunteer asked for their personal details to be removed."""
+
+    request_id: int
+    volunteer_id: int
+    volunteer_name: str
+    requested_at: datetime
+    reason: str
+    status: str  # PENDING, COMPLETED, DECLINED
+    handled_by: str | None = None
+    handled_at: datetime | None = None
+    response: str = ""

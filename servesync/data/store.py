@@ -22,6 +22,8 @@ from servesync.data.repositories import (
     AccountRepository,
     AnnouncementRepository,
     AssignmentRepository,
+    ChangeLogRepository,
+    DeletionRequestRepository,
     DocumentRepository,
     NoticeRepository,
     OpportunityRepository,
@@ -52,6 +54,8 @@ class DataStore:
         self.notices = NoticeRepository(db)
         self.announcements = AnnouncementRepository(db)
         self.documents = DocumentRepository(db)
+        self.changes = ChangeLogRepository(db)
+        self.deletion_requests = DeletionRequestRepository(db)
 
     @classmethod
     def open(cls, path: Path | str) -> DataStore:

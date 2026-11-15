@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
@@ -31,14 +32,19 @@ from servesync.models import Appearance, MessageDuration, ShiftOverview, Theme
 from servesync.services import Permission
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog, language_switch
+from servesync.ui.dialogs.coordination_dialogs import ask_save_path
+from servesync.ui.dialogs.data_dialogs import HistoryDialog, PrivacyRequestsPanel
 from servesync.ui.pages.base import Page
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
+    BusyCursor,
     EnumComboBox,
     PageHeader,
     Panel,
+    confirm,
     from_qdate,
     guarded,
+    inform,
     make_button,
     make_label,
     to_qdate,
@@ -301,30 +307,85 @@ class SettingsPage(Page):
         )
         self.layout_.addWidget(account)
 
-        if ctx.session.can(Permission.MANAGE_SETTINGS) and not ctx.services.store.db.is_in_memory:
+        self.privacy: PrivacyRequestsPanel | None = None
+        if ctx.session.can(Permission.MANAGE_SETTINGS):
             data = Panel(tr("Data and backup"))
-            folder = Path(ctx.services.store.db.path).parent
             data.body.addWidget(
                 make_label(
                     tr(
-                        "Everything ServeSync stores (records, photos, and settings) lives "
-                        "in this folder on this computer. To back up, close ServeSync and copy "
-                        "the folder to a USB drive or cloud storage."
+                        "Save a backup to a USB drive or cloud folder now and then. It holds every record, "
+                        "photo and setting in one file. Restoring replaces everything with the backup."
                     ),
                     "muted",
                     wrap=True,
                 )
             )
-            data.body.addWidget(make_label(str(folder), None, wrap=True, selectable=True))
+            if not ctx.services.store.db.is_in_memory:
+                folder = Path(ctx.services.store.db.path).parent
+                data.body.addWidget(
+                    make_label(tr("Data folder: {folder}", folder=str(folder)), "hint", wrap=True, selectable=True)
+                )
+            buttons = QHBoxLayout()
+            buttons.addWidget(make_button(tr("Back up..."), on_click=self._backup))
+            buttons.addWidget(make_button(tr("Restore..."), kind="danger", on_click=self._restore))
+            buttons.addWidget(make_button(tr("Change history..."), on_click=self._history))
+            buttons.addStretch(1)
+            data.body.addLayout(buttons)
             self.layout_.addWidget(data)
+            self.privacy = PrivacyRequestsPanel(ctx)
+            self.layout_.addWidget(self.privacy)
         self.layout_.addStretch(1)
 
     def refresh(self) -> None:
+        if self.privacy is not None:
+            self.privacy.refresh()
         settings = self.ctx.services.settings
         self._show_appearance(settings.appearance(self.ctx.session))
         self.org_name.setText(settings.organization_name())
         self.mission.setPlainText(settings.mission_statement())
         self.hour_value.setValue(settings.volunteer_hour_value())
+
+    @guarded
+    def _backup(self) -> None:
+        name = f"servesync-backup-{self.ctx.services.clock.now():%Y-%m-%d}.zip"
+        path = ask_save_path(self, name, tr("ServeSync backup"), "zip")
+        if path is not None:
+            with BusyCursor():
+                self.ctx.services.data.backup(self.ctx.session, path)
+            self.ctx.changed(
+                tr("Backup saved as {name}. Keep a copy somewhere other than this computer.", name=path.name)
+            )
+
+    @guarded
+    def _restore(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, tr("Choose a ServeSync backup"), str(Path.home()), f"{tr('ServeSync backup')} (*.zip)"
+        )
+        if not chosen or not confirm(
+            self,
+            tr("Restore a backup"),
+            tr(
+                "Replace everything in ServeSync with this backup? Changes made since it was saved will be lost. "
+                "Everyone is signed out afterward."
+            ),
+            tr("Restore"),
+        ):
+            return
+        with BusyCursor():
+            manifest = self.ctx.services.data.restore(self.ctx.session, Path(chosen))
+        inform(
+            self,
+            tr("Backup restored"),
+            tr("Restored the backup from {when}. Please sign in again.", when=manifest.get("created_at", "")),
+        )
+        window = self.window()
+        sign_out = getattr(window, "sign_out", None)
+        if callable(sign_out):
+            sign_out()
+
+    @guarded
+    def _history(self) -> None:
+        HistoryDialog(self.ctx, self).exec()
 
     def _show_appearance(self, appearance: Appearance) -> None:
         for button in self.theme_group.buttons():
