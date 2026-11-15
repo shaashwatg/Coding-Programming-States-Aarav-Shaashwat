@@ -14,11 +14,25 @@ Distinctive visual components.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterable, Sequence
 from datetime import date, datetime
 
-from PySide6.QtCore import QDate, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap, QTextCharFormat, QTransform
+from PySide6.QtCore import QDate, QPointF, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QHideEvent,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QPen,
+    QPixmap,
+    QShowEvent,
+    QTextCharFormat,
+    QTransform,
+)
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QFrame,
@@ -37,7 +51,7 @@ from servesync.core.i18n import format_day_short, mark, tr, tr_n
 from servesync.models import ActivityItem, ActivityKind, OpportunityCategory, ShiftOverview
 from servesync.services import ScoreFactor
 from servesync.ui import assets
-from servesync.ui.theme import current_palette
+from servesync.ui.theme import current_palette, motion_allowed
 from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label
 
 
@@ -480,3 +494,87 @@ class UpdatesPanel(QFrame):
                 row.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
             self._rows.addLayout(row)
         self.setVisible(bool(updates))
+
+
+class NetworkGlobe(QWidget):
+    """
+    A slowly turning globe of connected points, drawn in the theme's accent: a
+    picture of neighbors linked to one another, for the sign-in screen.
+
+    Purely decorative, so it is hidden from screen readers and takes no focus.
+    It turns only while motion is allowed (Reduce motion keeps it still, WCAG
+    2.3.3), and it is computed rather than drawn from an image so it stays crisp
+    at any size and follows every theme.
+    """
+
+    POINTS = 150
+    NEIGHBORS = 3
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumSize(240, 240)
+        self.setAccessibleName("")
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        golden = math.pi * (3 - math.sqrt(5))
+        self._points: list[tuple[float, float, float]] = []
+        for index in range(self.POINTS):  # evenly spread over the sphere (a Fibonacci lattice)
+            y = 1 - 2 * (index + 0.5) / self.POINTS
+            radius = math.sqrt(1 - y * y)
+            self._points.append((math.cos(golden * index) * radius, y, math.sin(golden * index) * radius))
+        edges: set[tuple[int, int]] = set()
+        for index, (x, y, z) in enumerate(self._points):
+
+            def distance(i: int, x: float = x, y: float = y, z: float = z) -> float:
+                px, py, pz = self._points[i]
+                return (px - x) ** 2 + (py - y) ** 2 + (pz - z) ** 2
+
+            nearest = sorted((i for i in range(self.POINTS) if i != index), key=distance)[: self.NEIGHBORS]
+            edges.update((min(index, i), max(index, i)) for i in nearest)
+        self._edges = sorted(edges)
+        self._angle = 0.6
+        self._timer = QTimer(self)
+        self._timer.setInterval(50)
+        self._timer.timeout.connect(self._turn)
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt API
+        super().showEvent(event)
+        if motion_allowed():
+            self._timer.start()
+
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt API
+        self._timer.stop()
+        super().hideEvent(event)
+
+    def _turn(self) -> None:
+        self._angle = (self._angle + 0.004) % (2 * math.pi)
+        self.update()
+
+    def _project(self, size: float, cx: float, cy: float) -> list[tuple[float, float, float]]:
+        cos_a, sin_a = math.cos(self._angle), math.sin(self._angle)
+        tilt_c, tilt_s = math.cos(0.35), math.sin(0.35)
+        projected = []
+        for x, y, z in self._points:
+            x, z = x * cos_a + z * sin_a, -x * sin_a + z * cos_a  # spin around the vertical axis
+            y, z = y * tilt_c - z * tilt_s, y * tilt_s + z * tilt_c  # lean toward the viewer
+            projected.append((cx + x * size, cy + y * size, z))
+        return projected
+
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802 - Qt API
+        palette = current_palette()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        size = min(self.width(), self.height()) / 2 - 8
+        points = self._project(size, self.width() / 2, self.height() / 2)
+        accent = QColor(palette.primary)
+        for a, b in self._edges:
+            depth = (points[a][2] + points[b][2]) / 2  # -1 at the back, 1 at the front
+            accent.setAlphaF(0.12 + 0.28 * (depth + 1) / 2)
+            painter.setPen(QPen(accent, 1))
+            painter.drawLine(QPointF(points[a][0], points[a][1]), QPointF(points[b][0], points[b][1]))
+        painter.setPen(Qt.PenStyle.NoPen)
+        for x, y, z in points:
+            accent.setAlphaF(0.3 + 0.7 * (z + 1) / 2)
+            painter.setBrush(accent)
+            radius = 1.2 + 1.6 * (z + 1) / 2
+            painter.drawEllipse(QPointF(x, y), radius, radius)
+        painter.end()

@@ -81,7 +81,7 @@ class Appearance:
     ============================  ==============================================
     """
 
-    theme: Theme = Theme.SYSTEM
+    theme: Theme = Theme.DARK
     font_scale: float = 1.0
     reduce_motion: bool = False
     text_spacing: bool = False

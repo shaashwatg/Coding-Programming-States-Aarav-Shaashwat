@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from servesync.core.i18n import Language
-from servesync.models import Appearance, MessageDuration, Theme
+from servesync.models import Appearance, MessageDuration, Theme, VolunteerStatus
 from servesync.services.base import Service
 from servesync.services.session import Permission, Session
 
@@ -53,6 +53,15 @@ class SettingsService(Service):
 
     def mission_statement(self) -> str:
         return self._store.settings.mission_statement()
+
+    def active_volunteer_count(self) -> int:
+        """
+        How many volunteers are active, for the big figure on the sign-in screen.
+
+        Safe to show before anyone signs in: it is one aggregate number, with no
+        names or details, the same figure an organization would put on a flyer.
+        """
+        return self._store.volunteers.count_by_status().get(VolunteerStatus.ACTIVE, 0)
 
     def set_appearance(
         self,

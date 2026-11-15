@@ -122,7 +122,7 @@ class SettingsRepository(Repository):
         )
         stored = {str(row["key"]).removeprefix(_DEVICE_PREFIX): str(row["value"]) for row in rows}
         # Files from earlier versions stored "ui_theme" and "ui_font_scale" — the same keys, so they carry over.
-        return Appearance.from_settings(stored, Appearance(theme=Theme.LIGHT))
+        return Appearance.from_settings(stored, Appearance())  # first launch: the default (dark) look
 
     def set_device_appearance(self, appearance: Appearance) -> None:
         with self._db.transaction():

@@ -482,7 +482,7 @@ class MainWindow(QMainWindow):
     @guarded
     def toggle_high_contrast(self) -> None:
         on = current_appearance().theme is not Theme.HIGH_CONTRAST
-        self.ctx.services.settings.set_appearance(self.ctx.session, theme=Theme.HIGH_CONTRAST if on else Theme.SYSTEM)
+        self.ctx.services.settings.set_appearance(self.ctx.session, theme=Theme.HIGH_CONTRAST if on else Theme.DARK)
         self.ctx.events.appearance_changed.emit()
         self.announcer.announce(tr("High contrast on") if on else tr("High contrast off"))
 

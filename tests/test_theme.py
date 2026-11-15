@@ -90,21 +90,20 @@ def test_targets_grow_with_text_size() -> None:
     assert f"min-height: {MIN_TARGET * 2 - 8}px" in large
 
 
-def test_the_palette_follows_the_cal_design_system() -> None:
-    """Near-black ink and primary, one blue accent; charts in ink, blue, green, in that order."""
+def test_the_palette_is_black_white_and_one_blue() -> None:
+    """Dark canvas, a blue accent that is also readable text, charts led by blue."""
     from servesync.ui import theme
 
-    assert LIGHT.primary == LIGHT.text == theme.INK == "#111111"
-    assert LIGHT.window == "#FFFFFF" and LIGHT.surface_alt == "#F5F5F5"
-    assert LIGHT.focus == theme.BLUE and LIGHT.chart == (theme.INK, theme.BLUE, theme.GREEN)
-    assert LIGHT.attention_fill == theme.AMBER and LIGHT.success_fill == theme.GREEN
+    assert DARK.window == theme.BLACK and DARK.primary == DARK.focus == theme.BLUE
+    assert LIGHT.primary == theme.DEEP_BLUE and LIGHT.chart[0] == theme.DEEP_BLUE
+    assert DARK.attention_fill == LIGHT.attention_fill == theme.AMBER
 
 
 def test_light_fills_are_never_text_on_a_light_background() -> None:
     from servesync.ui import theme
 
     text_tokens = {getattr(LIGHT, token) for token in TEXT_TOKENS}
-    assert not {theme.AMBER, theme.GREEN, theme.BLUE} & text_tokens
+    assert not {theme.AMBER, theme.GREEN_LIGHT} & text_tokens
     assert contrast(LIGHT.on_attention, LIGHT.attention_fill) >= 7.0  # dark text on amber fills
 
 

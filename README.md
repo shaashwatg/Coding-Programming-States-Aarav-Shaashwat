@@ -44,7 +44,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 627 automated tests, including the interface
+python -m pytest          # 628 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -232,7 +232,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   627 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   628 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -274,7 +274,7 @@ devtools.py              Command-line developer and demo tools
 
 | Principle | How ServeSync applies it |
 |---|---|
-| **1. A strong design system** | Modelled on Cal.com's design system (from its DESIGN.md in VoltAgent's awesome-design-md): near-black ink and primary buttons on white, light-gray cards, gray hairlines, and one blue accent, with amber and green used only as markers; every color defined once as a token and checked for 7:1 text contrast. Cal Sans for titles, Inter for text, and Atkinson Hyperlegible as the *Easier-to-read letters* comfort setting. One icon set (Lucide), with each idea keeping the same icon everywhere |
+| **1. A strong design system** | A dark, editorial look modelled on the Hyperiux Vault sign-in page, recolored in blue: near-black canvas, large light headings with one word in blue, monospaced labels, underline fields, square corners and hairlines. One blue does all the pointing; amber and green are only markers. Every color is defined once as a token and checked for 7:1 text contrast in Dark (default), Light and High contrast. Geist for titles, Figtree for text, IBM Plex Mono for labels, and Atkinson Hyperlegible as the *Easier-to-read letters* setting. One icon set (Lucide), with each idea keeping the same icon everywhere |
 | **2. Visually pleasing, functional choices** | A calm, flat layout on an 8 px grid: sections separated by space and hairlines, cards only for separate objects, one filled button per screen; readable fonts; click targets at least 44 px tall; Gestalt grouping |
 | **3. Regularly updated content** | A dynamic *Happening next* banner (one featured event, never a carousel), a live activity feed, a shift calendar, and impact figures that update as hours are recorded |
 | **4. Images and video that build empathy** | Each program can show the organization's own photo, automatically resized under 300 kB; story-video links open only when someone chooses to watch (never autoplay); original category artwork when no photo is added |
@@ -311,7 +311,7 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
 | Attention / cognitive load | *Simplified layout* hides secondary panels; plain-language messages; one call to action per screen | 3.1.5 AAA |
 | Reading speed | Messages stay 6 s, 20 s, or until closed; pause while hovered; *Recent messages* keeps the last 30 | 2.2.1, 2.2.3 AAA |
 | Color vision | Status always has words or a shape; chart values printed on every bar | 1.4.1 |
-| Preference everywhere | Comfort settings follow the person's account; *Match my computer* follows the OS dark mode, live | — |
+| Preference everywhere | Comfort settings follow the person's account; Dark is the default, and *Match my computer* follows the OS light or dark mode, live | — |
 
 ### Inclusion beyond the screen
 
@@ -526,7 +526,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 627 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 628 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 109 files, interface and tests included |
@@ -560,14 +560,15 @@ Override with the `SERVESYNC_DATA_DIR` environment variable or `--data-dir`. Log
 | SQLite                    | Embedded database engine     | Public domain                             |
 | PySide6 (Qt for Python)   | Desktop user interface       | LGPL v3 (used unmodified, as a library)   |
 | Atkinson Hyperlegible     | *Easier-to-read letters* font (Braille Institute) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
-| Inter                     | Interface font (The Inter Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
-| Cal Sans                  | Heading font (The Cal Sans Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| Figtree                   | Interface font (The Figtree Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| Geist                     | Heading font (The Geist Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| IBM Plex Mono             | Label font (IBM Corp.) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
 | Lucide icons              | Icon set                     | ISC License (`ui/assets/licenses`)        |
 | pytest-qt                 | Interface tests (development only) | MIT                                 |
 | PyInstaller               | Builds the standalone app (development only) | GPL v2 with bootloader exception — the built app may be distributed under any license |
 | pytest, ruff, mypy        | Testing and code quality (development only)  | MIT                       |
 
-The visual system follows Cal.com's DESIGN.md from VoltAgent's awesome-design-md collection (MIT), and the interface was reviewed against the Vercel Web Interface Guidelines; no Cal.com logo, wording or artwork is used. No code was copied from other projects. The ServeSync logo and all category artwork are original.
+The visual style is modelled on the Hyperiux Vault sign-in page (recolored in blue; no Hyperiux logo, wording, fonts or artwork are used), and the interface was reviewed against the Vercel Web Interface Guidelines. No code was copied from other projects. The ServeSync logo and all category artwork are original.
 No copyrighted images or trademarks are used; program photos are added by each organization.
 
 ## Sources

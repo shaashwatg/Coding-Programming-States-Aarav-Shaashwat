@@ -2,10 +2,10 @@
 Bundled design assets: fonts and icons.
 
 Fonts (SIL Open Font License, bundled so every computer looks the same):
-* **Inter**: interface and body text. Designed for screens, with clear figures
-  and tabular numbers; Regular, Medium and SemiBold are bundled.
-* **Cal Sans**: page titles and key figures. A geometric display face with
-  tight spacing that gives headings a calm, confident voice.
+* **Geist** (Light and Regular): page titles and big figures, set large and light.
+* **Figtree**: interface and body text; a clean geometric sans that stays
+  readable at small sizes (Regular, Medium and SemiBold).
+* **IBM Plex Mono**: step counters and small labels such as "01 / 02".
 * **Atkinson Hyperlegible** (Braille Institute): the "Easier-to-read letters"
   comfort setting. Similar letters (I/l/1, O/0, b/d) are drawn to differ, for
   readers with low vision.
@@ -31,8 +31,9 @@ from servesync.models import OpportunityCategory
 
 logger = logging.getLogger(__name__)
 
-BODY_FAMILY = "Inter"
-HEADING_FAMILY = "Cal Sans"
+BODY_FAMILY = "Figtree"
+HEADING_FAMILY = "Geist"
+MONO_FAMILY = "IBM Plex Mono"  # step counters and small labels
 LEGIBLE_FAMILY = "Atkinson Hyperlegible"  # the "Easier-to-read letters" comfort setting
 
 
@@ -41,9 +42,9 @@ def assets_dir() -> Path:
     return root / "servesync" / "ui" / "assets" if is_frozen() else root / "ui" / "assets"
 
 
-def load_fonts() -> tuple[str, str, str]:
-    """Register the bundled fonts: (body, heading, legible). An empty name means use the system font."""
-    body, heading, legible = "", "", ""
+def load_fonts() -> tuple[str, str, str, str]:
+    """Register the bundled fonts: (body, heading, legible, mono). An empty name means use the system font."""
+    body, heading, legible, mono = "", "", "", ""
     for font_file in sorted((assets_dir() / "fonts").glob("*.ttf")):
         font_id = QFontDatabase.addApplicationFont(str(font_file))
         if font_id < 0:
@@ -56,7 +57,9 @@ def load_fonts() -> tuple[str, str, str]:
             heading = HEADING_FAMILY
         if LEGIBLE_FAMILY in families:
             legible = LEGIBLE_FAMILY
-    return body, heading, legible
+        if MONO_FAMILY in families:
+            mono = MONO_FAMILY
+    return body, heading, legible, mono
 
 
 # ------------------------------------------------------------------- icons

@@ -153,7 +153,7 @@ def test_appearance_validates_and_round_trips() -> None:
 
 def test_damaged_preference_values_fall_back_safely() -> None:
     restored = Appearance.from_settings({"theme": "NEON", "font_scale": "huge", "reduce_motion": "1"})
-    assert restored.theme is Theme.SYSTEM and restored.font_scale == 1.0 and restored.reduce_motion
+    assert restored.theme is Theme.DARK and restored.font_scale == 1.0 and restored.reduce_motion
 
 
 def test_preferences_follow_each_account(services: Services, world: World) -> None:

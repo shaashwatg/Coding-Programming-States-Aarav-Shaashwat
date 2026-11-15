@@ -13,12 +13,16 @@ page, widget or dialog hard-codes a color.
 
 ## Where the look comes from
 
-The visual system follows **Cal.com's**, as documented in its DESIGN.md in VoltAgent's
-[awesome-design-md](https://github.com/VoltAgent/awesome-design-md) collection. Cal.com is
-scheduling software, so its language (calendars, time slots, people, one clear action) already
-fits shifts and volunteers, and its near-monochrome calm suits a screen someone looks at all day.
-Only the system is borrowed: the type roles, spacing, surfaces, corners and component shapes.
-No Cal.com logo, wording or artwork is used, and the ServeSync mark is our own.
+The visual language is modelled on the sign-in page of **Hyperiux Vault** (vault.hyperiux.com),
+recolored from its orange to blue. It is a dark, editorial style: a near-black canvas, large light
+headings with one word picked out in the accent color, small monospaced labels, fields drawn as a
+single underline, square corners and thin hairlines. It suits an app someone keeps open all day
+(dark surfaces mean less glare), and the single accent makes the next action obvious.
+
+Only the style is borrowed. Hyperiux's fonts are commercial (Aeonik Pro, Avenir Next), so ServeSync
+uses open look-alikes; its logo, wording and artwork are not used. The turning globe on the sign-in
+screen is our own drawing, computed in code: points spread evenly over a sphere, each joined to its
+nearest neighbors, as a picture of volunteers linked to one another.
 
 The interface was also reviewed against the
 [Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) where
@@ -28,29 +32,24 @@ inline errors next to their fields.
 
 ## Color
 
-Near-monochrome, with color reserved for meaning.
+Black, white and gray, with one blue that always means "here" or "do this".
 
-| Token | Value | Job |
-|---|---|---|
-| Ink | `#111111` | Headings, primary text, and the black primary button |
-| Canvas | `#FFFFFF` | The page |
-| Card | `#F5F5F5` | Cards and key figures (light gray, no border) |
-| Hairline | `#E5E7EB` | Dividers and table rows |
-| Blue | `#3B82F6` | The one accent: keyboard focus, the active chart series |
-| Amber | `#F59E0B` | "Needs attention" markers and calendar dots (a shape, never text) |
-| Green | `#10B981` | Success as a shape: score bars, finished goals |
+| Token | Dark (default) | Light | Job |
+|---|---|---|---|
+| Canvas | `#111111` | `#F4F4F4` | The page, sidebar and header |
+| Panel | `#161616` | `#FFFFFF` | Cards and featured items, edged with a hairline |
+| Hairline | `#262626` | `#DADADA` | Dividers and table rows |
+| Underline | `#7A7A7A` | `#7A7A7A` | Field underlines (3:1 or better) |
+| Blue | `#6AA4FF` | `#1840B8` | The main button, current page, focus, progress, the highlighted word |
+| Amber | `#FFB020` | `#FFB020` | "Needs attention" markers (a shape; text uses a lighter or darker shade) |
+| Green | `#34D399` | `#0E9F6E` | Success as a shape: score bars, finished goals |
 
-**Contrast is not negotiable.** ServeSync promises 7:1 for all text (WCAG AAA), and several of
-Cal.com's colors fall short as text: its gray `#6B7280` is 4.8:1 on white, its blue 3.7:1, its
-green 2.5:1, its red 3.8:1. So text uses deeper shades of the same hues (secondary text
-`#374151`, links `#1E40AF`, success `#065F46`, errors `#991B1B`), and the original bright
-colors are kept for fills, dots and chart bars, where 3:1 is the standard. Input borders use
-`#757B84` (4.3:1) so every field can be found, while secondary buttons keep Cal.com's softer edge
-because their label identifies them. `tests/test_theme.py` checks every pair, in every theme,
-including text on gray cards.
-
-**Dark theme:** Cal.com's own dark surfaces (`#101010`, `#1A1A1A`), white primary buttons with
-black text, and lighter tints of the same blue, green, amber and red.
+**Contrast is not negotiable.** ServeSync promises 7:1 for all text (WCAG AAA). The reference's
+bright accent works as a fill but not as small text, so each theme gets a blue that passes as text
+too: `#6AA4FF` is 7.2:1 on the dark panels and `#1840B8` is 7.1:1 on light ones. White text on a
+bright blue reaches only 4.5:1, so the dark theme's blue button carries near-black text (7.5:1),
+and the light theme's deep blue button carries white (8.5:1). Secondary text is `#ABABAB` on dark
+(7.6:1) and `#4A4A4A` on light (8:1). `tests/test_theme.py` checks every pair in every theme.
 
 **High contrast** keeps its black, white and yellow with a 3 px cyan focus ring: people who
 choose it need maximum contrast more than any brand look.
@@ -59,45 +58,47 @@ choose it need maximum contrast more than any brand look.
 
 | Role | Font | Size (at 100%) |
 |---|---|---|
-| Page title, key figures | Cal Sans | 1.75 x body |
-| Section title | Inter SemiBold | 1.15 x body |
-| Body | Inter | the person's chosen size |
-| Caption | Inter | 0.88 x body |
+| Sign-in headline, big figures | Geist Light | 3.4 x body |
+| Page title | Geist Light | 2.2 x body |
+| Section title | Figtree Medium | 1.2 x body |
+| Body | Figtree | the person's chosen size |
+| Small labels, counters, table headers, status bar | IBM Plex Mono | 0.85 x body |
 
-**Cal Sans** is Cal.com's open-source geometric display face, tight and confident; it is drawn
-heavy at its regular weight, so it is never bolded further. **Inter** handles everything people
-read and click: it was designed for screens and has clear figures. Both are under the SIL Open
-Font License and bundled, so the app looks the same on every computer.
+**Geist** set large and light gives the calm, editorial headings; **Figtree** is a clear geometric
+sans for everything people read and click; **IBM Plex Mono** marks small labels, the way the
+reference does. All three are under the SIL Open Font License and bundled, so the app looks the
+same on every computer.
 
 **Atkinson Hyperlegible** (Braille Institute) is kept as a comfort setting, *Easier-to-read
 letters*: it draws look-alike letters (I, l and 1; O and 0; b and d) to differ, which helps readers
-with low vision. Headings are sentence case, with no all-caps labels, and the whole scale grows
-with the person's text size (85% to 200%).
+with low vision. Headings are sentence case, and the whole scale grows with the person's text size
+(85% to 200%).
 
 ## Layout
 
-* **8 px rhythm on a 4 px base**, left-aligned content, generous but not empty whitespace.
-* **Light-gray cards without borders** for separate objects (a shift, a recommendation, the
-  featured event) and for the key figures; everything else is a plain section with a heading.
-  A figure that needs action gets an amber bar, and screen readers hear "needs attention".
-* **Corners:** 8 px on buttons and inputs, 12 px on cards, tables and dialogs.
-* **One black primary button per screen.** In the main window that is the header's action (*Add
-  volunteer* or *Find a shift*); other buttons are white with a soft gray edge.
-* **Sidebar:** soft gray, the current page a filled gray row in bold ink with its icon.
-* **Segmented choices** (language, theme) are a gray group with the chosen option raised in white.
-* **Tables:** no stripes, hairline rows 44 px tall, a light gray hover. A long program name ends in
-  "…" (its full text is in the details beside it); only when even a short column won't fit, at large
-  text sizes, does the table scroll sideways.
-* **Charts:** ink first, then blue, then green, on neutral gridlines; the bar or point being
-  inspected turns blue. Values are printed on every bar.
-* **Ask ServeSync** looks like a search panel, not a chat: each question and its answer form one
-  plain row.
-* **Motion** only follows something the person did; *Reduce motion* removes it.
+* **8 px rhythm on a 4 px base**, left-aligned content, generous whitespace.
+* **Square corners everywhere**, flat surfaces separated by space and 1 px hairlines; no shadows
+  or gradients.
+* **Fields are a single underline** with the label above. On focus the underline turns blue and
+  thicker; on an error it turns red and the message appears beneath, with an icon.
+* **One blue button per screen.** In the main window that is the header's action (*Add volunteer*
+  or *Find a shift*); other buttons are thin outlines.
+* **Key figures** sit under a gray rule, set in large light numerals. A figure that needs action
+  gets an amber rule and amber numerals, and screen readers hear "needs attention".
+* **Sidebar:** the same black as the page; the current page is white text with a blue bar.
+* **Tables:** no stripes, hairline rows 44 px tall, monospaced column labels. A long program name
+  ends in "…" (its full text is in the details beside it).
+* **Charts:** blue first, then white (ink on light), then green; values printed on every bar.
+* **Sign-in:** the form on the left (a small "Sign in" label, "Hello *again.*", underlined fields);
+  on the right the organization's name, the turning globe, the number of active volunteers and
+  the mission. The globe turns only while motion is allowed.
+* **Motion** only follows something the person did, apart from the slow globe; *Reduce motion*
+  removes all of it.
 
 What we avoided, and why: cream backgrounds, terracotta accents, serif display headings, sparkle
-and magic-wand icons, emoji, purple-to-blue gradients, small labels above headings, middle dots or
-long dashes joining labels, arrows in button text, and marketing-style copy. They are common in
-generated interfaces and add decoration without helping anyone finish a task.
+and magic-wand icons, emoji, purple-to-blue gradients, middle dots or long dashes joining labels,
+arrows in button text, and marketing-style copy. They add decoration without helping anyone finish
+a task.
 
 ## Two user journeys
 
@@ -155,9 +156,9 @@ generated interfaces and add decoration without helping anyone finish a task.
 
 ## Screens
 
-| Light | Dark | High contrast, 150% text |
+| Dark (default) | Light | High contrast, 150% text |
 |---|---|---|
-| ![Dashboard](screenshots/dashboard.png) | ![Dashboard, dark](screenshots/dark-mode.png) | ![Dashboard, high contrast](screenshots/high-contrast.png) |
+| ![Dashboard](screenshots/dashboard.png) | ![Dashboard, light](screenshots/light-mode.png) | ![Dashboard, high contrast](screenshots/high-contrast.png) |
 
 | Ask ServeSync | Smart Match | Spanish |
 |---|---|---|

@@ -167,10 +167,11 @@ ABOUT = f"""
 FBLA Coding &amp; Programming event (2026-2027).</p>
 <h3>Credits</h3>
 <ul>
-<li>Fonts: Inter (The Inter Project Authors) for text, Cal Sans (The Cal Sans Project Authors) for headings, and
-Atkinson Hyperlegible (Braille Institute of America) for Easier-to-read letters, all under the SIL Open Font
-License 1.1.</li>
-<li>Design system: modelled on Cal.com's, from its DESIGN.md in VoltAgent's awesome-design-md collection.</li>
+<li>Fonts: Figtree (The Figtree Project Authors) for text, Geist (The Geist Project Authors) for headings,
+IBM Plex Mono (IBM Corp.) for labels, and Atkinson Hyperlegible (Braille Institute of America) for
+Easier-to-read letters, all under the SIL Open Font License 1.1.</li>
+<li>Visual style: modelled on the Hyperiux Vault sign-in page, recolored in blue; no Hyperiux logo, wording
+or artwork is used.</li>
 <li>Icons: Lucide, ISC License.</li>
 <li>Interface toolkit: Qt for Python (PySide6), LGPL v3.</li>
 <li>Value of a volunteer hour: Independent Sector and the Do Good Institute, University of
@@ -360,11 +361,11 @@ ABOUT_ES = f"""
 FBLA Coding &amp; Programming (2026-2027).</p>
 <h3>Créditos</h3>
 <ul>
-<li>Fuentes: Inter (The Inter Project Authors) para el texto, Cal Sans (The Cal Sans Project Authors) para los
-títulos y Atkinson Hyperlegible (Braille Institute of America) para Letras más fáciles de leer, todas bajo la SIL
-Open Font License 1.1.</li>
-<li>Sistema de diseño: basado en el de Cal.com, a partir de su DESIGN.md en la colección awesome-design-md de
-VoltAgent.</li>
+<li>Fuentes: Figtree (The Figtree Project Authors) para el texto, Geist (The Geist Project Authors) para los
+títulos, IBM Plex Mono (IBM Corp.) para las etiquetas y Atkinson Hyperlegible (Braille Institute of America)
+para Letras más fáciles de leer, todas bajo la SIL Open Font License 1.1.</li>
+<li>Estilo visual: basado en la página de inicio de sesión de Hyperiux Vault, en azul; no se usa ningún
+logotipo, texto ni gráfico de Hyperiux.</li>
 <li>Íconos: Lucide, licencia ISC.</li>
 <li>Herramientas de interfaz: Qt for Python (PySide6), LGPL v3.</li>
 <li>Valor de una hora de voluntariado: Independent Sector y el Do Good Institute, Universidad de

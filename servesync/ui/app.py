@@ -180,9 +180,9 @@ def self_check(data_dir: Path | None = None) -> int:
             )
     except DataStoreError as error:
         results.append((tr("Data file"), False, error.message))
-    body, heading, legible = assets.load_fonts()
-    found = ", ".join(name or "missing" for name in (body, heading, legible))
-    results.append((tr("Fonts"), bool(body and heading and legible), found))
+    families = assets.load_fonts()
+    found = ", ".join(name or "missing" for name in families)
+    results.append((tr("Fonts"), all(families), found))
     icons = list((assets.assets_dir() / "icons").glob("*.svg"))
     results.append((tr("Icons"), len(icons) >= 40, f"{len(icons)} found"))
     spanish = catalog(Language.SPANISH)
@@ -209,7 +209,7 @@ def run(argv: list[str] | None = None, *, data_dir: Path | None = None) -> int:
     qt_app.setApplicationName(__app_name__)
     qt_app.setApplicationVersion(__version__)
     qt_app.setOrganizationName(__app_name__)
-    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(theme.INK, 256)))
+    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(theme.BLUE, 256)))
 
     paths = AppPaths.resolve(data_dir)
     configure_logging(paths.log_dir)

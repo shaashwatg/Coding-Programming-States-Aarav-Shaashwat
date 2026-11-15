@@ -143,3 +143,11 @@ def test_program_photos(services: Services, world: World) -> None:
         services.opportunities.set_photo(volunteer_session(world.ana_id), world.opportunity_id, jpeg)
     services.opportunities.remove_photo(COORDINATOR, world.opportunity_id)
     assert services.opportunities.photo(COORDINATOR, world.opportunity_id) is None
+
+
+def test_sign_in_figure_counts_only_active_volunteers(services: Services, world: World) -> None:
+    from servesync.models import VolunteerStatus
+
+    counts = services.store.volunteers.count_by_status()
+    assert services.settings.active_volunteer_count() == counts.get(VolunteerStatus.ACTIVE, 0)
+    assert services.settings.active_volunteer_count() >= 1

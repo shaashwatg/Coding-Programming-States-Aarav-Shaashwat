@@ -1,7 +1,7 @@
 """
 Render every major screen to PNG files (for design review, the README, and slides).
 
-    python tools/capture_screens.py OUTPUT_FOLDER [--theme LIGHT|DARK|HIGH_CONTRAST] [--scale 1.0] [--language es]
+    python tools/capture_screens.py OUTPUT_FOLDER [--theme DARK|LIGHT|HIGH_CONTRAST] [--scale 1.0] [--language es]
         [--date 2026-11-10]
 
 Runs against a throwaway copy of the demo data, so it never touches real records.
@@ -77,7 +77,7 @@ def save(app: QApplication, widget: QWidget, folder: Path, name: str, size: tupl
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("output", type=Path)
-    parser.add_argument("--theme", default="LIGHT")
+    parser.add_argument("--theme", default="DARK")
     parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--language", default="en", choices=[language.value for language in Language])
     parser.add_argument("--date", type=date.fromisoformat, help="pretend today is this day (default: real today)")
@@ -94,12 +94,12 @@ def main() -> int:
         services = Services.create(store, clock=clock, password_iterations=1_000)
         language = Language(args.language)
         theme.apply_appearance(app, Appearance(theme=Theme(args.theme), font_scale=args.scale, language=language))
-        suffix = "" if args.theme == "LIGHT" and args.scale == 1.0 else f"-{args.theme.lower()}-{args.scale:g}"
+        suffix = "" if args.theme == "DARK" and args.scale == 1.0 else f"-{args.theme.lower()}-{args.scale:g}"
         if language is not Language.ENGLISH:
             suffix += f"-{language.value}"
         spanish = language is Language.SPANISH
 
-        save(app, LoginDialog(services), args.output, f"01-sign-in{suffix}", (900, 560))
+        save(app, LoginDialog(services), args.output, f"01-sign-in{suffix}", (1200, 760))
         save(app, ApplicationDialog(services), args.output, f"01-apply{suffix}", (760, 900))
 
         def capture_role(username: str, prefix: str, extra: Callable[[AppContext, MainWindow], None]) -> None:
