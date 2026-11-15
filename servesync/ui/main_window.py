@@ -248,7 +248,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self.account)
         menu.addAction(tr("Signed in as {label}", label=self.ctx.session.role.label)).setEnabled(False)
         menu.addSeparator()
-        menu.addAction(tr("Change password..."), self._change_password)
+        menu.addAction(tr("Change password…"), self._change_password)
         menu.addAction(tr("Help"), self.show_help)
         menu.addAction(tr("Take the tour"), self.start_tour)
         menu.addSeparator()

@@ -3,33 +3,31 @@ Visual design system: tokens, four themes, text scaling, and comfort settings.
 
 Design rationale (the longer version is in docs/design-rationale.md)
 --------------------------------------------------------------------
-* **Three colors and neutrals, defined once.** Deep indigo is the working
-  color (navigation, the main button, links, selection, focus). Warm amber
-  only *marks* things (needs attention, calendar dots, the active chart
-  series) and never carries text on a light background. Emerald is saved for
-  the one thing that should stand out: success, open spots, the Smart Match
-  score, finished goals. Everything else is cool neutral: an off-white
-  canvas, white surfaces, slate text and hairline borders. Screens ask for
-  *meaning* ("primary", "text_muted", "attention_fill"), never a hex value,
-  so a theme is just a different set of values.
+* **Modelled on Cal.com's design system** (via its DESIGN.md in VoltAgent's
+  awesome-design-md): a white canvas, near-black ink and primary buttons,
+  light-gray cards, gray hairlines, and one blue accent used sparingly. It is
+  scheduling software's own visual language, which suits shifts and
+  volunteers, and its near-monochrome calm suits someone using it all day.
+  Only the system is borrowed (type, spacing, surfaces, components); no
+  Cal.com logo, wording or artwork.
+* **Tokens, not one-off colors.** Screens ask for *meaning* ("primary",
+  "text_muted", "attention_fill"), never a hex value; a test fails if a page,
+  widget or dialog hard-codes a color.
 * **WCAG 2.2 AAA contrast, verified by tests.** Every text color is at least
   7:1 against every background it can sit on (1.4.6); input borders and focus
-  rings are at least 3:1 (1.4.11, 2.4.13). Where a brand color is too light to
-  be text at 7:1 (emerald), a darker shade of the same hue is used for text and
-  the bright one only for shapes. See ``tests/test_theme.py``.
-* **Calm and flat.** Content is separated by space and hairlines, not boxes,
-  shadows or gradients. Only separate objects (a shift, a volunteer) get a
-  card. Spacing follows an 8 px grid.
-* **Two fonts, one scale.** Manrope SemiBold for headings and key figures,
-  Atkinson Hyperlegible (Braille Institute) for everything people read.
-  Four sizes: page title, section title, body, caption. Sentence case, no
-  all-caps or letter-spaced labels.
+  rings are at least 3:1 (1.4.11, 2.4.13). Where a Cal.com color is too light
+  for text (its gray #6b7280, blue, green and red), text uses a deeper shade of
+  the same hue and the original stays for fills, dots and charts.
+* **Two typefaces, one scale.** Cal Sans for page titles and key figures,
+  Inter for everything else (Regular, Medium, SemiBold). The comfort setting
+  "Easier-to-read letters" switches body text to Atkinson Hyperlegible.
+* **Hierarchical corners:** 8 px on buttons and inputs, 12 px on cards and
+  dialogs; flat surfaces separated by gray card fills and 1 px hairlines.
 * **Big targets.** Every button, field and tab is at least 44 px tall
   (2.5.5 Target Size, AAA), and grows with the text size.
 * **Four themes.** Match my computer (follows macOS/Windows light or dark,
-  live), Light, Dark (low glare), High contrast (black/white/yellow, 3 px focus).
-* **Text 85%-200%, plus optional extra letter and word spacing** (1.4.4,
-  1.4.12). The whole interface scales from one base size, so nothing clips.
+  live), Light, Dark (Cal.com's near-black #101010), High contrast
+  (black/white/yellow, 3 px focus).
 * **Never color alone.** Every status also has words or a shape.
 """
 
@@ -49,60 +47,53 @@ from servesync.models import Appearance, Theme
 
 # ------------------------------------------------------------ scale tokens
 
-#: 8-point spacing grid (px), with a 4 px half step for tight pairs (a label and its hint).
+#: 4-point base with an 8-point rhythm (Cal.com: 4, 8, 12, 16, 24, 32, 48).
 SPACE_HALF, SPACE_1, SPACE_2, SPACE_3, SPACE_4, SPACE_5, SPACE_6 = 4, 8, 16, 24, 32, 48, 64
 #: Corner radii: buttons and inputs; cards and dialogs.
-RADIUS_CONTROL, RADIUS_CARD = 6, 10
+RADIUS_CONTROL, RADIUS_CARD = 8, 12
 #: The one type scale (multiples of the body size): caption, body, section title, page title.
-TYPE_CAPTION, TYPE_BODY, TYPE_SECTION, TYPE_TITLE = 0.88, 1.0, 1.2, 1.6
+TYPE_CAPTION, TYPE_BODY, TYPE_SECTION, TYPE_TITLE = 0.88, 1.0, 1.15, 1.75
 #: Minimum interactive height at 100% text (WCAG 2.5.5 AAA: 44 x 44 px).
 MIN_TARGET = 44
 
-# ------------------------------------------------------------ brand colors
-# The three brand colors, as specified. Each theme below uses these or a
-# lighter/darker shade of the same hue, chosen so that text keeps 7:1.
+# ------------------------------------------------------------ palette (Cal.com system)
 
-INDIGO = "#2F3E9E"  # primary: navigation, the main button, links, selection, focus
-AMBER = "#F2A93B"  # complement: markers only (badges, attention, dots, active series)
-EMERALD = "#0E9F6E"  # stand-out: success, open spots, Smart Match score, finished goals
+INK = "#111111"  # headlines, primary text, and the primary button
+INK_PRESSED = "#242424"
+BLUE = "#3B82F6"  # the one accent: keyboard focus, the active chart series, links' family
+GREEN = "#10B981"  # success as a shape: score bars, finished goals, open spots
+AMBER = "#F59E0B"  # "needs attention" as a shape: markers, calendar dots
 
-#: Emerald is 3.4:1 on white, too light for text, so text uses this deeper shade (7:1+).
-EMERALD_TEXT = "#04553A"
-INDIGO_HOVER = "#26337F"
-INDIGO_TINT = "#ECEEF9"  # selected and hovered rows, the current page
-INDIGO_SELECTION = "#E3E6F7"
+#: Cal.com's text colors below 7:1 get a deeper shade of the same hue for text.
+BODY_TEXT = "#374151"  # secondary text (Cal.com's "body"; its #6b7280 is 4.8:1)
+LINK_TEXT = "#1E40AF"
+GREEN_TEXT = "#065F46"
+RED_TEXT = "#991B1B"
 
-# Neutrals (light theme). Secondary text is a shade darker than the brief's #5B6478,
-# which measures 5.6:1 on white; this one keeps the AAA 7:1 the app already met.
-CANVAS, SURFACE, SURFACE_SUNKEN = "#F7F8FB", "#FFFFFF", "#F1F3F8"
-SLATE, SLATE_MUTED = "#1E2433", "#454D61"
-HAIRLINE, BORDER = "#E3E6EE", "#7C8496"
-ERROR_RED = "#8C2A1F"
+CANVAS, CARD, SOFT, SUBTLE = "#FFFFFF", "#F5F5F5", "#F8F9FA", "#F3F4F6"
+HAIRLINE, STRONG = "#E5E7EB", "#E5E7EB"
+FIELD_BORDER = "#757B84"  # input borders: 3:1 or better on white and on gray cards
+BUTTON_BORDER = "#D1D5DB"  # quieter edge for secondary buttons (their label identifies them)
 
-# Dark theme: the brief's backgrounds, and lighter tints of the same three colors.
-DARK_CANVAS, DARK_SURFACE, DARK_SUNKEN = "#14161F", "#1C1F2B", "#232736"
-DARK_TEXT, DARK_TEXT_MUTED = "#E6E8EF", "#B4BACA"
-DARK_HAIRLINE, DARK_BORDER = "#2C3040", "#6B7286"
-INDIGO_LIGHT, INDIGO_LIGHTER, INDIGO_DEEP = "#AEB8F5", "#C3CAF8", "#262C4D"
-AMBER_LIGHT = "#F5C878"
-EMERALD_LIGHT = "#6EDBB0"
-DARK_ERROR = "#F7ADA0"
+DARK_CANVAS, DARK_SURFACE, DARK_SUNKEN, DARK_RAISED = "#101010", "#1A1A1A", "#242424", "#2A2A2A"
+DARK_TEXT, DARK_TEXT_MUTED, DARK_BORDER = "#F3F4F6", "#B4B4BB", "#71717A"
+DARK_BLUE, DARK_LINK, DARK_GREEN, DARK_AMBER, DARK_RED = "#60A5FA", "#93C5FD", "#6EE7B7", "#FBBF24", "#FCA5A5"
 
 
 @dataclass(frozen=True, slots=True)
 class Palette:
     name: str
     window: str  # page background ("canvas")
-    surface: str  # panels, tables, inputs
-    surface_alt: str  # sunken fills, hover
+    surface: str  # tables, inputs, dialogs
+    surface_alt: str  # cards and sunken fills
     text: str
     text_muted: str  # secondary text, still >= 7:1
     line: str  # decorative hairlines (cards, dividers)
     line_strong: str  # boundaries people must see: input borders (>= 3:1)
-    primary: str  # actions; also usable as text (>= 7:1)
+    primary: str  # the main button; also usable as text (>= 7:1)
     primary_hover: str
     on_primary: str
-    primary_soft: str  # tinted background for selected/active states
+    primary_soft: str  # hover tint for rows and quiet buttons
     topbar: str
     topbar_text: str
     topbar_muted: str
@@ -114,7 +105,7 @@ class Palette:
     focus: str  # keyboard focus ring (>= 3:1 against surfaces)
     selection: str
     on_selection: str
-    info: str
+    info: str  # links
     cta: str  # the header's main action: the one filled button on a screen
     on_cta: str
     cta_hover: str
@@ -126,58 +117,58 @@ class Palette:
     sidebar_muted: str  # secondary sidebar text, still >= 7:1
     sidebar_hover: str
     sidebar_active: str  # background of the current page (its text stays >= 7:1)
-    sidebar_accent: str  # the bar beside the current page, and its text
+    sidebar_accent: str  # the current page's text and icon
     sidebar_focus: str  # keyboard focus ring inside the sidebar (>= 3:1)
-    brand: str = INDIGO  # the logo square
-    success_fill: str = EMERALD  # success as a *shape* (score bars, open-spot dots)
-    on_attention: str = SLATE  # dark text on an amber fill
+    brand: str = INK  # the logo square
+    success_fill: str = GREEN  # success as a *shape* (score bars, open-spot dots)
+    on_attention: str = INK  # dark text on an amber fill
+    button_line: str = BUTTON_BORDER  # secondary buttons' edge
     is_dark: bool = False
     focus_width: int = 2
-    #: Smart Match factors (availability, skills, reliability, experience, fair share):
-    #: the brand colors first, then neutrals; every factor is also labeled in words.
-    factors: tuple[str, str, str, str, str] = (INDIGO, EMERALD, AMBER, BORDER, "#8A93C9")
-    #: Chart series, in order: indigo, amber, emerald. Charts also print values on every bar.
-    chart: tuple[str, str, str] = (INDIGO, AMBER, EMERALD)
+    #: Smart Match factors (availability, skills, reliability, experience, fair share), each also labeled.
+    factors: tuple[str, str, str, str, str] = (INK, BLUE, GREEN, AMBER, "#9CA3AF")
+    #: Chart series, in order: ink, blue (the active series), green. Charts print values on every bar.
+    chart: tuple[str, str, str] = (INK, BLUE, GREEN)
 
 
 LIGHT = Palette(
     name="Light",
     window=CANVAS,
-    surface=SURFACE,
-    surface_alt=SURFACE_SUNKEN,
-    text=SLATE,
-    text_muted=SLATE_MUTED,
+    surface=CANVAS,
+    surface_alt=CARD,
+    text=INK,
+    text_muted=BODY_TEXT,
     line=HAIRLINE,
-    line_strong=BORDER,
-    primary=INDIGO,
-    primary_hover=INDIGO_HOVER,
-    on_primary=SURFACE,
-    primary_soft=INDIGO_TINT,
-    topbar=SURFACE,
-    topbar_text=SLATE,
-    topbar_muted=SLATE_MUTED,
-    topbar_active=INDIGO_TINT,
-    attention=SLATE,
+    line_strong=FIELD_BORDER,
+    primary=INK,
+    primary_hover=INK_PRESSED,
+    on_primary=CANVAS,
+    primary_soft=SUBTLE,
+    topbar=CANVAS,
+    topbar_text=INK,
+    topbar_muted=BODY_TEXT,
+    topbar_active=SUBTLE,
+    attention=INK,
     attention_fill=AMBER,
-    danger=ERROR_RED,
-    success=EMERALD_TEXT,
-    focus=INDIGO,
-    selection=INDIGO_SELECTION,
-    on_selection=SLATE,
-    info=INDIGO,
-    cta=INDIGO,
-    on_cta=SURFACE,
-    cta_hover=INDIGO_HOVER,
-    banner=SURFACE,
+    danger=RED_TEXT,
+    success=GREEN_TEXT,
+    focus=BLUE,
+    selection=STRONG,
+    on_selection=INK,
+    info=LINK_TEXT,
+    cta=INK,
+    on_cta=CANVAS,
+    cta_hover=INK_PRESSED,
+    banner=CARD,
     banner_line=HAIRLINE,
-    callout=SURFACE,
-    sidebar=SURFACE,
-    sidebar_text=SLATE,
-    sidebar_muted=SLATE_MUTED,
-    sidebar_hover=SURFACE_SUNKEN,
-    sidebar_active=INDIGO_TINT,
-    sidebar_accent=INDIGO,
-    sidebar_focus=INDIGO,
+    callout=CANVAS,
+    sidebar=SOFT,
+    sidebar_text=INK,
+    sidebar_muted=BODY_TEXT,
+    sidebar_hover=SUBTLE,
+    sidebar_active=STRONG,
+    sidebar_accent=INK,
+    sidebar_focus=BLUE,
 )
 
 DARK = Palette(
@@ -187,47 +178,48 @@ DARK = Palette(
     surface_alt=DARK_SUNKEN,
     text=DARK_TEXT,
     text_muted=DARK_TEXT_MUTED,
-    line=DARK_HAIRLINE,
+    line=DARK_RAISED,
     line_strong=DARK_BORDER,
-    primary=INDIGO_LIGHT,
-    primary_hover=INDIGO_LIGHTER,
-    on_primary=DARK_CANVAS,
-    primary_soft=INDIGO_DEEP,
-    topbar=DARK_SURFACE,
+    primary="#FFFFFF",  # Cal.com's dark surfaces flip the button: white with black text
+    primary_hover=STRONG,
+    on_primary=INK,
+    primary_soft=DARK_RAISED,
+    topbar=DARK_CANVAS,
     topbar_text=DARK_TEXT,
     topbar_muted=DARK_TEXT_MUTED,
-    topbar_active=INDIGO_DEEP,
-    attention=AMBER_LIGHT,  # amber may be text on a dark background
-    attention_fill=AMBER_LIGHT,
-    danger=DARK_ERROR,
-    success=EMERALD_LIGHT,
-    focus=INDIGO_LIGHT,
-    selection="#2E3666",
-    on_selection="#F2F3F8",
-    info=INDIGO_LIGHT,
-    cta=INDIGO_LIGHT,
-    on_cta=DARK_CANVAS,
-    cta_hover=INDIGO_LIGHTER,
+    topbar_active=DARK_RAISED,
+    attention=DARK_AMBER,  # amber may be text on a dark background
+    attention_fill=DARK_AMBER,
+    danger=DARK_RED,
+    success=DARK_GREEN,
+    focus=DARK_BLUE,
+    selection="#33343A",
+    on_selection="#FFFFFF",
+    info=DARK_LINK,
+    cta="#FFFFFF",
+    on_cta=INK,
+    cta_hover=STRONG,
     banner=DARK_SURFACE,
-    banner_line=DARK_HAIRLINE,
-    callout=DARK_SURFACE,
-    sidebar=DARK_SURFACE,
+    banner_line=DARK_RAISED,
+    callout=DARK_CANVAS,
+    sidebar="#141414",
     sidebar_text=DARK_TEXT,
     sidebar_muted=DARK_TEXT_MUTED,
-    sidebar_hover=DARK_SUNKEN,
-    sidebar_active=INDIGO_DEEP,
-    sidebar_accent=INDIGO_LIGHT,
-    sidebar_focus=INDIGO_LIGHT,
-    brand="#3B4CC0",  # a step brighter than light-theme indigo, so the mark shows on the dark sidebar
-    success_fill=EMERALD_LIGHT,
-    on_attention=DARK_CANVAS,
+    sidebar_hover="#1F1F1F",
+    sidebar_active=DARK_RAISED,
+    sidebar_accent="#FFFFFF",
+    sidebar_focus=DARK_BLUE,
+    brand=DARK_RAISED,  # a dark square, so the white strokes of the mark still show
+    success_fill="#34D399",
+    on_attention=INK,
+    button_line="#3A3A40",
     is_dark=True,
-    factors=(INDIGO_LIGHT, EMERALD_LIGHT, AMBER_LIGHT, DARK_TEXT_MUTED, DARK_ERROR),
-    chart=(INDIGO_LIGHT, AMBER_LIGHT, EMERALD_LIGHT),
+    factors=(DARK_TEXT, DARK_BLUE, "#34D399", DARK_AMBER, "#9CA3AF"),
+    chart=(DARK_TEXT, DARK_BLUE, "#34D399"),
 )
 
 # High contrast keeps its own black, white and yellow: it exists for people who need
-# maximum contrast, which matters more there than the brand colors.
+# maximum contrast, which matters more there than any brand look.
 HIGH_CONTRAST = Palette(
     name="High contrast",
     window="#000000",
@@ -269,12 +261,12 @@ HIGH_CONTRAST = Palette(
     brand="#000000",  # the mark becomes white strokes on black
     success_fill="#7CFF9E",
     on_attention="#000000",
+    button_line="#FFFFFF",
     is_dark=True,
     focus_width=3,
     factors=("#7CFF9E", "#80D8FF", "#EA80FC", "#FFD400", "#FFFFFF"),
     chart=("#FFD400", "#80D8FF", "#7CFF9E"),
 )
-
 
 PALETTES: dict[Theme, Palette] = {Theme.LIGHT: LIGHT, Theme.DARK: DARK, Theme.HIGH_CONTRAST: HIGH_CONTRAST}
 
@@ -333,6 +325,8 @@ def apply_appearance(app: QApplication, appearance: Appearance) -> Palette:
         app.setProperty("baseFontPointSize", base_size)
     size = round(base_size * appearance.font_scale, 1)
     font = QFont(app.font())
+    # "Easier-to-read letters" swaps the interface face for Atkinson Hyperlegible (WCAG 1.4.8).
+    _fonts["body"] = (_fonts["legible"] if appearance.legible_font else "") or _fonts["interface"]
     if _fonts["body"]:
         font.setFamily(_fonts["body"])
     font.setPointSizeF(size)
@@ -431,12 +425,16 @@ def _qt_palette(p: Palette) -> QPalette:
     return qp
 
 
-_fonts: dict[str, str] = {"body": "", "heading": ""}
+_fonts: dict[str, str] = {"body": "", "heading": "", "interface": "", "legible": ""}
 
 
-def set_font_families(body: str, heading: str) -> None:
-    """Record the bundled font families (empty string = use the system font)."""
-    _fonts["body"], _fonts["heading"] = body, heading
+def set_font_families(body: str, heading: str, legible: str = "") -> None:
+    """
+    Record the bundled font families (empty string = use the system font): the interface
+    face, the heading face, and the easier-to-read face offered as a comfort setting.
+    """
+    _fonts["interface"], _fonts["heading"], _fonts["legible"] = body, heading, legible
+    _fonts["body"] = body
 
 
 def heading_family() -> str:
@@ -456,8 +454,10 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     heading = f'font-family: "{_fonts["heading"]}";' if _fonts["heading"] else ""
     target = round(MIN_TARGET * max(1.0, size / 13))  # minimum interactive height in pixels
     ctl, card = RADIUS_CONTROL, RADIUS_CARD
-    title = f"{heading} font-size: {pt(TYPE_TITLE)}; font-weight: 600;"
-    section = f"{heading} font-size: {pt(TYPE_SECTION)}; font-weight: 600;"
+    # Cal Sans is a display face drawn heavy at its regular weight, so it is never bolded further.
+    title = f"{heading} font-size: {pt(TYPE_TITLE)}; font-weight: 400;"
+    # Section titles stay in the interface face at SemiBold, as Cal.com's card and list titles do.
+    section = f"font-size: {pt(TYPE_SECTION)}; font-weight: 600;"
     caption = f"font-size: {pt(TYPE_CAPTION)};"
     return f"""
     QWidget {{ color: {p.text}; {body} }}
@@ -478,20 +478,21 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QLabel[role="error"] {{ color: {p.danger}; {caption} }}
     QLabel[role="banner-error"] {{ color: {p.danger}; background: {p.surface};
         border: 1px solid {p.danger}; border-radius: {ctl}px; padding: 8px 12px; }}
-    QLabel[role="link"] {{ color: {p.primary}; }}
+    QLabel[role="link"] {{ color: {p.info}; }}
     QLabel[role="concern"] {{ color: {p.danger}; }}
     QLabel[role="ok"] {{ color: {p.success}; font-weight: 600; }}
     QLabel[role="kbd"] {{ color: {p.text_muted}; border: 1px solid {p.line}; border-radius: {ctl}px;
         padding: 2px 8px; {caption} }}
-    QLabel[role="badge"] {{ color: {p.on_attention}; background: {p.attention_fill}; border-radius: {ctl}px;
+    QLabel[role="badge"] {{ color: {p.on_attention}; background: {p.attention_fill}; border-radius: 10px;
         padding: 2px 8px; {caption} font-weight: 600; }}
 
-    /* ---------- containers: plain sections, cards only for separate objects ---------- */
+    /* ---------- containers: plain sections; light-gray cards for objects and figures ---------- */
     QFrame[panel="true"] {{ background: transparent; border: none; }}
-    QFrame[kpi="true"] {{ background: transparent; border: none; border-left: 1px solid {p.line}; border-radius: 0; }}
+    QFrame[kpi="true"] {{ background: {p.surface_alt}; border: none; border-radius: {card}px; }}
     QFrame[kpi="true"][attention="true"] {{ border-left: 4px solid {p.attention_fill}; }}
-    QFrame[card="true"], QFrame[tile="true"], QFrame[banner="true"] {{ background: {p.surface};
-        border: 1px solid {p.line}; border-radius: {card}px; }}
+    QFrame[card="true"], QFrame[tile="true"], QFrame[banner="true"] {{ background: {p.surface_alt};
+        border: none; border-radius: {card}px; }}
+    QFrame[card="true"]:hover {{ background: {p.primary_soft}; }}
     QFrame[callout="true"] {{ background: transparent; border: none; border-top: 1px solid {p.line};
         border-radius: 0; }}
     QFrame[answer="true"] {{ background: transparent; border: none; border-bottom: 1px solid {p.line};
@@ -503,7 +504,7 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QGroupBox::title {{ subcontrol-origin: margin; left: 0; padding: 0; }}
     QGroupBox > QWidget {{ font-size: {pt(TYPE_BODY)}; font-weight: 400; }}
 
-    /* ---------- sidebar (light; the current page has an indigo bar and indigo text) ---------- */
+    /* ---------- sidebar (soft gray; the current page is a filled row in bold ink) ---------- */
     QWidget#Sidebar {{ background: {p.sidebar}; border-right: 1px solid {p.line}; }}
     QWidget#Sidebar QLabel {{ color: {p.sidebar_text}; }}
     QWidget#Sidebar QLabel#OrgName {{ color: {p.sidebar_muted}; }}
@@ -511,7 +512,7 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QWidget#TopBar QLabel {{ color: {p.topbar_text}; }}
     QLabel#Brand {{ {section} color: {p.sidebar_text}; }}
     QLabel#OrgName {{ color: {p.topbar_muted}; {caption} }}
-    QWidget#NavIndicator {{ background: {p.sidebar_accent}; border-radius: 2px; }}
+    QWidget#NavIndicator {{ background: transparent; }}
     QPushButton[nav="true"] {{ background: transparent; color: {p.sidebar_text}; border: none; text-align: left;
         border-radius: {ctl}px; padding: 8px 16px; min-height: {target - 8}px; font-size: {pt(TYPE_BODY)}; }}
     QPushButton[nav="true"]:hover {{ background: {p.sidebar_hover}; }}
@@ -523,7 +524,7 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         border-radius: {ctl}px; padding: 8px 16px; min-height: {target - 16}px; font-weight: 600; }}
     QPushButton#CallToAction:hover {{ background: {p.cta_hover}; border-color: {p.cta_hover}; }}
     QPushButton#CallToAction:focus {{ border: {fw}px solid {p.on_cta}; }}
-    QPushButton#AskButton {{ background: {p.surface}; color: {p.text_muted}; border: 1px solid {p.line_strong};
+    QPushButton#AskButton {{ background: {p.surface_alt}; color: {p.text_muted}; border: 1px solid {p.line_strong};
         border-radius: {ctl}px; padding: 8px 12px; min-height: {target - 16}px; text-align: left; }}
     QPushButton#AskButton:hover {{ color: {p.text}; background: {p.surface_alt}; }}
     QPushButton#AskButton:focus {{ border: {fw}px solid {p.focus}; }}
@@ -539,15 +540,15 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QToolButton#UserMenu::menu-indicator {{ image: url("{down_arrow}"); subcontrol-origin: padding;
         subcontrol-position: center right; right: 10px; width: 14px; height: 14px; }}
 
-    QToolButton#PageHelp {{ background: transparent; color: {p.primary}; border: 1px solid {p.line_strong};
+    QToolButton#PageHelp {{ background: transparent; color: {p.text}; border: 1px solid {p.button_line};
         border-radius: {target // 2 - 4}px; min-width: {target - 18}px; min-height: {target - 18}px;
         padding: 4px; font-weight: 600; }}
     QToolButton#PageHelp:hover {{ background: {p.primary_soft}; }}
     QToolButton#PageHelp:focus {{ border: {fw}px solid {p.focus}; }}
 
     /* ---------- first-run tour: a card in the corner, and an outline around what it describes ---------- */
-    QFrame#TourCard {{ background: {p.surface}; border: 1px solid {p.primary}; border-radius: {card}px; }}
-    QFrame#TourOutline {{ background: transparent; border: 3px solid {p.attention_fill}; border-radius: {ctl}px; }}
+    QFrame#TourCard {{ background: {p.surface}; border: 1px solid {p.line_strong}; border-radius: {card}px; }}
+    QFrame#TourOutline {{ background: transparent; border: 3px solid {p.focus}; border-radius: {ctl}px; }}
 
     /* ---------- toast ---------- */
     QFrame#Toast {{ background: {p.text}; border-radius: {card}px; }}
@@ -556,11 +557,11 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         border-radius: {ctl}px; min-height: 0; padding: 4px 8px; }}
     QFrame#Toast QPushButton:focus {{ border: {fw}px solid {p.focus}; }}
 
-    /* ---------- buttons: outlined by default; one filled primary per screen ---------- */
-    QPushButton {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
-        border-radius: {ctl}px; padding: 8px 16px; min-height: {target - 16}px; }}
+    /* ---------- buttons: white with a soft edge by default; one black primary per screen ---------- */
+    QPushButton {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.button_line};
+        border-radius: {ctl}px; padding: 8px 16px; min-height: {target - 16}px; font-weight: 500; }}
     QPushButton:hover {{ background: {p.surface_alt}; }}
-    QPushButton:pressed {{ background: {p.primary_soft}; }}
+    QPushButton:pressed {{ background: {p.line}; }}
     QPushButton:focus {{ border: {fw}px solid {p.focus}; }}
     QPushButton:disabled {{ color: {p.text_muted}; background: {p.surface_alt}; border-color: {p.line}; }}
     QPushButton[kind="primary"] {{ background: {p.primary}; color: {p.on_primary}; border: 1px solid {p.primary};
@@ -569,32 +570,33 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QPushButton[kind="primary"]:focus {{ border: {fw}px solid {p.on_primary}; }}
     QPushButton[kind="primary"]:disabled {{ background: {p.surface_alt}; color: {p.text_muted};
         border-color: {p.line}; }}
-    QPushButton[kind="secondary"] {{ color: {p.primary}; border: 1px solid {p.primary}; font-weight: 600; }}
-    QPushButton[kind="secondary"]:hover {{ background: {p.primary_soft}; }}
+    QPushButton[kind="secondary"] {{ color: {p.text}; border: 1px solid {p.line_strong}; font-weight: 600; }}
+    QPushButton[kind="secondary"]:hover {{ background: {p.surface_alt}; }}
     QPushButton[kind="secondary"]:focus {{ border: {fw}px solid {p.focus}; }}
     QPushButton[kind="danger"] {{ color: {p.danger}; border-color: {p.danger}; }}
-    QPushButton[kind="link"] {{ background: transparent; border: none; color: {p.primary};
+    QPushButton[kind="link"] {{ background: transparent; border: none; color: {p.info};
         padding: 2px 0; text-align: left; min-height: 0; text-decoration: underline; }}
     QPushButton[kind="link"]:focus {{ border: {fw}px solid {p.focus}; }}
-    QPushButton[kind="chip"] {{ background: transparent; color: {p.primary}; border: none; border-radius: {ctl}px;
+    QPushButton[kind="chip"] {{ background: transparent; color: {p.info}; border: none; border-radius: {ctl}px;
         padding: 8px 8px; min-height: {target - 16}px; text-align: left; }}
     QPushButton[kind="chip"]:hover {{ background: {p.primary_soft}; }}
     QPushButton[kind="chip"]:focus {{ border: {fw}px solid {p.focus}; }}
-    QPushButton[kind="kiosk"] {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
+    QPushButton[kind="kiosk"] {{ background: {p.surface_alt}; color: {p.text}; border: 1px solid {p.surface_alt};
         border-radius: {card}px; padding: 16px 24px; min-height: {target + 32}px; font-size: {pt(TYPE_SECTION)};
         text-align: left; }}
-    QPushButton[kind="kiosk"]:hover {{ background: {p.primary_soft}; border-color: {p.primary}; }}
+    QPushButton[kind="kiosk"]:hover {{ background: {p.line}; border-color: {p.line_strong}; }}
     QPushButton[kind="kiosk"]:focus {{ border: {fw}px solid {p.focus}; }}
     QPushButton[kind="kiosk"]:disabled {{ color: {p.text_muted}; background: {p.surface_alt}; }}
     QLineEdit#KioskSearch {{ font-size: {pt(TYPE_SECTION)}; padding: 16px; min-height: {target}px; }}
-    QPushButton[segment="true"] {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
-        border-radius: 0; padding: 8px 16px; min-height: {target - 16}px; }}
+    QPushButton[segment="true"] {{ background: {p.surface_alt}; color: {p.text_muted};
+        border: 1px solid {p.surface_alt}; border-radius: 0; padding: 8px 16px; min-height: {target - 16}px; }}
+    QPushButton[segment="true"]:hover {{ color: {p.text}; }}
     QPushButton[segment="true"][first="true"] {{ border-top-left-radius: {ctl}px;
         border-bottom-left-radius: {ctl}px; }}
     QPushButton[segment="true"][last="true"] {{ border-top-right-radius: {ctl}px;
         border-bottom-right-radius: {ctl}px; }}
-    QPushButton[segment="true"]:checked {{ background: {p.primary_soft}; color: {p.primary};
-        border-color: {p.primary}; font-weight: 600; }}
+    QPushButton[segment="true"]:checked {{ background: {p.surface}; color: {p.text};
+        border-color: {p.line_strong}; font-weight: 600; }}
     QPushButton[segment="true"]:focus {{ border: {fw}px solid {p.focus}; }}
 
     /* ---------- inputs (borders >= 3:1 so every field is findable) ---------- */
@@ -634,8 +636,8 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QCheckBox::indicator:focus, QRadioButton::indicator:focus {{ border-color: {p.focus}; }}
     QCheckBox:focus, QRadioButton:focus {{ color: {p.focus}; }}
 
-    /* ---------- tables and lists: no stripes, hairline dividers, soft indigo hover ---------- */
-    QTableView, QListWidget {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {ctl}px;
+    /* ---------- tables and lists: no stripes, hairline dividers, soft gray hover ---------- */
+    QTableView, QListWidget {{ background: {p.surface}; border: 1px solid {p.line}; border-radius: {card}px;
         gridline-color: {p.line}; selection-background-color: {p.selection}; selection-color: {p.on_selection}; }}
     QTableView:focus, QListWidget:focus {{ border: {fw}px solid {p.focus}; }}
     QTableView::item {{ padding: 8px 12px; border-bottom: 1px solid {p.line}; }}
@@ -648,14 +650,14 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         background: {p.surface}; border-radius: 4px; }}
     QListWidget::indicator:checked {{ background: {p.primary}; border-color: {p.primary}; image: url("{check}"); }}
     QHeaderView::section {{ background: {p.surface}; color: {p.text_muted}; border: none;
-        border-bottom: 1px solid {p.line_strong}; padding: 8px 12px; font-weight: 600; }}
+        border-bottom: 1px solid {p.line}; padding: 8px 12px; font-weight: 500; }}
     QTabWidget::pane {{ border: none; border-top: 1px solid {p.line}; background: transparent; top: -1px; }}
     QTabBar::tab {{ background: transparent; color: {p.text_muted}; padding: 8px 16px; min-height: {target - 20}px;
-        border-bottom: 3px solid transparent; }}
-    QTabBar::tab:selected {{ color: {p.primary}; border-bottom: 3px solid {p.primary}; font-weight: 600; }}
+        border-bottom: 2px solid transparent; font-weight: 500; }}
+    QTabBar::tab:selected {{ color: {p.text}; border-bottom: 2px solid {p.text}; font-weight: 600; }}
     QTabBar::tab:hover {{ color: {p.text}; }}
     QTabBar::tab:focus {{ color: {p.focus}; }}
-    QProgressBar {{ background: {p.surface_alt}; border: 1px solid {p.line}; border-radius: 4px;
+    QProgressBar {{ background: {p.line}; border: none; border-radius: 4px;
         text-align: center; height: 16px; color: {p.text}; }}
     QProgressBar::chunk {{ background: {p.primary}; border-radius: 3px; }}
     QProgressBar[complete="true"]::chunk {{ background: {p.success_fill}; }}

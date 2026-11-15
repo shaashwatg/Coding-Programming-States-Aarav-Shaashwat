@@ -104,7 +104,7 @@ class ReportsPage(Page):
             action.toggled.connect(lambda on, section=section: self._toggle_section(section, on))
         self.sections_button.setMenu(sections_menu)
         self.verify_button = make_button(
-            tr("Verify a record..."),
+            tr("Verify a record…"),
             tooltip=tr("Check the code printed on a service record or certificate"),
             on_click=self._verify,
         )

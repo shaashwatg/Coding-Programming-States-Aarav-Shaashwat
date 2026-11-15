@@ -54,6 +54,10 @@ def _sortable(value: object) -> object:
     return value
 
 
+#: A stretch column may shrink (its text cut short) to about this many characters before the table scrolls.
+STRETCH_MIN_CHARS = 12
+
+
 class RecordTableModel(QAbstractTableModel, Generic[T]):
     def __init__(self, columns: Sequence[Column[T]]) -> None:
         super().__init__()
@@ -187,18 +191,20 @@ class RecordTable(QWidget, Generic[T]):
 
     def _fit_columns(self) -> None:
         """
-        Let the main text column (a "stretch" column) fill spare width, but only
-        when everything fits. Qt would otherwise squeeze it to a few letters at
-        large text sizes; instead it keeps its full width and the table scrolls
-        sideways, so no text is cut off.
+        Let the main text column (a "stretch" column) take the spare width. It may
+        shrink, its text ending in an ellipsis, but never below a readable minimum;
+        when even that doesn't fit, as at large text sizes, it keeps its full width
+        and the table scrolls sideways instead of squeezing the text to a few letters.
         """
         header = self.view.horizontalHeader()
         if self._stretching:  # measure natural widths first
             for position in self._stretch:
                 header.setSectionResizeMode(position, QHeaderView.ResizeMode.Interactive)
         self.view.resizeColumnsToContents()
-        needed = sum(header.sectionSize(i) for i in range(header.count()))
-        self._stretching = bool(self._stretch) and needed <= self.view.viewport().width()
+        readable = self.view.fontMetrics().horizontalAdvance("M" * STRETCH_MIN_CHARS)
+        fixed = sum(header.sectionSize(i) for i in range(header.count()) if i not in self._stretch)
+        smallest = sum(min(header.sectionSize(i), readable) for i in self._stretch)
+        self._stretching = bool(self._stretch) and fixed + smallest <= self.view.viewport().width()
         if self._stretching:
             for position in self._stretch:
                 header.setSectionResizeMode(position, QHeaderView.ResizeMode.Stretch)

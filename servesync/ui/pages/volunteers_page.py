@@ -136,11 +136,7 @@ class VolunteersPage(Page):
                     "Search everyone, approve applicants, and keep contact details "
                     "current. Double-click a person to edit their profile."
                 ),
-                [
-                    make_button(
-                        tr("Import..."), tooltip=tr("Add many volunteers from a CSV file"), on_click=self._import
-                    )
-                ],
+                [make_button(tr("Import…"), tooltip=tr("Add many volunteers from a CSV file"), on_click=self._import)],
             )
         )
         filters = QHBoxLayout()

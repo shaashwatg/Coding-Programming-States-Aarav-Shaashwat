@@ -112,7 +112,7 @@ class ProgramsPage(Page):
         self.edit_button = make_button(tr("Edit program"), on_click=self._edit_program)
         self.publish_button = make_button(tr("Publish"), kind="secondary", on_click=self._publish)
         self.close_button = make_button(tr("Close program"), on_click=self._close)
-        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        self.announce_button = make_button(tr("Announce…"), on_click=self._announce)
         self.announce_button.setToolTip(tr("Post a note for everyone signed up for this program"))
         for button in (self.edit_button, self.publish_button, self.close_button, self.announce_button):
             lifecycle.addWidget(button)

@@ -77,7 +77,7 @@ class ScoreAnatomyBar(QWidget):
         clip = QPainterPath()
         clip.addRoundedRect(rect, 5, 5)
         painter.setClipPath(clip)
-        painter.fillRect(rect, QColor(palette.surface_alt))
+        painter.fillRect(rect, QColor(palette.line))  # the empty part of the bar, visible on a gray card
         available = sum(f.max_points for f in self._factors) or 1.0
         x = rect.left()
         for factor, color in zip(self._factors, palette.factors, strict=False):
@@ -211,7 +211,7 @@ class ProgramArt(QLabel):
             )
             self.setAccessibleName(tr("Photo of {title}", title=title))
         else:
-            painter.fillRect(frame, QColor(palette.surface_alt))
+            painter.fillRect(frame, QColor(palette.surface))  # a white frame on the gray card
             glyph = assets.pixmap(assets.CATEGORY_ICONS[category], palette.primary, 64)
             painter.drawPixmap(
                 QRectF(frame.center().x() - 32, frame.center().y() - 40, 64, 64), glyph, QRectF(glyph.rect())

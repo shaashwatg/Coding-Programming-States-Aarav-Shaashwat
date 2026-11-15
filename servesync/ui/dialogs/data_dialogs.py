@@ -159,8 +159,8 @@ class ImportDialog(QDialog):
             )
         )
         row = QHBoxLayout()
-        row.addWidget(make_button(tr("Choose file..."), on_click=self._choose))
-        row.addWidget(make_button(tr("Save template..."), on_click=self._template))
+        row.addWidget(make_button(tr("Choose file…"), on_click=self._choose))
+        row.addWidget(make_button(tr("Save template…"), on_click=self._template))
         row.addSpacing(24)
         row.addWidget(make_label(tr("Add them as"), "hint"))
         self.status: EnumComboBox[VolunteerStatus] = EnumComboBox(VolunteerStatus)
@@ -398,7 +398,7 @@ class PrivacyRequestsPanel(Panel):
                 text += " " + tr("Reason: {reason}", reason=request.reason)
             row.addWidget(make_label(text, None, wrap=True), 1)
             row.addWidget(make_button(tr("Complete"), on_click=partial(self._complete, request)))
-            row.addWidget(make_button(tr("Decline..."), on_click=partial(self._decline, request)))
+            row.addWidget(make_button(tr("Decline…"), on_click=partial(self._decline, request)))
             self._rows.addLayout(row)
 
     @guarded
@@ -453,7 +453,7 @@ class MyPrivacyPanel(Panel):
         )
         row = QHBoxLayout()
         self.download_button = make_button(tr("Download my data"), on_click=self._download)
-        self.request_button = make_button(tr("Request deletion..."), kind="danger", on_click=self._request)
+        self.request_button = make_button(tr("Request deletion…"), kind="danger", on_click=self._request)
         row.addWidget(self.download_button)
         row.addWidget(self.request_button)
         row.addStretch(1)

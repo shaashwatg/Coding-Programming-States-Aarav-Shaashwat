@@ -69,6 +69,9 @@ class Appearance:
     reduce_motion                 2.3.3 Animation from Interactions (AAA)
     text_spacing                  1.4.12 Text Spacing — wider letters and words
                                   (helps many dyslexic readers)
+    legible_font                  1.4.8 Visual Presentation — Atkinson
+                                  Hyperlegible, whose look-alike letters
+                                  (I l 1, O 0, b d) are drawn to differ
     simplified                    Cognitive load: hides secondary panels so
                                   each screen has one job
     message_duration              2.2.1 Timing Adjustable / 2.2.3 No Timing
@@ -82,6 +85,7 @@ class Appearance:
     font_scale: float = 1.0
     reduce_motion: bool = False
     text_spacing: bool = False
+    legible_font: bool = False
     simplified: bool = False
     message_duration: MessageDuration = MessageDuration.STANDARD
     language: Language = Language.ENGLISH
@@ -97,6 +101,7 @@ class Appearance:
         for name, label in (
             ("reduce_motion", tr("Reduce motion")),
             ("text_spacing", tr("Extra text spacing")),
+            ("legible_font", tr("Easier-to-read letters")),
             ("simplified", tr("Simplified layout")),
         ):
             errors.check(name, _parse_flag, getattr(self, name), label)
@@ -116,6 +121,7 @@ class Appearance:
             "font_scale": f"{self.font_scale:.2f}",
             "reduce_motion": _TRUE if self.reduce_motion else _FALSE,
             "text_spacing": _TRUE if self.text_spacing else _FALSE,
+            "legible_font": _TRUE if self.legible_font else _FALSE,
             "simplified": _TRUE if self.simplified else _FALSE,
             "message_duration": self.message_duration.value,
             "language": self.language.value,

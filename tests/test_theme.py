@@ -90,22 +90,28 @@ def test_targets_grow_with_text_size() -> None:
     assert f"min-height: {MIN_TARGET * 2 - 8}px" in large
 
 
-def test_brand_colors_are_defined_once_and_used_in_order() -> None:
-    """The three brand colors come from the brief; charts use them as indigo, amber, emerald."""
+def test_the_palette_follows_the_cal_design_system() -> None:
+    """Near-black ink and primary, one blue accent; charts in ink, blue, green, in that order."""
     from servesync.ui import theme
 
-    assert (theme.INDIGO, theme.AMBER, theme.EMERALD) == ("#2F3E9E", "#F2A93B", "#0E9F6E")
-    assert LIGHT.chart == (theme.INDIGO, theme.AMBER, theme.EMERALD)
-    assert LIGHT.primary == theme.INDIGO and LIGHT.attention_fill == theme.AMBER
-    assert LIGHT.success_fill == theme.EMERALD
+    assert LIGHT.primary == LIGHT.text == theme.INK == "#111111"
+    assert LIGHT.window == "#FFFFFF" and LIGHT.surface_alt == "#F5F5F5"
+    assert LIGHT.focus == theme.BLUE and LIGHT.chart == (theme.INK, theme.BLUE, theme.GREEN)
+    assert LIGHT.attention_fill == theme.AMBER and LIGHT.success_fill == theme.GREEN
 
 
-def test_amber_is_never_text_on_a_light_background() -> None:
+def test_light_fills_are_never_text_on_a_light_background() -> None:
     from servesync.ui import theme
 
     text_tokens = {getattr(LIGHT, token) for token in TEXT_TOKENS}
-    assert theme.AMBER not in text_tokens
+    assert not {theme.AMBER, theme.GREEN, theme.BLUE} & text_tokens
     assert contrast(LIGHT.on_attention, LIGHT.attention_fill) >= 7.0  # dark text on amber fills
+
+
+@pytest.mark.parametrize("palette", THEMES, ids=lambda p: p.name)
+def test_text_on_cards_meets_aaa(palette: Palette) -> None:
+    for token in TEXT_TOKENS:
+        assert contrast(getattr(palette, token), palette.surface_alt) >= 7.0, token
 
 
 def test_screens_never_hard_code_colors() -> None:

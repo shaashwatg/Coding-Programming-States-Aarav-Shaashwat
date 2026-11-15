@@ -110,7 +110,7 @@ class OpportunityDialog(FormDialog):
         self.art = ProgramArt(200, 128)
         photo_row.addWidget(self.art)
         buttons = QVBoxLayout()
-        buttons.addWidget(make_button(tr("Choose photo..."), on_click=self._choose_photo))
+        buttons.addWidget(make_button(tr("Choose photo…"), on_click=self._choose_photo))
         self.remove_photo_button = make_button(tr("Remove photo"), on_click=self._remove_photo)
         buttons.addWidget(self.remove_photo_button)
         buttons.addStretch(1)

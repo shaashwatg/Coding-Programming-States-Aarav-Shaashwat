@@ -218,10 +218,13 @@ class SettingsPage(Page):
         self.text_spacing = QCheckBox(
             tr("Extra letter and word spacing (easier for many readers, including people with dyslexia)")
         )
+        self.legible_font = QCheckBox(
+            tr("Easier-to-read letters (a font whose look-alike letters, like I, l and 1, are easy to tell apart)")
+        )
         self.simplified = QCheckBox(
             tr("Simplified layout (hide extra panels so each screen shows only the essentials)")
         )
-        for box in (self.reduce_motion, self.text_spacing, self.simplified):
+        for box in (self.reduce_motion, self.text_spacing, self.legible_font, self.simplified):
             access.body.addWidget(box)
 
         timing_row = QHBoxLayout()
@@ -326,9 +329,9 @@ class SettingsPage(Page):
                     make_label(tr("Data folder: {folder}", folder=str(folder)), "hint", wrap=True, selectable=True)
                 )
             buttons = QHBoxLayout()
-            buttons.addWidget(make_button(tr("Back up..."), on_click=self._backup))
-            buttons.addWidget(make_button(tr("Restore..."), kind="danger", on_click=self._restore))
-            buttons.addWidget(make_button(tr("Change history..."), on_click=self._history))
+            buttons.addWidget(make_button(tr("Back up…"), on_click=self._backup))
+            buttons.addWidget(make_button(tr("Restore…"), kind="danger", on_click=self._restore))
+            buttons.addWidget(make_button(tr("Change history…"), on_click=self._history))
             buttons.addStretch(1)
             data.body.addLayout(buttons)
             self.layout_.addWidget(data)
@@ -395,6 +398,7 @@ class SettingsPage(Page):
         self.size_label.setText(f"{TEXT_SIZES[closest]:.0%}")
         self.reduce_motion.setChecked(appearance.reduce_motion)
         self.text_spacing.setChecked(appearance.text_spacing)
+        self.legible_font.setChecked(appearance.legible_font)
         self.simplified.setChecked(appearance.simplified)
         self.message_duration.set_value(appearance.message_duration)
 
@@ -408,6 +412,7 @@ class SettingsPage(Page):
             font_scale=TEXT_SIZES[self.text_size.value()],
             reduce_motion=self.reduce_motion.isChecked(),
             text_spacing=self.text_spacing.isChecked(),
+            legible_font=self.legible_font.isChecked(),
             simplified=self.simplified.isChecked(),
             message_duration=self.message_duration.value() or MessageDuration.STANDARD,
         )

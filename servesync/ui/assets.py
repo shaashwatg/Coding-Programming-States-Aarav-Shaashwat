@@ -2,12 +2,13 @@
 Bundled design assets: fonts and icons.
 
 Fonts (SIL Open Font License, bundled so every computer looks the same):
-* **Atkinson Hyperlegible** — body and interface text. Designed by the Braille
-  Institute so similar letters (I/l/1, O/0, b/d) are easy to tell apart for
+* **Inter**: interface and body text. Designed for screens, with clear figures
+  and tabular numbers; Regular, Medium and SemiBold are bundled.
+* **Cal Sans**: page titles and key figures. A geometric display face with
+  tight spacing that gives headings a calm, confident voice.
+* **Atkinson Hyperlegible** (Braille Institute): the "Easier-to-read letters"
+  comfort setting. Similar letters (I/l/1, O/0, b/d) are drawn to differ, for
   readers with low vision.
-* **Manrope** (SemiBold) — page and section titles and key figures. A plain,
-  modern sans with open shapes; it reads as calm and current next to Atkinson
-  without competing with it, and stays legible at the large sizes headings use.
 
 Icons: the open-source **Lucide** set (ISC license). Each area of the app uses
 one icon everywhere (people = "users", shifts = "calendar-days", ...), so
@@ -30,8 +31,9 @@ from servesync.models import OpportunityCategory
 
 logger = logging.getLogger(__name__)
 
-BODY_FAMILY = "Atkinson Hyperlegible"
-HEADING_FAMILY = "Manrope"
+BODY_FAMILY = "Inter"
+HEADING_FAMILY = "Cal Sans"
+LEGIBLE_FAMILY = "Atkinson Hyperlegible"  # the "Easier-to-read letters" comfort setting
 
 
 def assets_dir() -> Path:
@@ -39,9 +41,9 @@ def assets_dir() -> Path:
     return root / "servesync" / "ui" / "assets" if is_frozen() else root / "ui" / "assets"
 
 
-def load_fonts() -> tuple[str, str]:
-    """Register the bundled fonts. Falls back to the system font if a file is missing."""
-    body, heading = "", ""
+def load_fonts() -> tuple[str, str, str]:
+    """Register the bundled fonts: (body, heading, legible). An empty name means use the system font."""
+    body, heading, legible = "", "", ""
     for font_file in sorted((assets_dir() / "fonts").glob("*.ttf")):
         font_id = QFontDatabase.addApplicationFont(str(font_file))
         if font_id < 0:
@@ -52,7 +54,9 @@ def load_fonts() -> tuple[str, str]:
             body = BODY_FAMILY
         if HEADING_FAMILY in families:
             heading = HEADING_FAMILY
-    return body, heading
+        if LEGIBLE_FAMILY in families:
+            legible = LEGIBLE_FAMILY
+    return body, heading, legible
 
 
 # ------------------------------------------------------------------- icons

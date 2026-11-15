@@ -11,104 +11,93 @@ page, widget or dialog hard-codes a color.
 
 ![Dashboard](screenshots/dashboard.png)
 
+## Where the look comes from
+
+The visual system follows **Cal.com's**, as documented in its DESIGN.md in VoltAgent's
+[awesome-design-md](https://github.com/VoltAgent/awesome-design-md) collection. Cal.com is
+scheduling software, so its language (calendars, time slots, people, one clear action) already
+fits shifts and volunteers, and its near-monochrome calm suits a screen someone looks at all day.
+Only the system is borrowed: the type roles, spacing, surfaces, corners and component shapes.
+No Cal.com logo, wording or artwork is used, and the ServeSync mark is our own.
+
+The interface was also reviewed against the
+[Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) where
+they apply to a desktop app: visible focus on every control, the "…" character in labels that
+open a window, plain loading and empty states, confirmation before anything destructive, and
+inline errors next to their fields.
+
 ## Color
 
-Three colors, plus neutrals. Each color has one job, so its meaning stays clear.
+Near-monochrome, with color reserved for meaning.
 
-| Color | Value | Job | Where it appears |
-|---|---|---|---|
-| Deep indigo | `#2F3E9E` | The working color | Navigation, the one filled button per screen, links, selected rows, keyboard focus |
-| Warm amber | `#F2A93B` | Look here | "Needs attention" markers, calendar dots for open days, the active chart bar, badges |
-| Emerald | `#0E9F6E` | Good news | Success messages, open spots, the Smart Match score, finished goals |
+| Token | Value | Job |
+|---|---|---|
+| Ink | `#111111` | Headings, primary text, and the black primary button |
+| Canvas | `#FFFFFF` | The page |
+| Card | `#F5F5F5` | Cards and key figures (light gray, no border) |
+| Hairline | `#E5E7EB` | Dividers and table rows |
+| Blue | `#3B82F6` | The one accent: keyboard focus, the active chart series |
+| Amber | `#F59E0B` | "Needs attention" markers and calendar dots (a shape, never text) |
+| Green | `#10B981` | Success as a shape: score bars, finished goals |
 
-**Why these three.** Indigo reads as trustworthy and serious without the coldness of a
-corporate blue, and it holds 9:1 contrast on white, so it can be both a button fill and link
-text. Amber is indigo's warm complement, so a single amber mark stands out on an otherwise cool
-screen without needing to be large. Emerald is the conventional "done" color, and keeping it
-rare means a green number is worth reading.
+**Contrast is not negotiable.** ServeSync promises 7:1 for all text (WCAG AAA), and several of
+Cal.com's colors fall short as text: its gray `#6B7280` is 4.8:1 on white, its blue 3.7:1, its
+green 2.5:1, its red 3.8:1. So text uses deeper shades of the same hues (secondary text
+`#374151`, links `#1E40AF`, success `#065F46`, errors `#991B1B`), and the original bright
+colors are kept for fills, dots and chart bars, where 3:1 is the standard. Input borders use
+`#757B84` (4.3:1) so every field can be found, while secondary buttons keep Cal.com's softer edge
+because their label identifies them. `tests/test_theme.py` checks every pair, in every theme,
+including text on gray cards.
 
-**Rules that keep it calm.**
+**Dark theme:** Cal.com's own dark surfaces (`#101010`, `#1A1A1A`), white primary buttons with
+black text, and lighter tints of the same blue, green, amber and red.
 
-* Amber is never text on a light background (it measures under 2:1 on white). It is always a
-  shape: a 4 px bar beside a figure, a calendar dot, a chart bar. When amber is a fill, the text
-  on it is dark slate (7.8:1).
-* Emerald is 3.4:1 on white, which is fine for a bar or a dot but too light for text. Text that
-  should be emerald uses a deeper shade of the same hue, `#04553A`, which keeps the 7:1 the app
-  meets everywhere.
-* The brief's secondary text color `#5B6478` measures 5.6:1 on white. ServeSync's standard is
-  7:1 (WCAG AAA), so secondary text is one step darker, `#454D61`.
-* Errors stay red (`#8C2A1F`) and always come with a warning icon and words, never color alone.
-
-**Neutrals.** A cool off-white canvas (`#F7F8FB`), white surfaces for tables and cards, slate
-text (`#1E2433`), and hairline borders (`#E3E6EE`). The cool cast keeps white areas from looking
-yellow under office lighting and avoids the cream and beige backgrounds common in generated
-designs.
-
-**Dark theme.** The canvas is `#14161F` and surfaces are `#1C1F2B`. The three brand colors
-become lighter tints of the same hues (indigo `#AEB8F5`, amber `#F5C878`, emerald `#6EDBB0`),
-so meaning carries over and every text color still reaches 7:1.
-
-**High contrast theme.** Black, white and yellow with a 3 px cyan focus ring. People who choose
-it need maximum contrast more than they need brand colors, so it keeps its own palette.
-
-`tests/test_theme.py` computes every contrast ratio with the WCAG formula, for every theme:
-text 7:1 on every background it can sit on, borders and focus rings 3:1, and button labels 7:1.
+**High contrast** keeps its black, white and yellow with a 3 px cyan focus ring: people who
+choose it need maximum contrast more than any brand look.
 
 ## Type
 
 | Role | Font | Size (at 100%) |
 |---|---|---|
-| Page title | Manrope SemiBold | 1.6 x body |
-| Section title | Manrope SemiBold | 1.2 x body |
-| Body | Atkinson Hyperlegible | the person's chosen size |
-| Caption | Atkinson Hyperlegible | 0.88 x body |
+| Page title, key figures | Cal Sans | 1.75 x body |
+| Section title | Inter SemiBold | 1.15 x body |
+| Body | Inter | the person's chosen size |
+| Caption | Inter | 0.88 x body |
 
-**Atkinson Hyperlegible** (Braille Institute) is used for everything people read. It was
-designed so that easily confused characters (I, l and 1; O and 0; b and d) look different, which
-helps readers with low vision and anyone scanning a roster quickly.
+**Cal Sans** is Cal.com's open-source geometric display face, tight and confident; it is drawn
+heavy at its regular weight, so it is never bolded further. **Inter** handles everything people
+read and click: it was designed for screens and has clear figures. Both are under the SIL Open
+Font License and bundled, so the app looks the same on every computer.
 
-**Manrope** (SIL Open Font License) is used for headings and key figures. It is a plain, modern
-sans-serif with open shapes, so it pairs with Atkinson without competing with it, and its numbers
-are clear at large sizes. It replaces the earlier serif headings, which felt editorial rather than
-like a tool.
-
-Headings are sentence case. There are no all-caps or letter-spaced labels, because all caps are
-slower to read, especially for people with dyslexia. The whole scale grows with the person's text
-size (85% to 200%), so nothing clips.
+**Atkinson Hyperlegible** (Braille Institute) is kept as a comfort setting, *Easier-to-read
+letters*: it draws look-alike letters (I, l and 1; O and 0; b and d) to differ, which helps readers
+with low vision. Headings are sentence case, with no all-caps labels, and the whole scale grows
+with the person's text size (85% to 200%).
 
 ## Layout
 
-* **8 px grid.** Margins, gaps and padding are multiples of 8 (with a 4 px half step for a label
-  and its hint). Content is left-aligned so the eye always returns to the same edge.
-* **Flat surfaces.** Areas are separated by space and hairline borders. There are no gradients,
-  glows or heavy shadows.
-* **Cards only for objects.** A shift, a volunteer recommendation, or the featured event is a
-  card (white, hairline border, 10 px corners). Everything else, such as "Shifts that need people"
-  or "What stands out", is a plain section with a heading.
-* **Key figures** sit in a row, each set off by a hairline on its left. A figure that needs
-  action gets an amber bar instead, and screen readers hear "needs attention".
-* **Corners.** 6 px on buttons and inputs, 10 px on cards and dialogs.
-* **One filled button per screen.** In the main window, the header's action (*Add volunteer* for
-  leaders, *Find a shift* for volunteers) is the only filled indigo button. Other actions are
-  outlined; a dialog's single main action (Save, Sign in) is filled.
-* **Sidebar.** Light, with the current page marked by an indigo bar and indigo text and icon.
-* **Tables.** No zebra stripes; hairline dividers, 44 px rows (comfortable to read and a full
-  touch target), and a soft indigo tint on hover and selection. When text is large, the table
-  scrolls sideways rather than squeezing a column until its text is cut off.
-* **Charts.** Indigo first, then amber, then emerald, on neutral gridlines. The bar or point
-  being inspected turns amber. Values are printed on every bar, and each chart has a text summary
-  and a matching table.
-* **Ask ServeSync** looks like a search panel: a search box, then plain rows that pair each
-  question with its answer, separated by hairlines. It deliberately avoids chat bubbles, because
-  it looks up the organization's own records and should not suggest a person or general chatbot is
-  replying.
-* **Motion** only follows something the person did (a click, a key press): a page fades in, the
-  sidebar marker slides to the new page. *Reduce motion* removes all of it.
+* **8 px rhythm on a 4 px base**, left-aligned content, generous but not empty whitespace.
+* **Light-gray cards without borders** for separate objects (a shift, a recommendation, the
+  featured event) and for the key figures; everything else is a plain section with a heading.
+  A figure that needs action gets an amber bar, and screen readers hear "needs attention".
+* **Corners:** 8 px on buttons and inputs, 12 px on cards, tables and dialogs.
+* **One black primary button per screen.** In the main window that is the header's action (*Add
+  volunteer* or *Find a shift*); other buttons are white with a soft gray edge.
+* **Sidebar:** soft gray, the current page a filled gray row in bold ink with its icon.
+* **Segmented choices** (language, theme) are a gray group with the chosen option raised in white.
+* **Tables:** no stripes, hairline rows 44 px tall, a light gray hover. A long program name ends in
+  "…" (its full text is in the details beside it); only when even a short column won't fit, at large
+  text sizes, does the table scroll sideways.
+* **Charts:** ink first, then blue, then green, on neutral gridlines; the bar or point being
+  inspected turns blue. Values are printed on every bar.
+* **Ask ServeSync** looks like a search panel, not a chat: each question and its answer form one
+  plain row.
+* **Motion** only follows something the person did; *Reduce motion* removes it.
 
 What we avoided, and why: cream backgrounds, terracotta accents, serif display headings, sparkle
-and magic-wand icons, emoji, purple-to-blue gradients, small labels above headings, pill chips,
-middle dots or long dashes joining labels, arrows in button text, and marketing-style copy. They
-are common in generated interfaces, and they add decoration without helping anyone finish a task.
+and magic-wand icons, emoji, purple-to-blue gradients, small labels above headings, middle dots or
+long dashes joining labels, arrows in button text, and marketing-style copy. They are common in
+generated interfaces and add decoration without helping anyone finish a task.
 
 ## Two user journeys
 
@@ -117,7 +106,7 @@ are common in generated interfaces, and they add decoration without helping anyo
 1. **Sign in.** The sign-in screen offers English or Español at the top, each written in its own
    language, so anyone can find theirs.
 2. **Home.** Her hours, shifts completed and show-up rate are the first figures. Her hour goal
-   shows a progress bar that turns emerald when she reaches it.
+   shows a progress bar and a projected finish date, and turns green when she reaches it.
 3. **Find a shift.** The header's one filled button opens *Find a shift*. Filters start with
    "Only shifts I can sign up for", so she never chooses a shift and then hits a rule. The *Fit*
    column is her Smart Match score.
@@ -133,7 +122,7 @@ are common in generated interfaces, and they add decoration without helping anyo
 2. **Review applicants.** One click opens the Volunteers page already filtered to applicants.
    *Approve* makes them active.
 3. **Fill a shift.** From *Shifts that need people this week*, she opens a shift and runs Smart
-   Match. Each candidate card shows an emerald score, a bar of where the points came from, and the
+   Match. Each candidate card shows a green score, a bar of where the points came from, and the
    reasons in words.
 4. **Look ahead.** *Staffing Studio* drafts sign-ups for the next two weeks, forecasts turnout,
    and lists people who have quietly stopped coming. Nothing is saved until she approves.

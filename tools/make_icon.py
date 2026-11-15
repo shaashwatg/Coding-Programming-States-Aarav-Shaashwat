@@ -19,7 +19,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from servesync.ui import assets
-from servesync.ui.theme import INDIGO
+from servesync.ui.theme import INK
 
 SIZES = (16, 32, 128, 256, 512)
 
@@ -30,7 +30,7 @@ def main() -> int:
     app = QApplication.instance() or QApplication([])
     for size in SIZES:
         for scale, suffix in ((1, ""), (2, "@2x")):
-            image = assets.pixmap("logo", INDIGO, size, ratio=scale).toImage()
+            image = assets.pixmap("logo", INK, size, ratio=scale).toImage()
             image.save(str(folder / f"icon_{size}x{size}{suffix}.png"))
     print(f"Wrote {len(SIZES) * 2} icon images to {folder}")
     del app
