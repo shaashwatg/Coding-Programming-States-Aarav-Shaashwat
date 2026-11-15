@@ -265,6 +265,9 @@ class StaffingService(Service):
 
     def _upcoming(self, days: int) -> list[ShiftOverview]:
         now = self._clock.now()
-        return self._store.shifts.overviews(
+        overviews = self._store.shifts.overviews(
             starts_after=now, starts_before=now + timedelta(days=days), opportunity_status=OpportunityStatus.OPEN
         )
+        # The query's boundary is inclusive, but a shift starting this very minute has
+        # already started for Smart Match; using the same rule keeps the two from disagreeing.
+        return [overview for overview in overviews if not overview.shift.has_started(now)]

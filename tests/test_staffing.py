@@ -85,6 +85,19 @@ def test_plan_obeys_every_rule_and_all_of_it_can_be_signed_up(demo: Services) ->
     assert result.skipped == () and len(result.assignment_ids) == len(plan.proposals)
 
 
+def test_a_shift_starting_this_minute_is_left_out(store: DataStore) -> None:
+    """Regression: the demo has shifts at 9:00, and at exactly 9:00 drafting used to fail."""
+    seed_demo_data(store, today=SEED_DAY, password_iterations=FAST_ITERATIONS)
+    services = Services.create(
+        store, clock=FixedClock(datetime.combine(SEED_DAY, time(9, 0))), password_iterations=FAST_ITERATIONS
+    )
+    session = services.auth.sign_in("coordinator", DEMO_PASSWORD)
+    now = datetime.combine(SEED_DAY, time(9, 0))
+    plan = services.staffing.draft_plan(session)
+    assert all(not p.overview.shift.has_started(now) for p in plan.proposals)
+    assert all(not f.overview.shift.has_started(now) for f in services.staffing.forecast(session))
+
+
 def test_drafting_saves_nothing(demo: Services) -> None:
     session = demo.auth.sign_in("coordinator", DEMO_PASSWORD)
     before = demo.store.assignments.count_by_status()
