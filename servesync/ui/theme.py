@@ -570,6 +570,13 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
         padding: 8px 8px; min-height: {target - 16}px; text-align: left; }}
     QPushButton[kind="chip"]:hover {{ background: {p.primary_soft}; }}
     QPushButton[kind="chip"]:focus {{ border: {fw}px solid {p.focus}; }}
+    QPushButton[kind="kiosk"] {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
+        border-radius: {card}px; padding: 16px 24px; min-height: {target + 32}px; font-size: {pt(TYPE_SECTION)};
+        text-align: left; }}
+    QPushButton[kind="kiosk"]:hover {{ background: {p.primary_soft}; border-color: {p.primary}; }}
+    QPushButton[kind="kiosk"]:focus {{ border: {fw}px solid {p.focus}; }}
+    QPushButton[kind="kiosk"]:disabled {{ color: {p.text_muted}; background: {p.surface_alt}; }}
+    QLineEdit#KioskSearch {{ font-size: {pt(TYPE_SECTION)}; padding: 16px; min-height: {target}px; }}
     QPushButton[segment="true"] {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.line_strong};
         border-radius: 0; padding: 8px 16px; min-height: {target - 16}px; }}
     QPushButton[segment="true"][first="true"] {{ border-top-left-radius: {ctl}px;

@@ -36,7 +36,10 @@ _ENTITY = mark("Sign-up")
 
 _V_NAME = display_name_sql("v")
 
-_ASSIGNMENT_COLUMNS = "a.assignment_id, a.shift_id, a.volunteer_id, a.status, a.hours_served, a.signed_up_at, a.role_id"
+_ASSIGNMENT_COLUMNS = (
+    "a.assignment_id, a.shift_id, a.volunteer_id, a.status, a.hours_served, a.signed_up_at, a.role_id, "
+    "a.checked_in_at, a.checked_out_at"
+)
 
 
 class AssignmentRepository(Repository):
@@ -75,6 +78,7 @@ class AssignmentRepository(Repository):
             UPDATE assignments
             SET status = :status, hours_served = :hours_served, signed_up_at = :signed_up_at,
                 role_id = COALESCE(:role_id, role_id),
+                checked_in_at = :checked_in_at, checked_out_at = :checked_out_at,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime')
             WHERE assignment_id = :assignment_id
             """,
@@ -426,6 +430,8 @@ class AssignmentRepository(Repository):
             "hours_served": assignment.hours_served,
             "signed_up_at": datetime_to_db(assignment.signed_up_at),
             "role_id": assignment.role_id,
+            "checked_in_at": datetime_to_db(assignment.checked_in_at) if assignment.checked_in_at else None,
+            "checked_out_at": datetime_to_db(assignment.checked_out_at) if assignment.checked_out_at else None,
         }
 
     def _first_role(self, shift_id: int) -> int | None:
@@ -444,4 +450,6 @@ class AssignmentRepository(Repository):
             signed_up_at=datetime_from_db(row["signed_up_at"]),
             assignment_id=row["assignment_id"],
             role_id=row["role_id"],
+            checked_in_at=datetime_from_db(row["checked_in_at"]) if row["checked_in_at"] else None,
+            checked_out_at=datetime_from_db(row["checked_out_at"]) if row["checked_out_at"] else None,
         )

@@ -189,6 +189,11 @@ DEMO_CREDENTIAL_VALID_DAYS = 365
 DEMO_EVENT_PROGRAM, DEMO_WAIVER, DEMO_FOOD_CARD = "Community 5K Fun Run", "Liability waiver", "Food Handler Card"
 DEMO_WAIVER_SOON_DAYS = 10
 DEMO_WAITLIST_SIZE = 2
+DEMO_EVENT_ANNOUNCEMENT = (
+    "Thank you for helping with the 5K! Please arrive 30 minutes early for a short briefing at the "
+    "registration tent. Parking is in the north lot."
+)
+DEMO_SHIFT_ANNOUNCEMENT = "We're short on reusable bags this week. If you have spares, please bring them along."
 DEMO_WAITLIST_LEAD_DAYS = 3  # the full shift is a few days out, so the demo has time to show it
 #: Roles for upcoming shifts: (name, people, required skill). Totals match each program's capacity.
 DEMO_ROLES: dict[str, tuple[tuple[str, int, str], ...]] = {
@@ -294,6 +299,7 @@ def seed_demo_data(
         _add_roles(store, shifts, today)
         checkin_shifts = _create_todays_checkin_shifts(store, volunteers, shifts, today)
         _add_waitlists_and_notices(store, volunteers, today)
+        _add_announcements_and_kiosk_times(store, volunteers, today)
 
     summary = SeedSummary(
         volunteers=len(volunteers),
@@ -962,6 +968,42 @@ def _add_waitlists_and_notices(store: DataStore, volunteers: list[Volunteer], to
         store.notices.add(
             _saved_id(priya.volunteer_id), NoticeKind.WAITLIST_PROMOTED, mine[-1].shift_id, now - timedelta(days=1)
         )
+
+
+def _add_announcements_and_kiosk_times(store: DataStore, volunteers: list[Volunteer], today: date) -> None:
+    """
+    Two notes from coordinators (one for the whole 5K, one for a shift Priya is on), and
+    kiosk arrival and departure times for the most recent finished shift, consistent with
+    the hours already recorded for it.
+    """
+    now = datetime.combine(today, time(8))
+    event = next(o for o in store.opportunities.find_all() if o.title == DEMO_EVENT_PROGRAM)
+    store.announcements.add(
+        body=DEMO_EVENT_ANNOUNCEMENT,
+        posted_by="coordinator",
+        posted_at=now - timedelta(days=2),
+        opportunity_id=event.opportunity_id,
+        shift_id=None,
+    )
+    mine = store.assignments.upcoming_scheduled(after=now, volunteer_id=_saved_id(volunteers[1].volunteer_id))
+    if mine:
+        store.announcements.add(
+            body=DEMO_SHIFT_ANNOUNCEMENT,
+            posted_by="coordinator",
+            posted_at=now - timedelta(days=1),
+            opportunity_id=None,
+            shift_id=mine[0].shift_id,
+        )
+    finished = [o for o in store.shifts.overviews(starts_before=now) if o.shift.ends_at <= now and o.filled]
+    if finished:
+        shift = finished[-1].shift
+        for index, entry in enumerate(store.assignments.roster(_saved_id(shift.shift_id))):
+            served = entry.assignment.hours_served
+            if entry.assignment.status is not AssignmentStatus.ATTENDED or served is None:
+                continue
+            arrived = shift.starts_at - timedelta(minutes=5) + timedelta(minutes=3 * index)
+            left = max(arrived, shift.starts_at) + timedelta(hours=served)
+            store.assignments.update(dataclasses.replace(entry.assignment, checked_in_at=arrived, checked_out_at=left))
 
 
 def _create_todays_checkin_shifts(

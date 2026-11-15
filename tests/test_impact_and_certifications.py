@@ -190,7 +190,7 @@ def test_walk_ins_and_the_kiosk_enforce_it_too(demo: Services) -> None:
     demo.store.opportunities.update(dataclasses.replace(program, required_certifications=frozenset({CPR})))
     entry = demo.attendance.roster(session, open_shift.shift.shift_id or 0)[0]
     with pytest.raises(BusinessRuleError, match="see a coordinator"):
-        demo.attendance.kiosk_check_in(session, entry.assignment.assignment_id or 0)
+        demo.attendance.kiosk_tap(session, entry.assignment.assignment_id or 0)
 
 
 @pytest.mark.parametrize(

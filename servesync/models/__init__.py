@@ -28,6 +28,7 @@ from servesync.models.opportunity import Opportunity, Shift
 from servesync.models.preferences import Appearance
 from servesync.models.read_models import (
     ActivityItem,
+    Announcement,
     Notice,
     RosterEntry,
     ServiceFact,
@@ -43,6 +44,7 @@ __all__ = [
     "AccessNeed",
     "ActivityItem",
     "ActivityKind",
+    "Announcement",
     "Appearance",
     "Assignment",
     "AssignmentStatus",

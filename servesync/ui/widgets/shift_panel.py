@@ -17,6 +17,7 @@ from servesync.models import AccessNeed, RoleOverview, ShiftOverview
 from servesync.services import Permission
 from servesync.services.rules import best_role, describe_access_gaps
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.widgets.common import Panel, format_hours, format_when, guarded, make_button, make_label, set_prop
 from servesync.ui.widgets.visuals import ProgramArt
@@ -41,6 +42,9 @@ class ShiftInfoPanel(Panel):
         self.story_button = make_button(tr("Watch the story video"), kind="link", on_click=self._open_story)
         self.story_button.setToolTip(tr("Opens in your web browser"))
         self.body.addWidget(self.story_button)
+        self.calendar_button = make_button(tr("Add to calendar"), kind="link", on_click=self._add_to_calendar)
+        self.calendar_button.setToolTip(tr("Saves a calendar file your phone or email app can open"))
+        self.body.addWidget(self.calendar_button)
         self.verdict = make_label("", wrap=True)
         self.body.addWidget(self.verdict)
         # Volunteers choose a role when a shift has several; ServeSync preselects the best fit for their skills.
@@ -67,7 +71,7 @@ class ShiftInfoPanel(Panel):
     def show_shift(self, overview: ShiftOverview | None) -> None:
         self._overview = overview
         has = overview is not None
-        for widget in (self.art, self.facts, self.description, self.primary, self.verdict):
+        for widget in (self.art, self.facts, self.description, self.primary, self.verdict, self.calendar_button):
             widget.setVisible(has)
         self.role_label.hide()
         self.role_box.hide()
@@ -204,6 +208,11 @@ class ShiftInfoPanel(Panel):
         several = len(choices) > 1
         self.role_label.setVisible(several)
         self.role_box.setVisible(several)
+
+    @guarded
+    def _add_to_calendar(self) -> None:
+        if self._overview is not None:
+            save_calendar_file(self._ctx, self._overview.shift.shift_id or 0, self)
 
     @guarded
     def _secondary(self) -> None:

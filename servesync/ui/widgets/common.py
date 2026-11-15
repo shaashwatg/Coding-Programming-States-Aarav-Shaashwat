@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -231,7 +232,7 @@ class EnumComboBox(QComboBox, Generic[E]):
         self.setCurrentIndex(max(index, 0))
 
 
-def clear_layout(layout: QVBoxLayout | QHBoxLayout) -> None:
+def clear_layout(layout: QLayout) -> None:
     """Remove and delete every widget in a layout (used when rebuilding lists)."""
     while layout.count():
         item = layout.takeAt(0)
@@ -242,7 +243,7 @@ def clear_layout(layout: QVBoxLayout | QHBoxLayout) -> None:
             widget.hide()  # hide now: deletion only happens on the next event-loop pass
             widget.deleteLater()
         child = item.layout()
-        if isinstance(child, (QVBoxLayout, QHBoxLayout)):
+        if isinstance(child, QLayout):
             clear_layout(child)
 
 

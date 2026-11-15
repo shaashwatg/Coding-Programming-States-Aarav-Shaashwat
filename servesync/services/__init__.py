@@ -17,9 +17,10 @@ from servesync.core.security import DEFAULT_ITERATIONS
 from servesync.data import DataStore
 from servesync.models import Appearance
 from servesync.services.assistant import AssistantService
-from servesync.services.attendance_service import AttendanceService, KioskPerson, KioskResult
+from servesync.services.attendance_service import AttendanceService, KioskPerson, KioskResult, KioskState
 from servesync.services.auth_service import AuthService
 from servesync.services.clock import Clock, FixedClock, SystemClock
+from servesync.services.coordination_service import CoordinationService, ReminderRow
 from servesync.services.dashboard_service import (
     DashboardService,
     FeaturedEvent,
@@ -64,6 +65,7 @@ class Services:
     settings: SettingsService
     setup: SetupService
     staffing: StaffingService
+    coordination: CoordinationService
 
     @classmethod
     def create(
@@ -97,6 +99,7 @@ class Services:
             settings=SettingsService(store, clock),
             setup=SetupService(store, clock, password_iterations=password_iterations),
             staffing=StaffingService(store, clock, matching=matching, scheduling=scheduling),
+            coordination=CoordinationService(store, clock),
         )
 
 
@@ -106,12 +109,14 @@ __all__ = [
     "AttendanceService",
     "AuthService",
     "Clock",
+    "CoordinationService",
     "DashboardService",
     "DriftAlert",
     "FeaturedEvent",
     "FixedClock",
     "KioskPerson",
     "KioskResult",
+    "KioskState",
     "LeaderSummary",
     "MatchingService",
     "OpportunityService",
@@ -119,6 +124,7 @@ __all__ = [
     "PlanProposal",
     "PlanResult",
     "RecruitmentInsight",
+    "ReminderRow",
     "ReportService",
     "SchedulingService",
     "ScoreFactor",

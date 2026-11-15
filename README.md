@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 557 automated tests, including the interface
+python -m pytest          # 0 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   557 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   0 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -391,6 +391,8 @@ volunteers ─┬─< volunteer_skills >── skills ──< opportunity_skills
 | `shift_roles`, `assignments.role_id` | Roles within a shift, each with a capacity and optional skill; the role each sign-up fills (schema version 6). A trigger rejects a role from another shift |
 | `waitlist`, `notices` | People waiting for a full shift, oldest first; Home-page notices stored as *what happened*, worded in the reader's language when shown (schema version 6) |
 | `volunteer_certifications.kind`, `issued_on` | Certification or waiver, and its issue date (schema version 6) |
+| `announcements` | A leader's note to one program or one shift (exactly one, enforced by a `CHECK`) (schema version 7) |
+| `assignments.checked_in_at`, `checked_out_at` | Kiosk arrival and departure; check-out can't come before check-in (schema version 7) |
 | `app_settings`           | Organization name, mission statement, value of a volunteer hour, accessibility |
 | `volunteer_participation`| *View:* hours, attendance, no-shows, reliability per volunteer |
 | `shift_fill`             | *View:* spots filled per shift                                 |
@@ -451,7 +453,11 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 |---|---|---|
 | **Become a volunteer** | A public form on the sign-in screen, including *Who invited you?* | It can only create an Applicant, whatever is submitted. Anyone under 18 must give a parent or guardian as their contact. If someone seems to be on file already, the answer never says who |
 | **Referrals** | The Recruitment report adds *Referred* and *Top referrer* columns for each channel, a headline count, and a chart of who brings in the most volunteers | Names are typed freely, so "Priya Patel" and "priya  patel" count as one person (case and extra spaces are ignored) |
-| **Check-in kiosk** | *Dashboard > Open check-in kiosk* turns a laptop into a welcome desk: type the last 4 digits of your phone | Opens 30 minutes before a shift and closes when it ends. Only people on that shift can match. Shows only a first name and last initial. Only the leader's password closes it. It records the full shift, and a leader can correct the hours on the roster |
+| **Check-in kiosk** | *Dashboard > Open check-in kiosk* turns a laptop into a full-screen welcome desk: find your name, tap to check in, tap again to check out | Opens 30 minutes before a shift and closes when it ends. Large touch targets, both languages. Shows only a first name and last initial. Hours come from the two times: only time inside the shift counts, rounded to the nearest quarter hour, at least a quarter hour. Only the leader's password closes it |
+| **Announcements** | *Announce* on a shift or a program | Everyone signed up for it sees the note on Home (1 to 500 characters; only open programs; not after the shift ends). ServeSync never sends messages itself |
+| **Tomorrow's reminders** | *Dashboard > Tomorrow's reminders*: everyone on the next day's shifts with phone, email, program, role and time | Any day can be chosen. *Export CSV* is protected against spreadsheet formula injection |
+| **Add to calendar** | Saves any shift as a standard `.ics` file (RFC 5545) for Apple, Google or Outlook calendars | Text is escaped and long lines folded at 75 bytes, as the standard requires; times are local to where the shift happens |
+| **Paper sign-in sheet** | *Print sign-in sheet* saves a PDF with each person's name, role and phone, columns for time in, time out and signature, and empty rows for walk-ins | The fallback for a day without the laptop |
 | **Hour goals** | A volunteer sets hours and a date on *Home*, then sees progress and a weekly pace. The kiosk reports progress too | Counts from August 1. The date must be after today. Only that person or a leader can change it |
 | **Results and impact summary** | A program names what it measures (*families served*); each shift records a number; the *Impact summary* report saves as a one-page PDF | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
 | **Certifications and waivers** | A program can require a certification or a signed waiver; leaders record each person's type, issue date and expiry date | A hard rule inside the one shared `signup_blockers` check, so manual sign-up, Smart Match, and Autopilot all enforce it; walk-ins and the kiosk check it too. It must still be valid on the day of the shift. The issue date can't be in the future or after the expiry. Volunteers can't certify themselves. The Dashboard lists what runs out in 30 days; the *Certification expiry* report covers what has expired or runs out within 90 days |
@@ -489,7 +495,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 557 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 0 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |

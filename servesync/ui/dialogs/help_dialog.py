@@ -52,9 +52,17 @@ then <b>Export CSV</b> or <b>Save PDF</b>. Exports contain exactly what you see.
 </ul>
 <h3>Check-in kiosk</h3>
 <ul>
-<li>On the <b>Dashboard</b>, choose <b>Open check-in kiosk</b>. Volunteers type the last 4 digits of their phone to
-check in, starting 30 minutes before a shift. Only your password closes it.</li>
-<li>Check-in records the full shift. Correct anyone's hours on the shift's roster afterward.</li>
+<li>On the <b>Dashboard</b>, choose <b>Open check-in kiosk</b>. Volunteers find their name, tap it to check in, and
+tap it again to check out. Check-in opens 30 minutes before a shift. Only your password closes it.</li>
+<li>Hours come from the two times (only time inside the shift counts). Anyone still checked in at the end gets time
+from arrival to the end with <b>Check in everyone</b>. Correct anyone's hours on the roster.</li>
+</ul>
+<h3>Coordinating people</h3>
+<ul>
+<li>Open a shift (or select a program) and choose <b>Announce</b> to post a note everyone signed up sees on Home.</li>
+<li><b>Tomorrow's reminders</b> on the Dashboard lists who is coming with phone and email; export it as CSV.</li>
+<li>In a shift, <b>Add to calendar</b> saves a calendar file, and <b>Print sign-in sheet</b> saves a paper
+fallback as a PDF.</li>
 </ul>
 <h3>Results and certifications</h3>
 <ul>
@@ -101,6 +109,8 @@ then choose <b>Sign up</b>. If you can't sign up, ServeSync tells you why.</li>
 <li><b>Calendar</b> shows every open shift by date.</li>
 <li>Some shifts have roles, such as Registration or Water station. When you sign up you can choose one; ServeSync
 suggests the one that fits your skills.</li>
+<li>Choose <b>Add to calendar</b> on any shift to save it to your phone or email calendar. Notes from coordinators
+appear on <b>Home</b>.</li>
 <li>Shift full? Choose <b>Join waitlist</b>. If a spot opens, you're signed up automatically and a note appears on
 <b>Home</b>.</li>
 <li>Need to cancel? Select the shift on <b>Home</b> and choose <b>Cancel sign-up</b>, any time before it starts.</li>
@@ -202,9 +212,19 @@ de esta computadora.</li>
 </ul>
 <h3>Quiosco de llegada</h3>
 <ul>
-<li>En el <b>Panel</b>, elija <b>Abrir quiosco de llegada</b>. Los voluntarios escriben los últimos 4 dígitos de su
-teléfono para registrarse, desde 30 minutos antes del turno. Solo su contraseña lo cierra.</li>
-<li>El registro cuenta el turno completo. Después puede corregir las horas en la lista del turno.</li>
+<li>En el <b>Panel</b>, elija <b>Abrir quiosco de llegada</b>. Los voluntarios buscan su nombre, lo tocan para
+registrar su llegada y lo vuelven a tocar al irse. El registro abre 30 minutos antes del turno. Solo su contraseña
+lo cierra.</li>
+<li>Las horas salen de esos dos momentos (solo cuenta el tiempo dentro del turno). Con <b>Registrar a todos</b>,
+quien siga registrado al final recibe el tiempo desde su llegada. Puede corregir las horas en la lista del turno.</li>
+</ul>
+<h3>Coordinar a las personas</h3>
+<ul>
+<li>Abra un turno (o seleccione un programa) y elija <b>Anunciar</b> para publicar una nota que verán en Inicio
+todas las personas inscritas.</li>
+<li><b>Recordatorios de mañana</b>, en el Panel, muestra quién viene, con teléfono y correo; expórtelo como CSV.</li>
+<li>En un turno, <b>Agregar al calendario</b> guarda un archivo de calendario, e <b>Imprimir hoja de asistencia</b>
+guarda una alternativa en papel como PDF.</li>
 </ul>
 <h3>Resultados y certificaciones</h3>
 <ul>
@@ -258,6 +278,8 @@ los detalles y luego elija <b>Inscribirme</b>. Si no puede inscribirse, ServeSyn
 <li><b>Calendario</b> muestra cada turno abierto por fecha.</li>
 <li>Algunos turnos tienen funciones, como Registro o Puesto de agua. Al inscribirse puede elegir una; ServeSync le
 sugiere la que encaja con sus habilidades.</li>
+<li>Elija <b>Agregar al calendario</b> en cualquier turno para guardarlo en el calendario de su teléfono o correo.
+Las notas de los coordinadores aparecen en <b>Inicio</b>.</li>
 <li>¿El turno está completo? Elija <b>Unirme a la lista de espera</b>. Si se libera un lugar, quedará inscrito
 automáticamente y verá un aviso en <b>Inicio</b>.</li>
 <li>¿Necesita cancelar? Seleccione el turno en <b>Inicio</b> y elija <b>Cancelar inscripción</b> en cualquier

@@ -43,6 +43,11 @@ def save_csv(report: Report, path: Path, columns: Sequence[str] | None) -> None:
     _atomic_write(path, to_csv(report, columns).encode("utf-8-sig"))
 
 
+def save_text(text: str, path: Path, *, excel: bool = False) -> None:
+    """Save plain text (a CSV or calendar file). ``excel`` adds the byte-order mark Excel needs for accents."""
+    _atomic_write(path, text.encode("utf-8-sig" if excel else "utf-8"))
+
+
 def save_pdf(report: Report, path: Path, columns: Sequence[str] | None, charts: Sequence[QImage]) -> None:
     """Letter-size PDF: title block, figures, insights, charts, then the table."""
     document = QTextDocument()
@@ -52,13 +57,24 @@ def save_pdf(report: Report, path: Path, columns: Sequence[str] | None, charts: 
         document.addResource(QTextDocument.ResourceType.ImageResource, QUrl(name), image)
         names.append(name)
     document.setHtml(to_html(report, columns, names))
+    _print_pdf(document, path, f"{report.title} - {report.organization_name}")
+
+
+def save_html_pdf(html: str, path: Path, title: str) -> None:
+    """Any printable page (such as a sign-in sheet) as a letter-size PDF."""
+    document = QTextDocument()
+    document.setHtml(html)
+    _print_pdf(document, path, title)
+
+
+def _print_pdf(document: QTextDocument, path: Path, title: str) -> None:
 
     with tempfile.TemporaryDirectory(dir=path.parent if path.parent.exists() else None) as folder:
         temp_path = Path(folder) / "report.pdf"
         writer = QPdfWriter(str(temp_path))
         writer.setPageSize(QPageSize(QPageSize.PageSizeId.Letter))
         writer.setPageMargins(QMarginsF(16, 16, 16, 16), QPageLayout.Unit.Millimeter)
-        writer.setTitle(f"{report.title} - {report.organization_name}")
+        writer.setTitle(title)
         writer.setCreator("ServeSync")
         writer.setResolution(144)
         page = writer.pageLayout().paintRectPixels(writer.resolution())

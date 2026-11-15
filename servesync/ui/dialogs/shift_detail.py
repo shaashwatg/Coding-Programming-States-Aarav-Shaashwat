@@ -34,6 +34,7 @@ from servesync.models import AssignmentStatus, OpportunityStatus, RoleOverview, 
 from servesync.models.opportunity import MAX_IMPACT_AMOUNT
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import AnnounceDialog, save_calendar_file, save_sign_in_sheet
 from servesync.ui.dialogs.roles_dialog import RolesDialog
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
@@ -210,6 +211,16 @@ class ShiftDetailDialog(QDialog):
         fill_row.addWidget(self.fill)
         fill_row.addWidget(self.state, 1)
         column.addLayout(fill_row)
+        tools = QHBoxLayout()
+        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        self.announce_button.setToolTip(tr("Post a note for everyone signed up for this shift"))
+        self.sheet_button = make_button(tr("Print sign-in sheet..."), on_click=self._sign_in_sheet)
+        self.sheet_button.setToolTip(tr("A paper fallback, saved as a PDF"))
+        self.calendar_button = make_button(tr("Add to calendar..."), on_click=self._add_to_calendar)
+        for button in (self.announce_button, self.sheet_button, self.calendar_button):
+            tools.addWidget(button)
+        tools.addStretch(1)
+        column.addLayout(tools)
 
         self.tabs = QTabWidget()
         column.addWidget(self.tabs, 1)
@@ -457,6 +468,8 @@ class ShiftDetailDialog(QDialog):
         )
         self._enable(self.walk_in_button, after, waiting)
         self._enable(self.roles_button, before, tr("Roles are fixed once the shift starts."))
+        over = self._overview.shift.ends_at <= self._ctx.services.clock.now()
+        self._enable(self.announce_button, not over, tr("This shift is over."))
         self._enable(
             self.change_role_button,
             before and status is AssignmentStatus.SCHEDULED and len(self._roles) > 1,
@@ -485,6 +498,18 @@ class ShiftDetailDialog(QDialog):
         self._ctx.services.scheduling.sign_up(self._ctx.session, self._shift_id, volunteer_id)
         name = self._ctx.services.volunteers.get(self._ctx.session, volunteer_id).full_name
         self._done(tr("Signed up {name}.", name=name))
+
+    @guarded
+    def _announce(self) -> None:
+        AnnounceDialog(self._ctx, self._overview.opportunity_title, shift_id=self._shift_id, parent=self).exec()
+
+    @guarded
+    def _sign_in_sheet(self) -> None:
+        save_sign_in_sheet(self._ctx, self._shift_id, self)
+
+    @guarded
+    def _add_to_calendar(self) -> None:
+        save_calendar_file(self._ctx, self._shift_id, self)
 
     @guarded
     def _edit_roles(self) -> None:

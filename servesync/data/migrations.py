@@ -353,6 +353,26 @@ ALTER TABLE volunteer_certifications ADD COLUMN issued_on TEXT
     CHECK (issued_on IS NULL OR issued_on <= expires_on);
 """
 
+_V7_ANNOUNCEMENTS_AND_CHECK_OUT = """
+-- A leader's note to everyone signed up for one program or one shift (exactly one of the two).
+CREATE TABLE announcements (
+    announcement_id INTEGER PRIMARY KEY,
+    opportunity_id  INTEGER REFERENCES opportunities (opportunity_id) ON DELETE CASCADE,
+    shift_id        INTEGER REFERENCES shifts (shift_id) ON DELETE CASCADE,
+    body            TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 500),
+    posted_by       TEXT NOT NULL CHECK (length(posted_by) BETWEEN 1 AND 80),
+    posted_at       TEXT NOT NULL,
+    CHECK ((opportunity_id IS NULL) <> (shift_id IS NULL))
+);
+CREATE INDEX idx_announcements_opportunity ON announcements (opportunity_id);
+CREATE INDEX idx_announcements_shift ON announcements (shift_id);
+
+-- The kiosk records arrival and departure times; hours are worked out from them.
+ALTER TABLE assignments ADD COLUMN checked_in_at TEXT;
+ALTER TABLE assignments ADD COLUMN checked_out_at TEXT
+    CHECK (checked_out_at IS NULL OR (checked_in_at IS NOT NULL AND checked_out_at >= checked_in_at));
+"""
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Initial schema", _V1_INITIAL_SCHEMA),
     Migration(2, "Program story videos and mission statement", _V2_STORIES_AND_MISSION),
@@ -360,6 +380,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(4, "Who referred each volunteer, and personal hour goals", _V4_REFERRALS_AND_GOALS),
     Migration(5, "Program results and required certifications", _V5_IMPACT_AND_CERTIFICATIONS),
     Migration(6, "Shift roles, waitlists, notices, and certification types", _V6_ROLES_WAITLIST_CREDENTIALS),
+    Migration(7, "Announcements, and kiosk check-in and check-out times", _V7_ANNOUNCEMENTS_AND_CHECK_OUT),
 )
 
 LATEST_VERSION: int = MIGRATIONS[-1].version

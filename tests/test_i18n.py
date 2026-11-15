@@ -85,6 +85,8 @@ def test_translations_are_real_translations() -> None:
         "{program}: {result} {unit}.",
         "General",
         "{role}: {message}",
+        "{program} ({organization})",
+        "{program}, {when}",
     }
     untouched = [k for k, v in entries.items() if k == v and len(k) > 4 and k not in same_in_both]
     assert untouched == []  # copied English would slip through the missing-message check

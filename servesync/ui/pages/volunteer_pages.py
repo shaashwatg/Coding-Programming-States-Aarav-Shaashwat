@@ -13,15 +13,17 @@ each with a note). Nothing is ever blocked because of an access need.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
 from servesync.core.i18n import mark, tr, tr_n
-from servesync.models import AssignmentStatus, Notice, OpportunityCategory, ServiceRecord, ShiftOverview
+from servesync.models import Announcement, AssignmentStatus, Notice, OpportunityCategory, ServiceRecord, ShiftOverview
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
+from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
 from servesync.ui.dialogs.goal_dialog import HourGoalPanel
 from servesync.ui.dialogs.shift_detail import status_color
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
@@ -81,7 +83,12 @@ class HomePage(Page):
         self.upcoming.setMinimumHeight(240)
         upcoming.body.addWidget(self.upcoming)
         self.cancel_button = make_button(tr("Cancel sign-up"), on_click=self._cancel)
-        upcoming.body.addWidget(self.cancel_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.calendar_button = make_button(tr("Add to calendar"), on_click=self._add_to_calendar)
+        upcoming_actions = QHBoxLayout()
+        upcoming_actions.addWidget(self.cancel_button)
+        upcoming_actions.addWidget(self.calendar_button)
+        upcoming_actions.addStretch(1)
+        upcoming.body.addLayout(upcoming_actions)
         grid.addWidget(upcoming, 0, 0)
 
         picks = Panel(tr("Recommended for you"))
@@ -127,12 +134,15 @@ class HomePage(Page):
         mission = services.settings.mission_statement()
         self.mission.setText(tr("Our mission: {mission}", mission=mission) if mission else "")
         self.mission.setVisible(bool(mission))
-        self.updates.set_updates(
-            [
-                (describe_notice(notice), partial(self._dismiss, notice.notice_id))
-                for notice in services.scheduling.notices(session, volunteer_id)
-            ]
-        )
+        updates: list[tuple[str, Callable[[], object] | None]] = [
+            (describe_notice(notice), partial(self._dismiss, notice.notice_id))
+            for notice in services.scheduling.notices(session, volunteer_id)
+        ]
+        updates += [
+            (describe_announcement(note), None)
+            for note in services.coordination.my_announcements(session, volunteer_id)
+        ]
+        self.updates.set_updates(updates)
         reliability = f"{stats.reliability:.0%}" if stats.reliability is not None else tr("New")
         self.strip.set_figures(
             [
@@ -193,6 +203,12 @@ class HomePage(Page):
     def _sign_up(self, shift_id: int, title: str) -> None:
         self.ctx.services.scheduling.sign_up(self.ctx.session, shift_id, self.ctx.session.volunteer_id or 0)
         self.ctx.changed(tr("You're signed up for {title}. Thank you!", title=title))
+
+    @guarded
+    def _add_to_calendar(self) -> None:
+        record = self.upcoming.selected() or next(iter(self.upcoming.records()), None)
+        if record is not None:
+            save_calendar_file(self.ctx, record.assignment.shift_id, self)
 
     @guarded
     def _dismiss(self, notice_id: int) -> None:
@@ -441,3 +457,12 @@ def describe_notice(notice: Notice) -> str:
         when=format_when(notice.starts_at, notice.ends_at),
         role=role,
     )
+
+
+def describe_announcement(note: Announcement) -> str:
+    """'Weekend Food Pantry, Sat, Nov 14: Parking is in the north lot.' (the leader's words, unchanged)."""
+    if note.shift_starts_at is not None:
+        about = tr("{program}, {when}", program=note.opportunity_title, when=format_when(note.shift_starts_at))
+    else:
+        about = note.opportunity_title
+    return tr("{about}: {body} (posted by {who})", about=about, body=note.body, who=note.posted_by)

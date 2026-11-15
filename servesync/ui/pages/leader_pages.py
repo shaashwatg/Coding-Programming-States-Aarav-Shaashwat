@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QGridLayout, QListWidget, QListWidgetItem
 from servesync.core.i18n import format_long_day, mark, tr
 from servesync.models import ShiftOverview
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.pages.base import Page
@@ -50,7 +51,10 @@ class DashboardPage(Page):
         self.header = PageHeader(
             tr("Dashboard"),
             "",
-            [make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk)],
+            [
+                make_button(tr("Tomorrow's reminders"), on_click=self._open_reminders),
+                make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk),
+            ],
         )
         self.layout_.addWidget(self.header)
         self.mission = make_label("", "mission", wrap=True)
@@ -214,6 +218,10 @@ class DashboardPage(Page):
                     total=insight.total,
                 ),
             )
+
+    @guarded
+    def _open_reminders(self) -> None:
+        RemindersDialog(self.ctx, self).exec()
 
     @guarded
     def _open_kiosk(self) -> None:

@@ -339,3 +339,22 @@ def describe_names(names: Sequence[str], limit: int = 3) -> str:
     if len(names) <= limit:
         return tr("{first} and {last}", first=", ".join(names[:-1]), last=names[-1])
     return tr("{join} and {value} more", join=", ".join(names[:limit]), value=len(names) - limit)
+
+
+#: Kiosk hours are rounded to the nearest quarter hour, and someone who came gets at least that.
+HOURS_STEP = 0.25
+
+
+def hours_from_times(shift_start: datetime, shift_end: datetime, checked_in: datetime, checked_out: datetime) -> float:
+    """
+    Hours served, from kiosk check-in and check-out (pure).
+
+    Only time inside the shift counts: arriving early or leaving late doesn't add
+    hours the organization didn't schedule. The result is rounded to the nearest
+    quarter hour, and anyone who checked in gets at least a quarter hour, because
+    they did come.
+    """
+    start = max(checked_in, shift_start)
+    end = min(checked_out, shift_end)
+    worked = max((end - start).total_seconds() / 3600, 0.0)
+    return max(round(worked / HOURS_STEP) * HOURS_STEP, HOURS_STEP)

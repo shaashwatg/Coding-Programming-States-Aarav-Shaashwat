@@ -3,8 +3,9 @@ Check-in kiosk: a full-screen welcome desk for a shared laptop.
 
 A leader opens it and walks away, so it is locked down: it shows only a first
 name and last initial, and only the leader's password closes it (Esc does
-nothing). Volunteers type the last 4 digits of their phone. When two people on
-a shift share those digits, each gets a button to choose from.
+nothing). Volunteers type the start of their name, tap it to check in, and tap
+it again to check out; hours come from the two times. Name buttons are large,
+for touch screens and unsteady hands.
 """
 
 from __future__ import annotations
@@ -12,18 +13,28 @@ from __future__ import annotations
 from functools import partial
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent, QIntValidator
-from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from servesync.core.errors import AuthenticationError, ServeSyncError
-from servesync.core.i18n import tr
-from servesync.services import KioskPerson, KioskResult
+from servesync.core.i18n import format_clock, tr
+from servesync.services import KioskPerson, KioskResult, KioskState
 from servesync.ui import assets
 from servesync.ui.context import AppContext
 from servesync.ui.theme import current_palette
-from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label, set_prop
+from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label
 
-CONTENT_WIDTH = 640
+CONTENT_WIDTH = 760
 LOGO_SIZE = 72
 
 
@@ -54,29 +65,39 @@ class KioskDialog(QDialog):
         self.shift_box.setAccessibleName(tr("Shift"))
         column.addWidget(self.shift_box)
         self.prompt = make_label(
-            tr("Type the last 4 digits of your phone number, then press Enter."), "subtitle", wrap=True
+            tr("Find your name and tap it to check in. Tap it again when you leave to check out."),
+            "subtitle",
+            wrap=True,
         )
         self.prompt.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         column.addWidget(self.prompt)
-        self.digits = QLineEdit()
-        self.digits.setObjectName("AskInput")
-        self.digits.setMaxLength(4)
-        self.digits.setValidator(QIntValidator(0, 9999, self))
-        self.digits.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.digits.setAccessibleName(tr("Last 4 digits of your phone number"))
-        self.digits.returnPressed.connect(self.look_up)
-        column.addWidget(self.digits)
-        self.check_in_button = make_button(tr("Check in"), kind="primary", on_click=self.look_up)
-        column.addWidget(self.check_in_button)
+        self.search = QLineEdit()
+        self.search.setObjectName("KioskSearch")
+        self.search.setPlaceholderText(tr("Type your name"))
+        self.search.setAccessibleName(tr("Type your name to find it"))
+        self.search.setMaxLength(40)
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(lambda _text: self.show_people())
+        column.addWidget(self.search)
 
-        self.choices_holder = QWidget()
-        self.choices = QVBoxLayout(self.choices_holder)
-        self.choices.setContentsMargins(0, 0, 0, 0)
-        column.addWidget(self.choices_holder)
+        # Big name buttons in two columns: easy to hit on a touch screen, quick to scan.
+        names_holder = QWidget()
+        self.names = QGridLayout(names_holder)
+        self.names.setContentsMargins(0, 0, 0, 0)
+        self.names.setSpacing(16)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(names_holder)
+        scroll.setMinimumHeight(280)
+        column.addWidget(scroll, 3)
         self.message = make_label("", "lead", wrap=True)
         self.message.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         column.addWidget(self.message)
-        column.addStretch(2)
+        self.problem = make_label("", "banner-error", wrap=True)
+        self.problem.hide()
+        column.addWidget(self.problem)
+        column.addStretch(1)
 
         exit_row = QHBoxLayout()
         self.exit_password = QLineEdit()
@@ -92,8 +113,9 @@ class KioskDialog(QDialog):
         outer.addWidget(holder, 3)
         outer.addStretch(1)
 
+        self.shift_box.currentIndexChanged.connect(lambda _index: self.show_people())
         self._load_shifts()
-        self.digits.setFocus()
+        self.search.setFocus()
 
     def _load_shifts(self) -> None:
         self.shift_box.clear()
@@ -104,43 +126,56 @@ class KioskDialog(QDialog):
             )
         has_shift = self.shift_box.count() > 0
         self.shift_box.setVisible(self.shift_box.count() > 1)
-        self.digits.setEnabled(has_shift)
-        self.check_in_button.setEnabled(has_shift)
+        self.search.setEnabled(has_shift)
         if not has_shift:
             self._say(tr("No shifts are open for check-in right now. Check-in opens 30 minutes before a shift."))
+        self.show_people()
 
     # ------------------------------------------------------------- checking in
 
-    def look_up(self) -> None:
-        clear_layout(self.choices)
+    def show_people(self) -> None:
+        """Fill the grid with the names on the chosen shift that match what was typed."""
+        clear_layout(self.names)
+        shift_id = self.shift_box.currentData()
+        if not shift_id:
+            return
         try:
-            people = self._ctx.services.attendance.kiosk_lookup(
-                self._ctx.session, self.shift_box.currentData() or 0, self.digits.text()
+            people = self._ctx.services.attendance.kiosk_people(self._ctx.session, shift_id, self.search.text())
+        except ServeSyncError as error:
+            self._say(error.message, problem=True)
+            return
+        if not people:
+            self.names.addWidget(
+                make_label(
+                    tr("We couldn't find that name on this shift. Please see a coordinator."), "lead", wrap=True
+                ),
+                0,
+                0,
+                1,
+                2,
             )
-        except ServeSyncError as error:
-            self._say(error.message, problem=True)
-            return
-        if len(people) == 1:
-            self.check_in(people[0])
-            return
-        self._say(tr("Please choose your name."))
-        for person in people:
-            self.choices.addWidget(make_button(person.short_name, on_click=partial(self.check_in, person)))
+        for index, person in enumerate(people):
+            button = make_button(f"{person.short_name}\n{_state_text(person)}", kind="kiosk")
+            button.setAccessibleName(f"{person.short_name}. {_state_text(person)}")
+            button.setEnabled(person.state is not KioskState.DONE)
+            button.clicked.connect(partial(self.tap, person))
+            self.names.addWidget(button, index // 2, index % 2)
 
-    def check_in(self, person: KioskPerson) -> None:
-        clear_layout(self.choices)
-        self.digits.clear()
-        self.digits.setFocus()
+    def tap(self, person: KioskPerson, _checked: bool = False) -> None:
         try:
-            result = self._ctx.services.attendance.kiosk_check_in(self._ctx.session, person.assignment_id)
+            result = self._ctx.services.attendance.kiosk_tap(self._ctx.session, person.assignment_id)
         except ServeSyncError as error:
             self._say(error.message, problem=True)
             return
+        self.search.clear()  # the next person starts from the full list
+        self.search.setFocus()
         self._say(_thank_you(result))
+        self.show_people()
 
     def _say(self, text: str, *, problem: bool = False) -> None:
-        self.message.setText(text)
-        set_prop(self.message, "role", "banner-error" if problem else "lead")
+        self.message.setVisible(not problem)
+        self.problem.setVisible(problem)
+        (self.problem if problem else self.message).setText(text)
         self._ctx.announce(text)
 
     # ----------------------------------------------------------------- leaving
@@ -167,9 +202,19 @@ class KioskDialog(QDialog):
             event.ignore()
 
 
+def _state_text(person: KioskPerson) -> str:
+    if person.state is KioskState.HERE and person.checked_in_at is not None:
+        return tr("Here since {time}. Tap to check out.", time=format_clock(person.checked_in_at))
+    if person.state is KioskState.DONE:
+        return tr("Done for today. Thank you!")
+    return tr("Tap to check in.")
+
+
 def _thank_you(result: KioskResult) -> str:
+    if not result.checked_out:
+        return tr("Welcome, {name}! You're checked in. Tap your name again when you leave.", name=result.given_name)
     text = tr(
-        "Thanks, {name}! You're checked in for {hours}.", name=result.given_name, hours=format_hours(result.hours)
+        "Thanks, {name}! You served {hours} today.", name=result.given_name, hours=format_hours(result.hours or 0)
     )
     goal = result.goal
     if goal is None:

@@ -216,11 +216,11 @@ ARTICLES: tuple[HelpArticle, ...] = (
     ),
     HelpArticle(
         "Let volunteers check themselves in",
-        "kiosk check in arrive arrival front desk shared laptop self phone digits",
+        "kiosk check in out arrive arrival leave front desk shared laptop self tap name",
         (
             "On the Dashboard, choose Open check-in kiosk and leave the laptop at the door.",
-            "Volunteers type the last 4 digits of their phone. Check-in opens 30 minutes before a shift.",
-            "Your password closes the kiosk. Correct anyone's hours on the shift's roster afterward.",
+            "Volunteers find their name and tap it to check in, then tap it again when they leave.",
+            "Hours come from the two times. Your password closes the kiosk.",
         ),
         page="dashboard",
         leaders_only=True,
@@ -330,6 +330,53 @@ ARTICLES: tuple[HelpArticle, ...] = (
         page="reports",
         leaders_only=True,
         action_label="Open Reports",
+    ),
+    HelpArticle(
+        "Post an announcement",
+        "announce announcement note message tell notify everyone signed up program shift news",
+        (
+            "Open the shift, or select the program on Programs, and choose Announce.",
+            "Write a short note (up to 500 characters) and choose Post.",
+            "Everyone signed up sees it on their Home page. ServeSync doesn't send texts or emails.",
+        ),
+        page="programs",
+        leaders_only=True,
+        action_label="Open Programs",
+    ),
+    HelpArticle(
+        "Remind tomorrow's volunteers",
+        "remind reminder reminders tomorrow call list phone email text export csv no-show",
+        (
+            "On the Dashboard, choose Tomorrow's reminders.",
+            "It lists everyone signed up, with phone and email. Pick another day if you like.",
+            "Choose Export CSV to use the list with a texting or email service.",
+        ),
+        page="dashboard",
+        leaders_only=True,
+        action_label="Open Dashboard",
+    ),
+    HelpArticle(
+        "Add a shift to your calendar",
+        "calendar ics add phone google outlook apple save event reminder",
+        (
+            "Select the shift on Home, Find a shift, or Calendar.",
+            "Choose Add to calendar and save the file.",
+            "Open the file to add the shift to your phone or email calendar.",
+        ),
+        page="home",
+        action_label="Open Home",
+    ),
+    HelpArticle(
+        "Print a paper sign-in sheet",
+        "paper print sign-in sheet pdf offline backup signature attendance",
+        (
+            "Open the shift from the Calendar or Dashboard.",
+            "Choose Print sign-in sheet and save the PDF.",
+            "Afterward, enter the times from the sheet on the shift's roster.",
+        ),
+        page="calendar",
+        leaders_only=True,
+        action_label="Open Calendar",
     ),
 )
 
@@ -526,12 +573,11 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
     ),
     (
         "Permitir que los voluntarios registren su llegada",
-        "quiosco registrar llegada entrada recepcion computadora compartida telefono digitos",
+        "quiosco registrar llegada salida entrada recepcion computadora compartida tocar nombre",
         (
             "En el Panel, elija Abrir quiosco de llegada y deje la computadora en la entrada.",
-            "Los voluntarios escriben los últimos 4 dígitos de su teléfono. El registro abre 30 minutos antes "
-            "del turno.",
-            "Su contraseña cierra el quiosco. Después puede corregir las horas en la lista del turno.",
+            "Los voluntarios buscan su nombre y lo tocan para registrar su llegada, y otra vez al irse.",
+            "Las horas salen de esos dos momentos. Su contraseña cierra el quiosco.",
         ),
         "Abrir Panel",
     ),
@@ -628,6 +674,46 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
             "Filtre por programa para ver solo lo que ese programa requiere.",
         ),
         "Abrir Informes",
+    ),
+    (
+        "Publicar un anuncio",
+        "anunciar anuncio nota mensaje avisar todos inscritos programa turno novedad",
+        (
+            "Abra el turno, o seleccione el programa en Programas, y elija Anunciar.",
+            "Escriba una nota breve (hasta 500 caracteres) y elija Publicar.",
+            "Todas las personas inscritas la verán en Inicio. ServeSync no envía mensajes ni correos.",
+        ),
+        "Abrir Programas",
+    ),
+    (
+        "Recordar a los voluntarios de mañana",
+        "recordar recordatorio recordatorios mañana lista llamadas telefono correo exportar csv inasistencia",
+        (
+            "En el Panel, elija Recordatorios de mañana.",
+            "Muestra a todas las personas inscritas, con teléfono y correo. Puede elegir otro día.",
+            "Elija Exportar CSV para usar la lista con un servicio de mensajes o de correo.",
+        ),
+        "Abrir Panel",
+    ),
+    (
+        "Agregar un turno a su calendario",
+        "calendario ics agregar telefono google outlook apple guardar evento",
+        (
+            "Seleccione el turno en Inicio, Buscar un turno o Calendario.",
+            "Elija Agregar al calendario y guarde el archivo.",
+            "Abra el archivo para agregar el turno al calendario de su teléfono o correo.",
+        ),
+        "Abrir Inicio",
+    ),
+    (
+        "Imprimir una hoja de asistencia en papel",
+        "papel imprimir hoja asistencia pdf sin conexion respaldo firma",
+        (
+            "Abra el turno desde el Calendario o el Panel.",
+            "Elija Imprimir hoja de asistencia y guarde el PDF.",
+            "Después, registre las horas de la hoja en la lista del turno.",
+        ),
+        "Abrir Calendario",
     ),
 )
 

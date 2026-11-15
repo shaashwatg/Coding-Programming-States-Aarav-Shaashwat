@@ -6,6 +6,8 @@ Rules:
 * Hours default to the shift's length and can never exceed it.
 * Walk-ins (people who show up without signing up) can be recorded, even past
   capacity, but they must be Active, old enough, and not booked elsewhere.
+* At the kiosk, people tap their name to check in and again to check out;
+  hours come from those two times (only time inside the shift counts).
 """
 
 from __future__ import annotations
@@ -13,7 +15,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
+from enum import Enum
 
 from servesync.config import MAX_SHIFT_HOURS
 from servesync.core.errors import BusinessRuleError
@@ -26,6 +29,7 @@ from servesync.services.rules import (
     HourGoalProgress,
     certification_message,
     hour_goal_progress,
+    hours_from_times,
     missing_certifications,
     walk_in_role,
 )
@@ -34,21 +38,33 @@ from servesync.services.session import Permission, Session
 logger = logging.getLogger(__name__)
 
 CHECK_IN_EARLY_MINUTES = 30
-PHONE_DIGITS_FOR_CHECK_IN = 4
+KIOSK_SEARCH_MAX_LENGTH = 40
+
+
+class KioskState(Enum):
+    """Where someone is in their day at the kiosk."""
+
+    WAITING = "WAITING"  # signed up, not here yet: tapping checks them in
+    HERE = "HERE"  # checked in: tapping checks them out
+    DONE = "DONE"  # checked out (or hours already recorded)
 
 
 @dataclass(frozen=True, slots=True)
 class KioskPerson:
-    """One possible match on the check-in screen (just enough to tell people apart)."""
+    """One name on the check-in screen: just enough to find yourself, never a full name."""
 
     assignment_id: int
     short_name: str
+    state: KioskState
+    checked_in_at: datetime | None = None
+    hours: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class KioskResult:
     given_name: str
-    hours: float
+    checked_out: bool  # False = just checked in
+    hours: float | None  # set on check-out
     goal: HourGoalProgress | None
     assignment: Assignment
 
@@ -93,10 +109,15 @@ class AttendanceService(Service):
         with self._store.transaction():
             for entry in self._store.assignments.roster(shift_id):
                 if entry.assignment.status is AssignmentStatus.SCHEDULED:
+                    # Someone who tapped in at the kiosk but never out gets the time from arrival to the end.
+                    arrived = entry.assignment.checked_in_at
+                    hours = (
+                        hours_from_times(shift.starts_at, shift.ends_at, arrived, shift.ends_at)
+                        if arrived
+                        else shift.duration_hours
+                    )
                     self._store.assignments.update(
-                        dataclasses.replace(
-                            entry.assignment, status=AssignmentStatus.ATTENDED, hours_served=shift.duration_hours
-                        )
+                        dataclasses.replace(entry.assignment, status=AssignmentStatus.ATTENDED, hours_served=hours)
                     )
                     count += 1
         logger.info("Checked in %s volunteers on shift #%s", count, shift_id)
@@ -163,47 +184,73 @@ class AttendanceService(Service):
         earliest_start = now + timedelta(minutes=CHECK_IN_EARLY_MINUTES)
         return [o for o in nearby if o.shift.starts_at <= earliest_start and o.shift.ends_at > now]
 
-    def kiosk_lookup(self, session: Session, shift_id: int, last_four: str) -> list[KioskPerson]:
+    def kiosk_people(self, session: Session, shift_id: int, search: str = "") -> list[KioskPerson]:
         """
-        Find who is checking in from the last 4 digits of their phone. Only people on this
-        shift can match, and only a first name and last initial are shown on the shared screen.
+        The names on a shift for the kiosk, alphabetical, optionally narrowed by what
+        someone typed. Shows only a first name and last initial on the shared screen.
         """
         session.require(Permission.RECORD_ATTENDANCE)
-        digits = last_four.strip()
-        if len(digits) != PHONE_DIGITS_FOR_CHECK_IN or not digits.isdecimal():
-            raise BusinessRuleError(tr("Enter the last 4 digits of your phone number."))
-        people = [
-            KioskPerson(entry.assignment.assignment_id or 0, _first_name_and_initial(entry.volunteer_name))
-            for entry in self._store.assignments.roster(shift_id)
-            if entry.volunteer_phone.endswith(digits)
-        ]
-        if not people:
-            raise BusinessRuleError(tr("We couldn't find you on this shift. Please see a coordinator."))
-        return people
+        text = " ".join(str(search).split()).casefold()
+        if len(text) > KIOSK_SEARCH_MAX_LENGTH:
+            raise BusinessRuleError(tr("That's longer than any name here. Type just the start of your name."))
+        people = []
+        for entry in self._store.assignments.roster(shift_id):
+            if entry.assignment.status not in (AssignmentStatus.SCHEDULED, AssignmentStatus.ATTENDED):
+                continue
+            if text and not any(
+                word.startswith(text)
+                for word in [entry.volunteer_name.casefold(), *entry.volunteer_name.casefold().split()]
+            ):
+                continue
+            assignment = entry.assignment
+            if assignment.status is AssignmentStatus.ATTENDED:
+                state = KioskState.DONE
+            elif assignment.checked_in_at is not None:
+                state = KioskState.HERE
+            else:
+                state = KioskState.WAITING
+            people.append(
+                KioskPerson(
+                    assignment.assignment_id or 0,
+                    _first_name_and_initial(entry.volunteer_name),
+                    state,
+                    assignment.checked_in_at,
+                    assignment.hours_served,
+                )
+            )
+        return sorted(people, key=lambda person: person.short_name.casefold())
 
-    def kiosk_check_in(self, session: Session, assignment_id: int) -> KioskResult:
-        """Record arrival for the full shift (a leader can correct the hours on the roster afterward)."""
+    def kiosk_tap(self, session: Session, assignment_id: int) -> KioskResult:
+        """
+        A tap on someone's name: the first checks them in, the second checks them out and
+        records their hours from the two times. A leader can correct hours on the roster.
+        """
         session.require(Permission.RECORD_ATTENDANCE)
+        now = self._clock.now()
         signup = self._store.assignments.get(assignment_id)
         shift = self._store.shifts.get(signup.shift_id)
         if shift.shift_id not in {o.shift.shift_id for o in self.kiosk_shifts(session)}:
             raise BusinessRuleError(tr("Check-in for this shift isn't open right now."))
-        if signup.status is AssignmentStatus.ATTENDED:
-            raise BusinessRuleError(tr("You're already checked in. Thank you for coming!"))
+        if signup.status is not AssignmentStatus.SCHEDULED:
+            raise BusinessRuleError(tr("You're already checked out. Thank you for coming!"))
         volunteer = self._store.volunteers.get(signup.volunteer_id)
         required = self._store.opportunities.get(shift.opportunity_id).required_certifications
         if missing_certifications(volunteer, required, shift.starts_at.date()):
             raise BusinessRuleError(tr("Please see a coordinator before you start today."))
+        if signup.checked_in_at is None:
+            saved = self._store.assignments.update(dataclasses.replace(signup, checked_in_at=now))
+            logger.info("Kiosk check-in: sign-up #%s", assignment_id)
+            return KioskResult(volunteer.given_name, False, None, None, saved)
+        hours = hours_from_times(shift.starts_at, shift.ends_at, signup.checked_in_at, now)
         saved = self._store.assignments.update(
-            dataclasses.replace(signup, status=AssignmentStatus.ATTENDED, hours_served=shift.duration_hours)
+            dataclasses.replace(signup, checked_out_at=now, status=AssignmentStatus.ATTENDED, hours_served=hours)
         )
-        logger.info("Kiosk check-in: sign-up #%s", assignment_id)
+        logger.info("Kiosk check-out: sign-up #%s (%s h)", assignment_id, hours)
         return KioskResult(
             volunteer.given_name,
-            shift.duration_hours,
-            hour_goal_progress(
-                volunteer, self._store.assignments.history(signup.volunteer_id), self._clock.now().date()
-            ),
+            True,
+            hours,
+            hour_goal_progress(volunteer, self._store.assignments.history(signup.volunteer_id), now.date()),
             saved,
         )
 

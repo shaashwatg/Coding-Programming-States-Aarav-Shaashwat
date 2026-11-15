@@ -15,6 +15,7 @@ from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import Opportunity, OpportunityStatus, ShiftOverview
 from servesync.services import Permission
 from servesync.ui.context import AppContext
+from servesync.ui.dialogs.coordination_dialogs import AnnounceDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog, ShiftDialog
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.pages.base import Page
@@ -111,7 +112,9 @@ class ProgramsPage(Page):
         self.edit_button = make_button(tr("Edit program"), on_click=self._edit_program)
         self.publish_button = make_button(tr("Publish"), kind="secondary", on_click=self._publish)
         self.close_button = make_button(tr("Close program"), on_click=self._close)
-        for button in (self.edit_button, self.publish_button, self.close_button):
+        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        self.announce_button.setToolTip(tr("Post a note for everyone signed up for this program"))
+        for button in (self.edit_button, self.publish_button, self.close_button, self.announce_button):
             lifecycle.addWidget(button)
         lifecycle.addStretch(1)
         detail.body.addLayout(lifecycle)
@@ -228,6 +231,7 @@ class ProgramsPage(Page):
         self.publish_button.setVisible(status is not OpportunityStatus.OPEN)
         self.publish_button.setText(tr("Publish") if status is OpportunityStatus.DRAFT else tr("Reopen"))
         self.close_button.setVisible(status is not OpportunityStatus.CLOSED)
+        self.announce_button.setVisible(status is OpportunityStatus.OPEN)
         self.add_shift_button.setEnabled(status is not OpportunityStatus.CLOSED)
         self.add_shift_button.setToolTip(
             "" if status is not OpportunityStatus.CLOSED else tr("Reopen the program to add shifts.")
@@ -280,6 +284,12 @@ class ProgramsPage(Page):
         dialog = OpportunityDialog(self.ctx, program, self)
         if dialog.exec() and dialog.saved is not None:
             self.ctx.changed(tr("Saved {title}.", title=dialog.saved.title))
+
+    @guarded
+    def _announce(self) -> None:
+        program = self.programs.selected()
+        if program is not None:
+            AnnounceDialog(self.ctx, program.title, opportunity_id=program.opportunity_id, parent=self).exec()
 
     @guarded
     def _publish(self) -> None:

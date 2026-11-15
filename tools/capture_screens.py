@@ -31,6 +31,7 @@ from servesync.ui.context import AppContext, AppEvents
 from servesync.ui.dialogs.application_dialog import ApplicationDialog
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
+from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
 from servesync.ui.dialogs.roles_dialog import RolesDialog
@@ -147,6 +148,7 @@ def main() -> int:
             window.ctx.events.status_message.emit(tr("Saved {title}.", title="servesync-program-impact.pdf"))
             save(app, window, args.output, f"02-9g-toast{suffix}")
             save(app, KioskDialog(ctx), args.output, f"02-9h-kiosk{suffix}", (1360, 860))
+            save(app, RemindersDialog(ctx), args.output, f"02-9l-reminders{suffix}", (1080, 640))
 
         capture_role("coordinator", "02-leader", leader_extras)
         capture_role("priya.patel", "03-volunteer", lambda _ctx, _window: None)

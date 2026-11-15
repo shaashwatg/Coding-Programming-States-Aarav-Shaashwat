@@ -97,7 +97,8 @@ def test_home_shows_and_dismisses_a_waitlist_notice(demo: Services, qtbot) -> No
     notice = demo.scheduling.notices(ctx.session, ctx.session.volunteer_id or 0)[0]
     page._dismiss(notice.notice_id)
     assert demo.scheduling.notices(ctx.session, ctx.session.volunteer_id or 0) == []
-    assert page.updates.isHidden()
+    texts = [label.text() for label in page.updates.findChildren(type(page.mission)) if not label.isHidden()]
+    assert not any("waitlist" in text for text in texts)  # announcements may remain; the notice is gone
 
 
 def test_dashboard_lists_expiring_items_and_opens_the_report(demo: Services, qtbot) -> None:  # type: ignore[no-untyped-def]

@@ -177,3 +177,17 @@ class Notice:
     starts_at: datetime
     ends_at: datetime
     role_name: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class Announcement:
+    """A leader's note to everyone signed up for a program or for one shift."""
+
+    announcement_id: int
+    body: str
+    posted_by: str
+    posted_at: datetime
+    opportunity_title: str
+    opportunity_id: int | None = None  # set when it is for the whole program
+    shift_id: int | None = None  # set when it is for one shift
+    shift_starts_at: datetime | None = None

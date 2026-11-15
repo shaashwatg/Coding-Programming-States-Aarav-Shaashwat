@@ -37,6 +37,8 @@ class Assignment:
     signed_up_at: datetime = field(default_factory=_now_to_minute)
     assignment_id: int | None = None
     role_id: int | None = None  # which of the shift's roles this sign-up fills (None = chosen when saved)
+    checked_in_at: datetime | None = None  # tapped in at the kiosk
+    checked_out_at: datetime | None = None  # tapped out at the kiosk
 
     def __post_init__(self) -> None:
         errors = ErrorCollector()
@@ -49,6 +51,8 @@ class Assignment:
             "assignment_id", validate_optional_id, self.assignment_id, tr("Assignment ID")
         )
         self.role_id = errors.check("role_id", validate_optional_id, self.role_id, tr("Role ID"))
+        if self.checked_out_at is not None and (self.checked_in_at is None or self.checked_out_at < self.checked_in_at):
+            errors.add("checked_out_at", tr("Check-out must come after check-in."))
 
         # Semantic invariant (also enforced by a CHECK constraint in SQLite):
         # hours exist if, and only if, the volunteer actually attended.

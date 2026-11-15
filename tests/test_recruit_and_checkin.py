@@ -6,16 +6,16 @@ from datetime import date, datetime, time, timedelta
 
 import pytest
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 
 from servesync.core.errors import BusinessRuleError, PermissionDeniedError, ValidationError
 from servesync.data import DataStore
 from servesync.data.seed import DEMO_PASSWORD, seed_demo_data
 from servesync.models import Appearance, AssignmentStatus, RecruitmentSource, ServiceRecord, Theme, VolunteerStatus
-from servesync.services import FixedClock, Services
+from servesync.services import FixedClock, KioskState, Services
 from servesync.services.reports.analytics import referral_counts
 from servesync.services.reports.model import DatePreset, ReportKind
-from servesync.services.rules import hour_goal_progress
+from servesync.services.rules import hour_goal_progress, hours_from_times
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
 from servesync.ui.dialogs.application_dialog import ApplicationDialog
@@ -161,27 +161,64 @@ def _person_on_open_shift(services: Services) -> tuple[int, str, int]:
     session = services.auth.sign_in("coordinator", DEMO_PASSWORD)
     shift_id = services.attendance.kiosk_shifts(session)[0].shift.shift_id or 0
     entry = services.attendance.roster(session, shift_id)[0]
-    return shift_id, entry.volunteer_phone[-4:], entry.assignment.assignment_id or 0
+    return shift_id, entry.volunteer_name, entry.assignment.assignment_id or 0
 
 
-def test_kiosk_checks_someone_in_for_the_full_shift(demo: Services) -> None:
+def test_kiosk_checks_in_then_out_with_hours_from_the_times(store: DataStore) -> None:
+    seed_demo_data(store, today=SEED_DAY, password_iterations=FAST_ITERATIONS)
+
+    def at(hour: int, minute: int) -> Services:
+        clock = FixedClock(datetime.combine(SEED_DAY, time(hour, minute)))
+        return Services.create(store, clock=clock, password_iterations=FAST_ITERATIONS)
+
+    arriving = at(12, 0)
+    session = arriving.auth.sign_in("coordinator", DEMO_PASSWORD)
+    shift_id, _name, assignment_id = _person_on_open_shift(arriving)
+    first = arriving.attendance.kiosk_tap(session, assignment_id)
+    assert not first.checked_out and first.assignment.status is AssignmentStatus.SCHEDULED
+    person = next(p for p in arriving.attendance.kiosk_people(session, shift_id) if p.assignment_id == assignment_id)
+    assert person.state is KioskState.HERE
+
+    leaving = at(14, 10)
+    second = leaving.attendance.kiosk_tap(session, assignment_id)
+    assert second.checked_out and second.hours == 2.25  # 2 h 10 min, to the nearest quarter hour
+    assert second.assignment.status is AssignmentStatus.ATTENDED and second.assignment.checked_out_at is not None
+    with pytest.raises(BusinessRuleError, match="already checked out"):
+        leaving.attendance.kiosk_tap(session, assignment_id)
+
+
+def test_kiosk_finds_names_but_shows_only_first_names_and_initials(demo: Services) -> None:
     session = demo.auth.sign_in("coordinator", DEMO_PASSWORD)
-    shift_id, digits, assignment_id = _person_on_open_shift(demo)
-    people = demo.attendance.kiosk_lookup(session, shift_id, digits)
-    assert assignment_id in {p.assignment_id for p in people}
-    assert all(p.short_name.endswith(".") for p in people)  # never a full name on a shared screen
-    result = demo.attendance.kiosk_check_in(session, assignment_id)
-    assert result.assignment.status is AssignmentStatus.ATTENDED and result.hours == 4
-    with pytest.raises(BusinessRuleError, match="already checked in"):
-        demo.attendance.kiosk_check_in(session, assignment_id)
+    shift_id, name, assignment_id = _person_on_open_shift(demo)
+    everyone = demo.attendance.kiosk_people(session, shift_id)
+    assert all(p.short_name.endswith(".") for p in everyone)  # never a full name on a shared screen
+    found = demo.attendance.kiosk_people(session, shift_id, name.split()[0][:3].upper())
+    assert assignment_id in {p.assignment_id for p in found} and len(found) <= len(everyone)
+    assert demo.attendance.kiosk_people(session, shift_id, "zzzz") == []
+    with pytest.raises(BusinessRuleError, match="longer than any name"):
+        demo.attendance.kiosk_people(session, shift_id, "x" * 41)
 
 
-@pytest.mark.parametrize("digits", ["", "12", "12345", "abcd"])
-def test_kiosk_rejects_malformed_digits(demo: Services, digits: str) -> None:
+@pytest.mark.parametrize(
+    ("arrive", "leave", "hours"),
+    [
+        (time(10, 30), time(15, 30), 4.0),  # early and late: only the shift's 11:00-15:00 counts
+        (time(11, 5), time(13, 0), 2.0),  # 1 h 55 min rounds to 2
+        (time(11, 0), time(11, 1), 0.25),  # came, then had to leave: still a quarter hour
+    ],
+)
+def test_hours_count_only_time_inside_the_shift(arrive: time, leave: time, hours: float) -> None:
+    day = SEED_DAY
+    start, end = datetime.combine(day, time(11)), datetime.combine(day, time(15))
+    assert hours_from_times(start, end, datetime.combine(day, arrive), datetime.combine(day, leave)) == hours
+
+
+def test_check_in_everyone_counts_from_kiosk_arrival(demo: Services) -> None:
     session = demo.auth.sign_in("coordinator", DEMO_PASSWORD)
-    shift_id, _, _ = _person_on_open_shift(demo)
-    with pytest.raises(BusinessRuleError, match="last 4 digits"):
-        demo.attendance.kiosk_lookup(session, shift_id, digits)
+    shift_id, _name, assignment_id = _person_on_open_shift(demo)
+    demo.attendance.kiosk_tap(session, assignment_id)  # arrives at 12:00, one hour late, never taps out
+    demo.attendance.check_in_everyone(session, shift_id)
+    assert demo.store.assignments.get(assignment_id).hours_served == 3.0
 
 
 def test_kiosk_window_opens_30_minutes_early_and_closes_at_the_end(store: DataStore) -> None:
@@ -220,16 +257,20 @@ def test_kiosk_needs_the_leaders_password_to_close(demo: Services, ui: None, qtb
     assert not dialog.isVisible()
 
 
-def test_kiosk_screen_checks_in_and_reports_goal_progress(demo: Services, ui: None, qtbot) -> None:  # type: ignore[no-untyped-def]
+def test_kiosk_screen_finds_a_name_and_checks_in_and_out(demo: Services, ui: None, qtbot) -> None:  # type: ignore[no-untyped-def]
     session = demo.auth.sign_in("coordinator", DEMO_PASSWORD)
     dialog = KioskDialog(AppContext(demo, session, AppEvents()))
     qtbot.addWidget(dialog)
-    priya = demo.store.volunteers.find_by_email("priya.patel@example.org")
-    assert priya is not None
-    dialog.digits.setText(priya.phone[-4:])
-    dialog.check_in_button.click()
-    assert "Thanks, Priya" in dialog.message.text() and "goal" in dialog.message.text()
-    assert dialog.digits.text() == ""
+    shift_id, name, _assignment_id = _person_on_open_shift(demo)
+    dialog.shift_box.setCurrentIndex(dialog.shift_box.findData(shift_id))
+    dialog.search.setText(name.split()[0])
+    buttons = [w for w in dialog.findChildren(QPushButton) if w.property("kind") == "kiosk" and w.isVisibleTo(dialog)]
+    assert buttons and all(name.split()[0] in b.text() for b in buttons)
+    buttons[0].click()
+    assert "Welcome" in dialog.message.text() and dialog.search.text() == ""
+    dialog.search.setText(name.split()[0])
+    again = [w for w in dialog.findChildren(QPushButton) if w.property("kind") == "kiosk" and w.isVisibleTo(dialog)]
+    assert any("check out" in b.text() for b in again)
 
 
 # ---------------------------------------------------------------------- goals
