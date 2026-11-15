@@ -1084,7 +1084,6 @@
   "Add or renew": "Agregar o renovar",
   "An hour goal needs both a number of hours and a date.": "Una meta de horas necesita un número de horas y una fecha.",
   "Application received": "Solicitud recibida",
-  "Apply to volunteer": "Solicitar ser voluntario",
   "By this date": "Para esta fecha",
   "Certification": "Certificación",
   "Certification must be at least 2 characters.": "La certificación debe tener al menos 2 caracteres.",
@@ -1113,7 +1112,6 @@
   "Measured in": "Unidad de medida",
   "My hour goal": "Mi meta de horas",
   "Name you go by": "Nombre que usa",
-  "New here? Apply to volunteer": "¿Es nuevo? Solicite ser voluntario",
   "No shifts are open for check-in right now. Check-in opens 30 minutes before a shift.": "Ahora no hay turnos abiertos para registrarse. El registro abre 30 minutos antes de cada turno.",
   "Nobody can be scheduled for a program without a current certification, so renew these soon.": "Nadie puede programarse en un programa sin una certificación vigente, así que renueve estas pronto.",
   "None recorded yet.": "Ninguna registrada todavía.",
@@ -1133,7 +1131,6 @@
   "Remove goal": "Quitar meta",
   "Required certifications": "Certificaciones requeridas",
   "Required certifications must be a list of names.": "Las certificaciones requeridas deben ser una lista de nombres.",
-  "Required if you are under 18 (a parent or guardian).": "Obligatorio si tiene menos de 18 años (padre, madre o tutor).",
   "Result": "Resultado",
   "Result ({unit}):": "Resultado ({unit}):",
   "Result saved.": "Resultado guardado.",
@@ -1175,5 +1172,13 @@
   "• Referred by: {name}": "• Referido por: {name}",
   "{served} of {goal} hours by {due}, counting from August 1": "{served} de {goal} horas para el {due}, contando desde el 1 de agosto",
   "{label}: {value} (needs attention)": "{label}: {value} (requiere atención)",
-  "Happening next: {title}": "Lo que viene: {title}"
+  "Happening next: {title}": "Lo que viene: {title}",
+  "Become a volunteer": "Hacerme voluntario",
+  "Parent, guardian, or emergency contact": "Madre, padre, tutor o contacto de emergencia",
+  "If you are under 18, this must be your parent or guardian. Otherwise optional.": "Si tiene menos de 18 años, debe ser su madre, padre o tutor. Si no, es opcional.",
+  "Referred": "Referidos",
+  "Top referrer": "Quién refirió más",
+  "Referred by someone": "Referidos por alguien",
+  "most by {name}": "la mayoría por {name}",
+  "Who brings in the most volunteers": "Quién trae más voluntarios"
 }

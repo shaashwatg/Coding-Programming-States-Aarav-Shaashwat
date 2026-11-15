@@ -227,13 +227,26 @@ ARTICLES: tuple[HelpArticle, ...] = (
         action_label="Open Dashboard",
     ),
     HelpArticle(
-        "Apply to become a volunteer",
-        "apply application join new become volunteer referred referral invite friend",
+        "Become a volunteer",
+        "apply application join new become volunteer referred referral invite friend sign up form guardian parent",
         (
-            "On the sign-in screen, choose New here? Apply to volunteer.",
+            "On the sign-in screen, choose Become a volunteer.",
             "Fill in the form, and say who invited you if someone did.",
+            "If you are under 18, give a parent or guardian as your contact.",
             "A coordinator reviews it on the Volunteers page and gives you a sign-in.",
         ),
+    ),
+    HelpArticle(
+        "See who brings in new volunteers",
+        "referral referrals referrer who invited recruit recruiting thank top bring brings most",
+        (
+            "On Reports, choose Recruitment.",
+            "The Referred and Top referrer columns show referrals for each channel.",
+            "The chart Who brings in the most volunteers ranks the people who invited others.",
+        ),
+        page="reports",
+        leaders_only=True,
+        action_label="Open Reports",
     ),
     HelpArticle(
         "Report results, not just hours",
@@ -475,14 +488,26 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
         "Abrir Panel",
     ),
     (
-        "Solicitar ser voluntario",
-        "solicitar solicitud unirse nuevo ser voluntario referido recomendacion invitar amigo",
+        "Hacerme voluntario",
+        "solicitar solicitud unirse nuevo hacerme ser voluntario referido recomendacion invitar amigo "
+        "formulario tutor padre madre",
         (
-            "En la pantalla de inicio de sesión, elija ¿Es nuevo? Solicite ser voluntario.",
+            "En la pantalla de inicio de sesión, elija Hacerme voluntario.",
             "Complete el formulario y diga quién lo invitó, si alguien lo hizo.",
+            "Si tiene menos de 18 años, indique a su madre, padre o tutor como contacto.",
             "Un coordinador la revisa en la página Voluntarios y le da un acceso.",
         ),
         "",
+    ),
+    (
+        "Ver quién trae voluntarios nuevos",
+        "referencia referencias referido quien invito reclutar reclutamiento agradecer trae mas",
+        (
+            "En Informes, elija Reclutamiento.",
+            "Las columnas Referidos y Quién refirió más muestran las referencias de cada canal.",
+            "El gráfico Quién trae más voluntarios ordena a las personas que invitaron a otras.",
+        ),
+        "Abrir Informes",
     ),
     (
         "Informar resultados, no solo horas",

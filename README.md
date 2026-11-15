@@ -43,7 +43,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 511 automated tests, including the interface
+python -m pytest          # 515 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +231,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   511 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   515 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -336,8 +336,8 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
 
 ### Reports (customizable output and analysis)
 
-Pick a question — *Volunteer hours, Program impact, Shift attendance, Recruitment channels, Impact summary,* or one
-person's *Service hours record* — then a period (presets including *This school year*, or custom
+Pick a question (*Volunteer hours, Program impact, Shift attendance, Recruitment channels and referrals, Impact summary,* or one
+person's *Service hours record*), then a period (presets including *This school year*, or custom
 dates), and optionally a program or category. Each report shows four headline figures,
 **plain-English insights** (for example, which weekday fills best and which fills least,
 how much of the service the top fifth of volunteers gave, and which shifts have already started but
@@ -443,7 +443,8 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 
 | Feature | What it does | Rules worth explaining |
 |---|---|---|
-| **Apply to volunteer** | A public form on the sign-in screen, including *Who invited you?* | It can only create an Applicant, whatever is submitted. If someone seems to be on file already, the answer never says who. The Recruitment report names the top referrer to thank |
+| **Become a volunteer** | A public form on the sign-in screen, including *Who invited you?* | It can only create an Applicant, whatever is submitted. Anyone under 18 must give a parent or guardian as their contact. If someone seems to be on file already, the answer never says who |
+| **Referrals** | The Recruitment report adds *Referred* and *Top referrer* columns for each channel, a headline count, and a chart of who brings in the most volunteers | Names are typed freely, so "Priya Patel" and "priya  patel" count as one person (case and extra spaces are ignored) |
 | **Check-in kiosk** | *Dashboard > Open check-in kiosk* turns a laptop into a welcome desk: type the last 4 digits of your phone | Opens 30 minutes before a shift and closes when it ends. Only people on that shift can match. Shows only a first name and last initial. Only the leader's password closes it. It records the full shift, and a leader can correct the hours on the roster |
 | **Hour goals** | A volunteer sets hours and a date on *Home*, then sees progress and a weekly pace. The kiosk reports progress too | Counts from August 1. The date must be after today. Only that person or a leader can change it |
 | **Results and impact summary** | A program names what it measures (*families served*); each shift records a number; the *Impact summary* report saves as a one-page PDF | A result can only be recorded after the shift starts. Missing results are reported, never guessed |
@@ -480,7 +481,7 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 511 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 515 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
 | `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |

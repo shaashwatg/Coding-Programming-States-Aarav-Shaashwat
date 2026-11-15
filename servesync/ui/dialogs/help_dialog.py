@@ -25,6 +25,10 @@ LEADER_GUIDE = """
 <ul>
 <li>Choose <b>Add volunteer</b> (top right) to register someone. New people start as <i>Applicants</i>.</li>
 <li>On <b>Volunteers</b>, select an applicant and choose <b>Approve</b> once they've completed orientation.</li>
+<li>New people can also apply on their own: <b>Become a volunteer</b> on the sign-in screen creates an
+<i>Applicant</i> for you to review. Anyone under 18 must give a parent or guardian as their contact.</li>
+<li>The form asks <i>Who invited you?</i> The <b>Recruitment</b> report counts referrals for each channel and
+charts who brings in the most volunteers, so you know whom to thank.</li>
 <li>Archive people who step away; their service history is always kept.</li>
 </ul>
 <h3>Programs and shifts</h3>
@@ -106,7 +110,7 @@ SHORTCUTS = """
 <tr><td><b>Ctrl+Shift+H</b></td><td>High contrast on or off</td></tr>
 <tr><td><b>Arrow keys</b></td><td>On a chart: move between bars or points; each value is read aloud</td></tr>
 <tr><td><b>F1</b></td><td>Open this help</td></tr>
-<tr><td><b>Tab / Shift+Tab</b></td><td>Move between controls (the focused control has a blue outline)</td></tr>
+<tr><td><b>Tab / Shift+Tab</b></td><td>Move between controls (the focused control has a colored outline)</td></tr>
 <tr><td><b>Enter</b></td><td>Open the selected row, or press the highlighted button</td></tr>
 <tr><td><b>Esc</b></td><td>Close a window without saving</td></tr>
 </table>
@@ -153,6 +157,11 @@ la asistencia.</li>
 <i>Solicitantes</i>.</li>
 <li>En <b>Voluntarios</b>, seleccione a un solicitante y elija <b>Aprobar</b> cuando haya completado
 la orientación.</li>
+<li>Las personas nuevas también pueden postularse por su cuenta: <b>Hacerme voluntario</b>, en la pantalla de
+inicio de sesión, crea un <i>Solicitante</i> para que usted lo revise. Quien tenga menos de 18 años debe indicar a
+su madre, padre o tutor como contacto.</li>
+<li>El formulario pregunta <i>¿Quién lo invitó?</i> El informe de <b>Reclutamiento</b> cuenta las referencias de
+cada canal y muestra en un gráfico quién trae más voluntarios, para que sepa a quién agradecer.</li>
 <li>Archive a quienes se retiren; su historial de servicio siempre se conserva.</li>
 </ul>
 <h3>Programas y turnos</h3>
@@ -247,7 +256,7 @@ usted)</td></tr>
 <tr><td><b>Teclas de flecha</b></td><td>En un gráfico: moverse entre barras o puntos; cada valor se lee en voz
 alta</td></tr>
 <tr><td><b>F1</b></td><td>Abrir esta ayuda</td></tr>
-<tr><td><b>Tab / Shift+Tab</b></td><td>Moverse entre controles (el control activo tiene un contorno azul)</td></tr>
+<tr><td><b>Tab / Shift+Tab</b></td><td>Moverse entre controles (el control activo tiene un contorno de color)</td></tr>
 <tr><td><b>Enter</b></td><td>Abrir la fila seleccionada o presionar el botón resaltado</td></tr>
 <tr><td><b>Esc</b></td><td>Cerrar una ventana sin guardar</td></tr>
 </table>

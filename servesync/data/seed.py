@@ -59,6 +59,8 @@ DEMO_MISSION = (
     "feeding families, tutoring kids, caring for our parks, and checking in on seniors."
 )
 DEMO_PASSWORD = "ServeSync2026!"  # documented in README; demo use only
+#: A community partner (not a volunteer) who invites people; shows referrals outside the Referral channel.
+DEMO_PARTNER_REFERRER = "Ruth Alvarez"
 HISTORY_DAYS = 119
 UPCOMING_DAYS = 42
 GENERATED_VOLUNTEERS = 38
@@ -739,6 +741,11 @@ def _add_referrals_and_goals(store: DataStore, volunteers: list[Volunteer], toda
         # Priya invited two of every three, so the recruiting report has a clear person to thank.
         referrer = jordan if index % 3 == 2 else priya
         store.volunteers.update(dataclasses.replace(volunteer, referred_by=referrer.full_name))
+    # A community partner who isn't a volunteer also sends people, through other channels. One
+    # applicant typed the name in lowercase, which the report still counts as the same person.
+    others = [v for v in volunteers[2:] if v.recruitment_source is RecruitmentSource.COMMUNITY_EVENT][:2]
+    for volunteer, typed in zip(others, (DEMO_PARTNER_REFERRER, DEMO_PARTNER_REFERRER.lower()), strict=False):
+        store.volunteers.update(dataclasses.replace(volunteer, referred_by=typed))
     due = date(today.year + (today.month >= DEMO_GOAL_MONTH), DEMO_GOAL_MONTH, 1)
     for person, hours in ((jordan, DEMO_STUDENT_GOAL_HOURS), (priya, DEMO_ADULT_GOAL_HOURS)):
         store.volunteers.update(

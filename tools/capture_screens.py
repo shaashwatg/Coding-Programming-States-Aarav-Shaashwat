@@ -139,6 +139,8 @@ def main() -> int:
             box = reports.kind_box  # type: ignore[attr-defined]
             box.setCurrentIndex(box.findData("IMPACT_SUMMARY"))
             save(app, window, args.output, f"02-9i-impact-summary{suffix}")
+            box.setCurrentIndex(box.findData("RECRUITMENT"))
+            save(app, window, args.output, f"02-9j-recruitment{suffix}")
             window.ctx.events.status_message.emit(tr("Saved {title}.", title="servesync-program-impact.pdf"))
             save(app, window, args.output, f"02-9g-toast{suffix}")
             save(app, KioskDialog(ctx), args.output, f"02-9h-kiosk{suffix}", (1360, 860))

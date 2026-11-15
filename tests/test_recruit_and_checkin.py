@@ -11,13 +11,15 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from servesync.core.errors import BusinessRuleError, PermissionDeniedError, ValidationError
 from servesync.data import DataStore
 from servesync.data.seed import DEMO_PASSWORD, seed_demo_data
-from servesync.models import Appearance, AssignmentStatus, ServiceRecord, Theme, VolunteerStatus
+from servesync.models import Appearance, AssignmentStatus, RecruitmentSource, ServiceRecord, Theme, VolunteerStatus
 from servesync.services import FixedClock, Services
+from servesync.services.reports.analytics import referral_counts
 from servesync.services.reports.model import DatePreset, ReportKind
 from servesync.services.rules import hour_goal_progress
 from servesync.ui import assets, theme
 from servesync.ui.context import AppContext, AppEvents
 from servesync.ui.dialogs.application_dialog import ApplicationDialog
+from servesync.ui.dialogs.auth_dialogs import LoginDialog
 from servesync.ui.dialogs.goal_dialog import HourGoalPanel
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from tests.factories import FAST_ITERATIONS, make_volunteer
@@ -93,6 +95,56 @@ def test_recruitment_report_names_the_top_referrer(demo: Services) -> None:
     report = demo.reports.build(session, ReportKind.RECRUITMENT, filters)
     assert any("Priya Patel has referred" in insight for insight in report.insights)
     assert DatePreset.SCHOOL_YEAR  # the preset goals count from also exists for reports
+
+
+def test_a_minor_must_list_a_parent_or_guardian(demo: Services) -> None:
+    fifteen = SEED_DAY.replace(year=SEED_DAY.year - 15)
+    with pytest.raises(ValidationError) as caught:
+        demo.volunteers.apply(
+            make_volunteer(email="teen@example.org", phone="206-555-0179", birth_date=fifteen, joined_on=SEED_DAY)
+        )
+    assert "parent or guardian" in caught.value.errors["emergency_contact_name"]
+    saved = demo.volunteers.apply(
+        make_volunteer(
+            email="teen@example.org",
+            phone="206-555-0179",
+            birth_date=fifteen,
+            joined_on=SEED_DAY,
+            emergency_contact_name="Maria Lopez",
+            emergency_contact_phone="206-555-0180",
+        )
+    )
+    assert saved.status is VolunteerStatus.APPLICANT
+
+
+def test_referral_counts_treat_spellings_of_one_name_as_one_person() -> None:
+    people = [
+        make_volunteer(referred_by="Priya Patel"),
+        make_volunteer(referred_by="priya  patel"),
+        make_volunteer(referred_by="Priya Patel"),
+        make_volunteer(referred_by="Jordan Rivera"),
+        make_volunteer(referred_by=""),
+    ]
+    assert referral_counts(people) == [("Priya Patel", 3), ("Jordan Rivera", 1)]
+
+
+def test_recruitment_report_shows_who_brings_in_the_most_volunteers(demo: Services) -> None:
+    session = demo.auth.sign_in("coordinator", DEMO_PASSWORD)
+    filters = demo.reports.default_filters(ReportKind.RECRUITMENT, session)
+    report = demo.reports.build(session, ReportKind.RECRUITMENT, filters)
+    assert {"referred", "top_referrer"} <= {column.key for column in report.columns}
+    referral_row = next(row for row in report.rows if row["source"] == RecruitmentSource.REFERRAL.label)
+    assert referral_row["referred"] > 0 and str(referral_row["top_referrer"]).startswith("Priya Patel (")
+    chart = next(chart for chart in report.charts if chart.title == "Who brings in the most volunteers")
+    assert chart.labels[0] == "Priya Patel" and list(chart.values) == sorted(chart.values, reverse=True)
+    everyone = demo.store.volunteers.find_all()
+    assert sum(row["referred"] for row in report.rows) == sum(1 for v in everyone if v.referred_by)
+
+
+def test_sign_in_screen_offers_become_a_volunteer(demo: Services, ui: None, qtbot) -> None:  # type: ignore[no-untyped-def]
+    dialog = LoginDialog(demo)
+    qtbot.addWidget(dialog)
+    assert dialog.apply_button.text() == "Become a volunteer"
 
 
 def test_a_volunteer_cannot_change_who_referred_them(demo: Services) -> None:

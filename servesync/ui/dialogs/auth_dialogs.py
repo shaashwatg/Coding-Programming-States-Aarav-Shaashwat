@@ -142,7 +142,7 @@ class LoginDialog(QDialog):
         self.sign_in_button = make_button(tr("Sign in"), kind="primary", on_click=self._sign_in)
         self.sign_in_button.setDefault(True)
         column.addWidget(self.sign_in_button)
-        self.apply_button = make_button(tr("New here? Apply to volunteer"), on_click=self._apply)
+        self.apply_button = make_button(tr("Become a volunteer"), on_click=self._apply)
         column.addWidget(self.apply_button)
 
         if organization == DEMO_ORGANIZATION_NAME:

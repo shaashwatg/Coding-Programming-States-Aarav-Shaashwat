@@ -1,5 +1,5 @@
 """
-Apply to volunteer: the public front door, reached from the sign-in screen.
+Become a volunteer: the public front door, reached from the sign-in screen.
 
 Anyone may fill this in without an account, so it only ever creates an Applicant
 for a leader to review. Validation is the same as everywhere else, because the
@@ -21,7 +21,7 @@ from servesync.ui.widgets.forms import AccessPicker, AvailabilityGrid, FormDialo
 class ApplicationDialog(FormDialog):
     def __init__(self, services: Services, parent: QWidget | None = None) -> None:
         super().__init__(
-            tr("Apply to volunteer"),
+            tr("Become a volunteer"),
             tr(
                 "Tell us about yourself. A coordinator will review this and give you a sign-in. "
                 "Fields marked * are required."
@@ -50,9 +50,13 @@ class ApplicationDialog(FormDialog):
         self.birth_date.setDate(today.addYears(-18))
         self.add_field("birth_date", tr("Birth date *"), self.birth_date, tr("Volunteers must be at least 14."))
 
-        self.add_section(tr("Emergency contact"))
+        # Under 18, this contact must be a parent or guardian; the Volunteer model enforces it.
+        self.add_section(tr("Parent, guardian, or emergency contact"))
         self.emergency_name = self._text_field(
-            "emergency_contact_name", tr("Name"), 80, tr("Required if you are under 18 (a parent or guardian).")
+            "emergency_contact_name",
+            tr("Name"),
+            80,
+            tr("If you are under 18, this must be your parent or guardian. Otherwise optional."),
         )
         self.emergency_phone = self._text_field("emergency_contact_phone", tr("Phone"), 25)
 

@@ -622,7 +622,34 @@ RECRUITMENT_COLUMNS = (
     ReportColumn("retention", mark("Still active"), ValueKind.PERCENT),
     ReportColumn("hours", mark("Hours in period"), ValueKind.HOURS),
     ReportColumn("hours_each", mark("Hours per volunteer"), ValueKind.HOURS),
+    ReportColumn("referred", mark("Referred"), ValueKind.COUNT),
+    ReportColumn("top_referrer", mark("Top referrer")),
 )
+
+#: How many people the "who brings in the most volunteers" chart lists.
+TOP_REFERRERS = 5
+
+
+def referral_counts(volunteers: Iterable[Volunteer]) -> list[tuple[str, int]]:
+    """
+    Who invited the most volunteers, most first: (name as most often written, count).
+
+    "Who invited you?" is typed freely, so "Priya Patel", "priya patel" and
+    "Priya  Patel" must count as one person. Names are compared ignoring case
+    and extra spaces; the spelling shown is the one people used most.
+    """
+    counts: Counter[str] = Counter()
+    spellings: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    for volunteer in volunteers:
+        name = " ".join(volunteer.referred_by.split())
+        if not name:
+            continue
+        key = name.casefold()
+        counts[key] += 1
+        spellings[key][name] += 1
+    ranked = [(spellings[key].most_common(1)[0][0], count) for key, count in counts.items()]
+    ranked.sort(key=lambda pair: (-pair[1], pair[0].casefold()))
+    return ranked
 
 
 @dataclass(frozen=True, slots=True)
@@ -635,6 +662,8 @@ class _SourceRow:
     retention: float | None
     hours: float
     hours_each: float
+    referred: int  # volunteers from this channel who named the person who invited them
+    top_referrer: str  # "Priya Patel (6)", or empty
 
 
 def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
@@ -652,6 +681,7 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         active = sum(v.status is VolunteerStatus.ACTIVE for v in people)
         inactive = sum(v.status is VolunteerStatus.INACTIVE for v in people)
         hours = round(hours_by_source[source], 2)
+        referrers = referral_counts(people)
         rows.append(
             _SourceRow(
                 source=source.label,
@@ -662,9 +692,13 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
                 retention=percent(active, active + inactive),
                 hours=hours,
                 hours_each=round(hours / len(people), 1),
+                referred=sum(count for _name, count in referrers),
+                top_referrer=f"{referrers[0][0]} ({referrers[0][1]})" if referrers else "",
             )
         )
     rows.sort(key=lambda row: (-row.new, -row.total, row.source))
+    referrers = referral_counts(inputs.volunteers)
+    referred_total = sum(count for _name, count in referrers)
 
     today = inputs.now.date()
     waiting = sum(
@@ -677,6 +711,11 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
         Figure(tr("New volunteers"), str(new_total), tr("joined in this period")),
         Figure(tr("Awaiting review"), str(sum(row.applicants for row in rows))),
         Figure(tr("Top channel"), rows[0].source if rows and new_total else "\u2013", tr("by new volunteers")),
+        Figure(
+            tr("Referred by someone"),
+            str(referred_total),
+            tr("most by {name}", name=referrers[0][0]) if referrers else "",
+        ),
     )
     insights: list[str] = []
     if rows and new_total:
@@ -702,9 +741,8 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
                     hours=_hours(deepest.hours_each),
                 )
             )
-    referrers = Counter(v.referred_by for v in inputs.volunteers if v.referred_by)
     if referrers:
-        name, invited = referrers.most_common(1)[0]
+        name, invited = referrers[0]
         insights.append(
             tr_n(
                 "{name} has referred {count} volunteer. Consider a thank-you note.",
@@ -724,7 +762,22 @@ def recruitment(inputs: ReportInputs, filters: ReportFilters) -> Report:
             )
         )
     chart = top_bars(tr("New volunteers by channel"), ((row.source, float(row.new)) for row in rows), ValueKind.COUNT)
-    return _report(ReportKind.RECRUITMENT, inputs, filters, RECRUITMENT_COLUMNS, rows, figures, insights, (chart,))
+    referral_chart = top_bars(
+        tr("Who brings in the most volunteers"),
+        ((name, float(count)) for name, count in referrers),
+        ValueKind.COUNT,
+        limit=TOP_REFERRERS,
+    )
+    return _report(
+        ReportKind.RECRUITMENT,
+        inputs,
+        filters,
+        RECRUITMENT_COLUMNS,
+        rows,
+        figures,
+        insights,
+        (chart, referral_chart),
+    )
 
 
 # ------------------------------------------------------------ service record
