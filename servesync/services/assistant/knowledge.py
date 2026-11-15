@@ -577,8 +577,7 @@ _SPANISH: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
         "Atajos de teclado",
         "teclado atajo teclas raton navegar tab sin raton",
         (
-            "Ctrl+1, Ctrl+2, etc. abren cada página; Ctrl+K abre Pregúntale a ServeSync; Ctrl+N es la "
-            "acción principal.",
+            "Ctrl+1, Ctrl+2, etc. abren cada página; Ctrl+K abre Pregunte a ServeSync; Ctrl+N es la acción principal.",
             "Ctrl+F va a la búsqueda; F1 abre la ayuda; Tab pasa de un control a otro; Esc cierra una ventana.",
             "En una Mac, use Comando donde vea Ctrl.",
         ),

@@ -23,6 +23,7 @@ Main window: a conventional nonprofit layout adapted to a desktop app.
 
 from __future__ import annotations
 
+import logging
 from functools import partial
 from typing import Any
 
@@ -42,6 +43,7 @@ from PySide6.QtWidgets import (
 )
 
 from servesync import __app_name__
+from servesync.core.errors import ServeSyncError
 from servesync.core.i18n import tr
 from servesync.models import Theme
 from servesync.models.preferences import MAX_FONT_SCALE, MIN_FONT_SCALE
@@ -50,9 +52,10 @@ from servesync.ui import assets
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.assistant_dialog import AssistantDialog, Command
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
-from servesync.ui.dialogs.help_dialog import HelpDialog, RecentMessagesDialog
+from servesync.ui.dialogs.help_dialog import TOPIC_TAB, HelpDialog, PageHelpDialog, RecentMessagesDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.feedback import Announcer, ToastHost
+from servesync.ui.help_topics import LEADER_TOUR, VOLUNTEER_TOUR, TourStep
 from servesync.ui.motion import DURATION_BASE, DURATION_FAST, animate, fade_in
 from servesync.ui.pages.base import Page
 from servesync.ui.pages.leader_pages import DashboardPage
@@ -63,8 +66,13 @@ from servesync.ui.pages.staffing_page import StaffingPage
 from servesync.ui.pages.volunteer_pages import FindShiftsPage, HomePage, ProfilePage
 from servesync.ui.pages.volunteers_page import VolunteersPage
 from servesync.ui.theme import current_appearance, current_palette, current_scale
+from servesync.ui.tour import TourGuide
 from servesync.ui.widgets.common import guarded
 
+logger = logging.getLogger(__name__)
+
+#: The tour waits this long after sign-in, so the window has drawn before it appears.
+TOUR_DELAY_MS = 400
 #: Text-size steps for Ctrl+= and Ctrl+- (same steps as Settings).
 TEXT_STEPS = (0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
 #: Below this window width the sidebar shows icons only; it may take at most a quarter of the window.
@@ -78,7 +86,7 @@ ORG_NAME_MAX_SCALE = 1.5
 class MainWindow(QMainWindow):
     signed_out = Signal()
 
-    def __init__(self, ctx: AppContext) -> None:
+    def __init__(self, ctx: AppContext, *, offer_tour: bool = False) -> None:
         super().__init__()
         self.ctx = ctx
         ctx.navigate = self.navigate
@@ -129,6 +137,9 @@ class MainWindow(QMainWindow):
             10000,
         )
         self.navigate(next(iter(self.pages)))
+        self._tour: TourGuide | None = None
+        if offer_tour and not ctx.services.settings.tour_seen(ctx.session):
+            QTimer.singleShot(TOUR_DELAY_MS, self.start_tour)  # once the window is on screen
 
     # ------------------------------------------------------------------ chrome
 
@@ -220,6 +231,15 @@ class MainWindow(QMainWindow):
         self.cta.clicked.connect(self._call_to_action)
         row.addWidget(self.cta)
 
+        self.page_help_button = QToolButton()
+        self.page_help_button.setObjectName("PageHelp")
+        self.page_help_button.setText("?")
+        self.page_help_button.setAccessibleName(tr("Help for this page"))
+        self.page_help_button.setToolTip(tr("Help for this page"))
+        self.page_help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.page_help_button.clicked.connect(self.show_page_help)
+        row.addWidget(self.page_help_button)
+
         self.account = QToolButton()
         self.account.setObjectName("UserMenu")
         self.account.setText(self.ctx.session.username)  # the stylesheet draws the menu chevron
@@ -230,6 +250,7 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction(tr("Change password..."), self._change_password)
         menu.addAction(tr("Help"), self.show_help)
+        menu.addAction(tr("Take the tour"), self.start_tour)
         menu.addSeparator()
         menu.addAction(tr("Sign out"), self.sign_out)
         self.account.setMenu(menu)
@@ -304,6 +325,12 @@ class MainWindow(QMainWindow):
         recent = QAction(tr("Recent messages"), self)
         recent.triggered.connect(self.show_recent_messages)
         help_menu.addAction(recent)
+        topic = QAction(tr("How ServeSync addresses the topic"), self)
+        topic.triggered.connect(lambda: self.show_help(tab=TOPIC_TAB))
+        help_menu.addAction(topic)
+        tour = QAction(tr("Take the tour"), self)
+        tour.triggered.connect(self.start_tour)
+        help_menu.addAction(tour)
         about = QAction(tr("About {app}", app=__app_name__), self)
         about.triggered.connect(lambda: self.show_help(tab=2))
         help_menu.addAction(about)
@@ -362,6 +389,42 @@ class MainWindow(QMainWindow):
     def show_help(self, tab: int = 0) -> None:
         HelpDialog(self.ctx.session.role, self, start_tab=tab).exec()
 
+    def show_page_help(self) -> None:
+        page = self.stack.currentWidget()
+        key = page.key if isinstance(page, Page) else ""
+        PageHelpDialog(key, self.ctx.session.role, self).exec()
+
+    def start_tour(self) -> None:
+        """Show the short tour for this person's role (also from Help > Take the tour)."""
+        if self._tour is not None:
+            return
+        steps = LEADER_TOUR if self.ctx.session.is_leader else VOLUNTEER_TOUR
+        self._tour = TourGuide(
+            self,
+            [step for step in steps if step.page in self.pages],
+            go_to=self.navigate,
+            target_for=self._tour_target,
+            announce=self.announcer.announce,
+            on_done=self._tour_done,
+        )
+        self._tour.start()
+
+    def _tour_target(self, step: TourStep) -> QWidget | None:
+        if step.target == "ask":
+            return self.ask_button
+        if step.target == "cta":
+            return self.cta
+        if step.target == "help":
+            return self.page_help_button
+        return self.nav_buttons.get(step.page)
+
+    def _tour_done(self) -> None:
+        self._tour = None
+        try:
+            self.ctx.services.settings.set_tour_seen(self.ctx.session)
+        except ServeSyncError:  # never block the app over a preference
+            logger.exception("Could not save that the tour was seen")
+
     def show_recent_messages(self) -> None:
         RecentMessagesDialog(list(self.announcer.history), self).exec()
 
@@ -384,6 +447,9 @@ class MainWindow(QMainWindow):
             Command(tr("Comfort and accessibility settings"), lambda: self.navigate("settings")),
             Command(tr("Keyboard shortcuts"), lambda: self.show_help(tab=1)),
             Command(tr("Getting started help"), self.show_help, "F1"),
+            Command(tr("Help for this page"), self.show_page_help),
+            Command(tr("How ServeSync addresses the topic"), lambda: self.show_help(tab=TOPIC_TAB)),
+            Command(tr("Take the tour"), self.start_tour),
             Command(tr("Recent messages"), self.show_recent_messages),
             Command(tr("Change password"), self._change_password),
             Command(tr("Sign out"), self.sign_out),

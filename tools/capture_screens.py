@@ -33,6 +33,7 @@ from servesync.ui.dialogs.assistant_dialog import AssistantDialog
 from servesync.ui.dialogs.auth_dialogs import LoginDialog
 from servesync.ui.dialogs.coordination_dialogs import RemindersDialog
 from servesync.ui.dialogs.data_dialogs import HistoryDialog, ImportDialog
+from servesync.ui.dialogs.help_dialog import TOPIC_TAB, HelpDialog
 from servesync.ui.dialogs.kiosk_dialog import KioskDialog
 from servesync.ui.dialogs.program_dialogs import OpportunityDialog
 from servesync.ui.dialogs.roles_dialog import RolesDialog
@@ -170,7 +171,20 @@ def main() -> int:
             save(app, HistoryDialog(ctx), args.output, f"04-history{suffix}", (1080, 680))
 
         capture_role("coordinator", "02-leader", leader_extras)
-        capture_role("priya.patel", "03-volunteer", lambda _ctx, _window: None)
+
+        def volunteer_extras(ctx: AppContext, window: MainWindow) -> None:
+            window.navigate("home")
+            window.start_tour()
+            if window._tour is not None:
+                window._tour.show_step(2)  # "Find a shift", with its outline
+            save(app, window, args.output, f"03-9a-tour{suffix}")
+            if window._tour is not None:
+                window._tour.finish()
+            save(
+                app, HelpDialog(ctx.session.role, start_tab=TOPIC_TAB), args.output, f"03-9b-topic{suffix}", (760, 680)
+            )
+
+        capture_role("priya.patel", "03-volunteer", volunteer_extras)
         session = services.auth.sign_in("admin", DEMO_PASSWORD)
         admin_window = MainWindow(AppContext(services, session, AppEvents()))
         admin_window.resize(1360, 860)

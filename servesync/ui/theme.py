@@ -539,6 +539,16 @@ def build_stylesheet(p: Palette, size: float, arrows: tuple[str, str] = ("", "")
     QToolButton#UserMenu::menu-indicator {{ image: url("{down_arrow}"); subcontrol-origin: padding;
         subcontrol-position: center right; right: 10px; width: 14px; height: 14px; }}
 
+    QToolButton#PageHelp {{ background: transparent; color: {p.primary}; border: 1px solid {p.line_strong};
+        border-radius: {target // 2 - 4}px; min-width: {target - 18}px; min-height: {target - 18}px;
+        padding: 4px; font-weight: 600; }}
+    QToolButton#PageHelp:hover {{ background: {p.primary_soft}; }}
+    QToolButton#PageHelp:focus {{ border: {fw}px solid {p.focus}; }}
+
+    /* ---------- first-run tour: a card in the corner, and an outline around what it describes ---------- */
+    QFrame#TourCard {{ background: {p.surface}; border: 1px solid {p.primary}; border-radius: {card}px; }}
+    QFrame#TourOutline {{ background: transparent; border: 3px solid {p.attention_fill}; border-radius: {ctl}px; }}
+
     /* ---------- toast ---------- */
     QFrame#Toast {{ background: {p.text}; border-radius: {card}px; }}
     QFrame#Toast QLabel {{ color: {p.window}; }}

@@ -7,13 +7,14 @@ manage volunteers and community service activities**. Leaders track the recruitm
 publish service opportunities, schedule shifts, take attendance, and report on participation and
 impact. Volunteers sign in to a self-service portal to find shifts, sign up, and see their hours.
 
-> **Build status:** feature-complete and tested — data storage, business rules with Smart Match,
+> **Build status:** feature-complete and tested: data storage, business rules with Smart Match,
 > the desktop interface, customizable reports with CSV/PDF export, *Staffing Studio*
-> (Autopilot scheduling, attendance forecast, re-engagement), public applications with referrals, a
-> check-in kiosk, personal hour goals, program results with a one-page impact summary, required
-> certifications with expiry dates, the offline *Ask ServeSync*
-> assistant, inclusive profiles and comfort settings, a full **English / Español** interface, and a
-> standalone app build.
+> (Autopilot scheduling, attendance forecast, re-engagement), self-service applications with referrals,
+> roles within shifts, certifications and waivers, waitlists, announcements, reminders, calendar files,
+> a check-in kiosk with check-out, paper sign-in sheets, hour goals, milestone certificates, impact
+> results, verification codes, CSV import, backup and restore, change history, privacy tools, a guided
+> tour, the offline *Ask ServeSync* assistant, inclusive profiles and comfort settings, a full
+> **English / Español** interface, and a standalone app build.
 
 ![ServeSync dashboard](docs/screenshots/dashboard.png)
 
@@ -43,7 +44,7 @@ pip install -r requirements-dev.txt
 python devtools.py reset --yes
 
 # 4. Verify everything
-python -m pytest          # 618 automated tests, including the interface
+python -m pytest          # 624 automated tests, including the interface
 python devtools.py summary
 
 # 5. Open the app
@@ -231,7 +232,7 @@ servesync/
     │                    shift workspace (roster + Smart Match), help, recent messages
     ├── widgets/         Tables, forms, keyboard-navigable charts, banner, calendar
     └── assets/          Fonts, Lucide icons, logo, license files
-tests/                   618 pytest tests (in-memory databases, fixed clock, offscreen UI)
+tests/                   624 pytest tests (in-memory databases, fixed clock, offscreen UI)
 tools/capture_screens.py Renders every screen to PNG (design review, slides; --language es)
 tools/messages.py        Lists every on-screen message and any still missing a Spanish translation
 tools/make_icon.py       Draws the app icon for the standalone build
@@ -470,6 +471,17 @@ rule the sign-up screen uses. "Recommended for you" shows at most two shifts per
 
 Every result in the demo is sample data calculated from attendance.
 
+### Help built in
+
+| Feature | What it does |
+|---|---|
+| **How ServeSync addresses the topic** | *Help > How ServeSync addresses the topic* maps each phrase of the FBLA prompt (recruit, organize, manage, coordinate, manage service opportunities, maintain records, monitor participation, the needs of volunteers and of leaders) to the screens that do it |
+| **First-run tour** | A short tour for each role (leaders: 8 steps; volunteers: 6) on first sign-in. It's a card in the corner, not a pop-up: the page stays usable, the control it describes is outlined, each step is read aloud by screen readers, and *Skip tour* (or Esc) ends it. *Help > Take the tour* replays it |
+| **The ? button** | In the header on every page: what this page is for, in a few lines, with a link to all help topics |
+| **Ask ServeSync** | Help articles for every feature, in English and Spanish, found by plain questions (Ctrl+K) |
+
+![First-run tour](docs/screenshots/tour.png)
+
 ### Data and trust
 
 | Feature | What it does | Rules worth explaining |
@@ -498,6 +510,12 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 ![Staffing Studio](docs/screenshots/staffing.png)
 
+| | |
+|---|---|
+| ![Roster grouped by role](docs/screenshots/roster-roles.png) | ![Tomorrow's reminders](docs/screenshots/reminders.png) |
+| ![CSV import preview](docs/screenshots/import.png) | ![Change history](docs/screenshots/change-history.png) |
+| ![How ServeSync addresses the topic](docs/screenshots/topic.png) | ![Sign-in](docs/screenshots/sign-in.png) |
+
 ![Check-in kiosk](docs/screenshots/kiosk.png)
 
 ![Impact summary](docs/screenshots/impact-summary.png)
@@ -508,10 +526,10 @@ thresholds are transparent rules of thumb based on past attendance, not a traine
 
 | Check                    | Result                                     |
 |--------------------------|--------------------------------------------|
-| `python -m pytest`       | 618 tests pass (business logic in seconds; interface tests drive real windows) |
+| `python -m pytest`       | 624 tests pass (business logic in seconds; interface tests drive real windows) |
 | Test coverage            | 88% of the whole code base, interface included |
 | `ruff check .`           | No lint issues                             |
-| `mypy` (strict mode)     | No type errors in all 95 files, interface and tests included |
+| `mypy` (strict mode)     | No type errors in all 109 files, interface and tests included |
 | Contrast                 | Every text color ≥ 7:1, every boundary ≥ 3:1, in all themes (`tests/test_theme.py`) |
 | Standalone build         | `ServeSync --check` passes on the built app with no Python installed |
 

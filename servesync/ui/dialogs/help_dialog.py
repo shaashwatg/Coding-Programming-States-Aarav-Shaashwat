@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTabWidget, QTextBrowse
 from servesync import __app_name__, __version__
 from servesync.core.i18n import Language, current_language, format_clock, tr
 from servesync.models import UserRole
+from servesync.ui.help_topics import page_help_html, topic_html
 from servesync.ui.widgets.common import make_label
 
 LEADER_GUIDE = """
@@ -221,7 +222,7 @@ detalle y luego <b>Exportar CSV</b> o <b>Guardar PDF</b>. Lo que exporta es exac
 <li>Cada PDF de horas de servicio y cada certificado lleva un código de verificación. Elija <b>Verificar un
 documento</b> y escríbalo para confirmar que un documento que le envían es auténtico.</li>
 </ul>
-<h3>Pregúntale a ServeSync</h3>
+<h3>Pregunte a ServeSync</h3>
 <ul>
 <li>Presione <b>Ctrl+K</b> (o elija el cuadro <b>Preguntar</b> arriba) y escriba una pregunta como
 <i>¿Quién está libre el sábado por la mañana?</i> o <i>¿Cómo va la despensa de alimentos?</i></li>
@@ -390,6 +391,7 @@ class HelpDialog(QDialog):
             (tr("Getting started"), guide),
             (tr("Keyboard shortcuts"), shortcuts),
             (tr("About"), about),
+            (tr("How ServeSync addresses the topic"), topic_html()),
         ):
             browser = QTextBrowser()
             browser.setOpenExternalLinks(False)
@@ -401,6 +403,36 @@ class HelpDialog(QDialog):
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close.rejected.connect(self.reject)
         column.addWidget(close)
+
+
+#: Tabs of the help window, for links that open a particular one.
+GUIDE_TAB, SHORTCUTS_TAB, ABOUT_TAB, TOPIC_TAB = range(4)
+
+
+class PageHelpDialog(QDialog):
+    """The "?" button: what this page is for, in a few lines, with a way to the full help."""
+
+    def __init__(self, page_key: str, role: UserRole, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._role = role
+        self.setWindowTitle(tr("Help for this page"))
+        self.resize(560, 380)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(24, 24, 24, 16)
+        column.setSpacing(16)
+        self.browser = QTextBrowser()
+        self.browser.setHtml(page_help_html(page_key))
+        self.browser.setAccessibleName(tr("Help for this page"))
+        column.addWidget(self.browser, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        more = buttons.addButton(tr("All help topics"), QDialogButtonBox.ButtonRole.ActionRole)
+        more.clicked.connect(self._all_topics)
+        buttons.rejected.connect(self.reject)
+        column.addWidget(buttons)
+
+    def _all_topics(self) -> None:
+        self.accept()
+        HelpDialog(self._role, self.parentWidget()).exec()
 
 
 class RecentMessagesDialog(QDialog):

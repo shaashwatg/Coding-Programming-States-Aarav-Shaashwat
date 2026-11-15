@@ -86,7 +86,7 @@ class ServeSyncApp:
         events = AppEvents()
         ctx = AppContext(self._services, session, events)
         events.appearance_changed.connect(self._apply_appearance)
-        window = MainWindow(ctx)
+        window = MainWindow(ctx, offer_tour=True)  # a first sign-in gets the short tour
         window.signed_out.connect(self._after_sign_out)
         window.setWindowIcon(self._qt.windowIcon())
         window.resize(1360, 860)

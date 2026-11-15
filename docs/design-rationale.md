@@ -140,6 +140,15 @@ are common in generated interfaces, and they add decoration without helping anyo
 5. **Report.** *Reports* answers a question for a period and saves exactly what is on screen as
    CSV or PDF.
 
+## Finding your way
+
+* **A first-run tour** for each role: a card in the corner (never a pop-up that blocks the page)
+  that opens each page in turn and outlines the control it describes. It can be skipped with
+  one click or Esc, is offered once, and is replayed from *Help > Take the tour*.
+* **A "?" button** in the header of every page explains that page in a few lines.
+* **Help > How ServeSync addresses the topic** maps each phrase of the FBLA prompt to the screens
+  that do it, for judges and for new staff.
+
 ## Accessibility features
 
 | Need | What ServeSync does | WCAG |
