@@ -35,7 +35,6 @@ from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog, language_swi
 from servesync.ui.dialogs.coordination_dialogs import ask_save_path
 from servesync.ui.dialogs.data_dialogs import HistoryDialog, PrivacyRequestsPanel
 from servesync.ui.pages.base import Page
-from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
     BusyCursor,
     EnumComboBox,
@@ -49,8 +48,9 @@ from servesync.ui.widgets.common import (
     make_label,
     to_qdate,
 )
+from servesync.ui.widgets.elements import NEUTRAL, SUCCESS, divider
 from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
-from servesync.ui.widgets.table import Column, RecordTable
+from servesync.ui.widgets.table import TAG, Column, RecordTable
 from servesync.ui.widgets.visuals import ShiftCalendar
 
 TEXT_SIZES = (0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
@@ -78,16 +78,20 @@ class CalendarPage(Page):
             )
         )
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
         left = QWidget()
         left_column = QVBoxLayout(left)
-        left_column.setContentsMargins(0, 0, 12, 0)
+        left_column.setContentsMargins(0, 0, 8, 0)
+        left_column.setSpacing(16)
+        month = Panel(card=True)
         self.calendar = ShiftCalendar()
         self.calendar.setMinimumHeight(330)
         self.calendar.selectionChanged.connect(self._show_day)
         self.calendar.currentPageChanged.connect(lambda _y, _m: self.reload())
-        left_column.addWidget(self.calendar)
-        self.day_title = make_label("", "section")
-        left_column.addWidget(self.day_title)
+        month.body.addWidget(self.calendar)
+        left_column.addWidget(month)
+        day = Panel(tr("Shifts"), flush=True)
+        self.day_title = day.heading or make_label("", "section")
         self.day_table: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
@@ -95,25 +99,29 @@ class CalendarPage(Page):
                     lambda o: f"{_clock(o.shift.starts_at)} – {_clock(o.shift.ends_at)}",
                     sort=lambda o: o.shift.starts_at,
                 ),
-                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True),
+                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True, strong=True),
                 Column(
                     tr("Spots open"),
-                    lambda o: o.open_spots,
-                    color=lambda o: current_palette().success if o.open_spots else None,  # open spots: emerald
-                    align_right=True,
+                    lambda o: tr("{count} open", count=o.open_spots) if o.open_spots else tr("Full"),
+                    sort=lambda o: o.open_spots,
+                    kind=TAG,
+                    tone=lambda o: SUCCESS if o.open_spots else NEUTRAL,
                 ),
             ],
             empty_message=tr("No shifts on this day."),
             accessible_name=tr("Shifts on the selected day"),
+            empty_icon="calendar",
         )
         self.info = ShiftInfoPanel(ctx)
         self.info.changed.connect(self.reload)
         self.day_table.selection_changed.connect(self.info.show_shift)
-        left_column.addWidget(self.day_table, 1)
+        day.body.addWidget(self.day_table, 1)
+        left_column.addWidget(day, 1)
         splitter.addWidget(left)
         splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([620, 440])
         self.layout_.addWidget(splitter, 1)
 
     def refresh(self) -> None:
@@ -158,26 +166,20 @@ class SettingsPage(Page):
         )
 
         # Comfort and accessibility (everyone; saved to *their* account) -------
-        access = Panel(tr("Comfort and accessibility"))
-        access.body.addWidget(
-            make_label(
-                tr(
-                    "Your choices follow your account to any computer. Shortcuts: Ctrl+= "
-                    "and Ctrl+- change text size, Ctrl+Shift+H turns high contrast on or "
-                    "off."
-                ),
-                "muted",
-                wrap=True,
-            )
+        access = Panel(
+            tr("Comfort and accessibility"),
+            subtitle=tr(
+                "Your choices follow your account to any computer. Shortcuts: Ctrl+= "
+                "and Ctrl+- change text size, Ctrl+Shift+H turns high contrast on or "
+                "off."
+            ),
         )
         # Bilingual on purpose: someone who can't read the current language can still find theirs.
-        access.body.addWidget(make_label("Language / Idioma", "section"))
         language_row = QHBoxLayout()
         language_row.addWidget(language_switch(self._choose_language))
         language_row.addStretch(1)
-        access.body.addLayout(language_row)
+        self._setting(access, "Language / Idioma", language_row, first=True)
 
-        access.body.addWidget(make_label(tr("Color theme"), "section"))
         themes = QHBoxLayout()
         themes.setSpacing(0)
         self.theme_group = QButtonGroup(self)
@@ -199,9 +201,8 @@ class SettingsPage(Page):
             self.theme_group.addButton(button, index)
             themes.addWidget(button)
         themes.addStretch(1)
-        access.body.addLayout(themes)
+        self._setting(access, tr("Color theme"), themes)
 
-        access.body.addWidget(make_label(tr("Text size"), "section"))
         size_row = QHBoxLayout()
         self.text_size = QSlider(Qt.Orientation.Horizontal)
         self.text_size.setRange(0, len(TEXT_SIZES) - 1)
@@ -209,11 +210,13 @@ class SettingsPage(Page):
         self.text_size.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.text_size.setAccessibleName(tr("Text size"))
         self.size_label = make_label("", "muted")
+        self.text_size.setMaximumWidth(360)
         size_row.addWidget(self.text_size, 1)
+        size_row.addSpacing(8)
         size_row.addWidget(self.size_label)
-        access.body.addLayout(size_row)
+        size_row.addStretch(1)
+        self._setting(access, tr("Text size"), size_row)
 
-        access.body.addWidget(make_label(tr("Reading and motion"), "section"))
         self.reduce_motion = QCheckBox(tr("Reduce motion (no sliding, fading, or growing animations)"))
         self.text_spacing = QCheckBox(
             tr("Extra letter and word spacing (easier for many readers, including people with dyslexia)")
@@ -221,8 +224,14 @@ class SettingsPage(Page):
         self.simplified = QCheckBox(
             tr("Simplified layout (hide extra panels so each screen shows only the essentials)")
         )
-        for box in (self.reduce_motion, self.text_spacing, self.simplified):
-            access.body.addWidget(box)
+        self.legible_font = QCheckBox(
+            tr("Easy-read font (Atkinson Hyperlegible: letters like I, l and 1 are easy to tell apart)")
+        )
+        reading = QVBoxLayout()
+        reading.setSpacing(4)
+        for box in (self.legible_font, self.text_spacing, self.reduce_motion, self.simplified):
+            reading.addWidget(box)
+        self._setting(access, tr("Reading and motion"), reading)
 
         timing_row = QHBoxLayout()
         timing_label = make_label(tr("Keep confirmation messages on screen"), None)
@@ -239,10 +248,11 @@ class SettingsPage(Page):
         timing_row.addWidget(timing_label)
         timing_row.addWidget(self.message_duration)
         timing_row.addStretch(1)
-        access.body.addLayout(timing_row)
+        self._setting(access, tr("Messages"), timing_row)
 
         buttons = QHBoxLayout()
-        buttons.addWidget(make_button(tr("Save comfort settings"), kind="secondary", on_click=self._apply_display))
+        buttons.setContentsMargins(0, 8, 0, 0)
+        buttons.addWidget(make_button(tr("Save comfort settings"), kind="primary", on_click=self._apply_display))
         buttons.addWidget(make_button(tr("Restore defaults"), on_click=self._restore_defaults))
         buttons.addStretch(1)
         access.body.addLayout(buttons)
@@ -253,6 +263,8 @@ class SettingsPage(Page):
         self._admin = ctx.session.can(Permission.MANAGE_SETTINGS)
         org = Panel(tr("Organization"))
         form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        form.setVerticalSpacing(6)
         self.org_name = QLineEdit()
         self.org_name.setMaxLength(80)
         self.mission = QPlainTextEdit()
@@ -270,6 +282,7 @@ class SettingsPage(Page):
         ):
             widget.setAccessibleName(label)
             widget.setEnabled(self._admin)
+            widget.setMaximumWidth(640 if widget is not self.hour_value else 200)
             form.addRow(label, widget)
         org.body.addLayout(form)
         org.body.addWidget(
@@ -336,6 +349,24 @@ class SettingsPage(Page):
             self.layout_.addWidget(self.privacy)
         self.layout_.addStretch(1)
 
+    @staticmethod
+    def _setting(panel: Panel, title: str, control: QHBoxLayout | QVBoxLayout, *, first: bool = False) -> None:
+        """One setting: its name on the left, the control on the right, a hairline between settings."""
+        if not first:
+            panel.body.addWidget(divider())
+        row = QHBoxLayout()
+        row.setSpacing(24)
+        name = make_label(title, "strong", wrap=True)
+        name.setFixedWidth(180)
+        name.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        holder = QVBoxLayout()
+        holder.setContentsMargins(0, 10, 0, 0)
+        holder.addWidget(name)
+        holder.addStretch(1)
+        row.addLayout(holder)
+        row.addLayout(control, 1)
+        panel.body.addLayout(row)
+
     def refresh(self) -> None:
         if self.privacy is not None:
             self.privacy.refresh()
@@ -394,6 +425,7 @@ class SettingsPage(Page):
         self.text_size.setValue(closest)
         self.size_label.setText(f"{TEXT_SIZES[closest]:.0%}")
         self.reduce_motion.setChecked(appearance.reduce_motion)
+        self.legible_font.setChecked(appearance.legible_font)
         self.text_spacing.setChecked(appearance.text_spacing)
         self.simplified.setChecked(appearance.simplified)
         self.message_duration.set_value(appearance.message_duration)
@@ -409,6 +441,7 @@ class SettingsPage(Page):
             reduce_motion=self.reduce_motion.isChecked(),
             text_spacing=self.text_spacing.isChecked(),
             simplified=self.simplified.isChecked(),
+            legible_font=self.legible_font.isChecked(),
             message_duration=self.message_duration.value() or MessageDuration.STANDARD,
         )
         self.ctx.events.appearance_changed.emit()

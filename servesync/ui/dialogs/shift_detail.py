@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
+    QFrame,
     QHBoxLayout,
     QLineEdit,
     QListWidget,
@@ -45,8 +46,10 @@ from servesync.ui.widgets.common import (
     guarded,
     make_button,
     make_label,
+    set_prop,
 )
-from servesync.ui.widgets.table import Column, RecordTable
+from servesync.ui.widgets.elements import status_tone
+from servesync.ui.widgets.table import PERSON, TAG, Column, RecordTable
 from servesync.ui.widgets.visuals import FactorLegend, MatchCard
 
 ROSTER_TAB, MATCH_TAB = 0, 1
@@ -196,8 +199,8 @@ class ShiftDetailDialog(QDialog):
         self.resize(940, 700)
 
         column = QVBoxLayout(self)
-        column.setContentsMargins(24, 20, 24, 16)
-        column.setSpacing(10)
+        column.setContentsMargins(28, 24, 28, 20)
+        column.setSpacing(8)
         self.title = make_label("", "title", wrap=True)
         self.when = make_label("", "subtitle", wrap=True)
         self.state = make_label("", "muted", wrap=True)
@@ -206,17 +209,22 @@ class ShiftDetailDialog(QDialog):
         fill_row = QHBoxLayout()
         self.fill = QProgressBar()
         self.fill.setAccessibleName(tr("Spots filled"))
-        self.fill.setMaximumWidth(320)
+        self.fill.setMaximumWidth(240)
         self.fill.setTextVisible(False)
+        fill_row.setSpacing(12)
         fill_row.addWidget(self.fill)
         fill_row.addWidget(self.state, 1)
         column.addLayout(fill_row)
         tools = QHBoxLayout()
-        self.announce_button = make_button(tr("Announce..."), on_click=self._announce)
+        tools.setContentsMargins(0, 4, 0, 4)
+        tools.setSpacing(8)
+        self.announce_button = make_button(tr("Announce..."), on_click=self._announce, icon="megaphone")
         self.announce_button.setToolTip(tr("Post a note for everyone signed up for this shift"))
-        self.sheet_button = make_button(tr("Print sign-in sheet..."), on_click=self._sign_in_sheet)
+        self.sheet_button = make_button(tr("Print sign-in sheet..."), on_click=self._sign_in_sheet, icon="printer")
         self.sheet_button.setToolTip(tr("A paper fallback, saved as a PDF"))
-        self.calendar_button = make_button(tr("Add to calendar..."), on_click=self._add_to_calendar)
+        self.calendar_button = make_button(
+            tr("Add to calendar..."), on_click=self._add_to_calendar, icon="calendar-plus"
+        )
         for button in (self.announce_button, self.sheet_button, self.calendar_button):
             tools.addWidget(button)
         tools.addStretch(1)
@@ -228,7 +236,8 @@ class ShiftDetailDialog(QDialog):
         # Roster tab -------------------------------------------------------
         roster_page = QWidget()
         roster_layout = QVBoxLayout(roster_page)
-        roster_layout.setContentsMargins(12, 12, 12, 12)
+        roster_layout.setContentsMargins(0, 16, 0, 0)
+        roster_layout.setSpacing(12)
         self.roles_summary = make_label("", "muted", wrap=True)
         self.roles_summary.setAccessibleName(tr("Roles on this shift"))
         roster_layout.addWidget(self.roles_summary)
@@ -247,11 +256,14 @@ class ShiftDetailDialog(QDialog):
                     lambda e: e.volunteer_name,
                     sort=lambda e: f"{e.volunteer_name.split()[-1]} {e.volunteer_name}".casefold(),
                     stretch=True,
+                    kind=PERSON,
+                    secondary=lambda e: e.volunteer_email,
                 ),
                 Column(
                     tr("Status"),
                     lambda e: e.assignment.status.label,
-                    color=lambda e: status_color(e.assignment.status),
+                    kind=TAG,
+                    tone=lambda e: status_tone(e.assignment.status),
                 ),
                 Column(
                     tr("Hours"),
@@ -259,14 +271,20 @@ class ShiftDetailDialog(QDialog):
                     sort=lambda e: e.assignment.counted_hours,
                     align_right=True,
                 ),
-                Column(tr("Phone"), lambda e: e.display_phone),
-                Column(tr("Email"), lambda e: e.volunteer_email),
+                Column(tr("Phone"), lambda e: e.display_phone, muted=True),
             ],
             empty_message=tr("Nobody has signed up yet. Use Smart Match or Sign up a volunteer to fill this shift."),
             accessible_name=tr("Roster"),
+            empty_icon="users",
+            edge=12,
         )
         self.roster.selection_changed.connect(lambda _record: self._update_buttons())
-        roster_layout.addWidget(self.roster, 1)
+        roster_card = QFrame()
+        roster_card.setProperty("card", True)
+        roster_box = QVBoxLayout(roster_card)
+        roster_box.setContentsMargins(4, 4, 4, 4)
+        roster_box.addWidget(self.roster)
+        roster_layout.addWidget(roster_card, 1)
         self.waitlist_label = make_label("", "muted", wrap=True)
         roster_layout.addWidget(self.waitlist_label)
 
@@ -303,7 +321,8 @@ class ShiftDetailDialog(QDialog):
         # Smart Match tab ----------------------------------------------------
         match_page = QWidget()
         match_layout = QVBoxLayout(match_page)
-        match_layout.setContentsMargins(12, 12, 12, 12)
+        match_layout.setContentsMargins(0, 16, 0, 0)
+        match_layout.setSpacing(10)
         match_layout.addWidget(
             make_label(
                 tr(
@@ -312,7 +331,7 @@ class ShiftDetailDialog(QDialog):
                     "Volunteers who are too young, double-booked, or not yet approved are "
                     "never shown."
                 ),
-                "subtitle",
+                "muted",
                 wrap=True,
             )
         )
@@ -321,6 +340,7 @@ class ShiftDetailDialog(QDialog):
         match_layout.addWidget(self.match_message)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         holder = QWidget()
         self.match_list = QVBoxLayout(holder)
         self.match_list.setSpacing(10)
@@ -352,6 +372,7 @@ class ShiftDetailDialog(QDialog):
         )
         self.fill.setRange(0, shift.capacity)
         self.fill.setValue(min(overview.filled, shift.capacity))
+        set_prop(self.fill, "complete", overview.filled >= shift.capacity)
         filled = tr("{filled} of {capacity} filled. ", filled=overview.filled, capacity=shift.capacity)
         self.fill.setAccessibleDescription(filled)
         if shift.ends_at <= now:

@@ -3,7 +3,8 @@ Volunteers: search, review applicants, and keep records current.
 
 Master-detail layout: the list on the left stays put while the right side
 shows everything about the selected person, so coordinators never lose
-their place.
+their place. Each person has an initials avatar and a status tag, so the list
+reads as people; the profile shows details as labeled pairs and skills as tags.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QScrollArea, QSplitter, QVBoxLayout, QWidget
 
 from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import AccessNeed, AssignmentStatus, Volunteer, VolunteerParticipation, VolunteerStatus
@@ -20,11 +21,11 @@ from servesync.ui.context import AppContext
 from servesync.ui.dialogs.data_dialogs import ImportDialog
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
-from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import (
     EnumComboBox,
     PageHeader,
     Panel,
+    add_search_icon,
     confirm,
     format_date,
     format_hours,
@@ -33,12 +34,9 @@ from servesync.ui.widgets.common import (
     make_button,
     make_label,
 )
-from servesync.ui.widgets.table import Column, RecordTable
-
-
-def status_color(status: VolunteerStatus) -> str | None:
-    palette = current_palette()
-    return {VolunteerStatus.APPLICANT: palette.attention, VolunteerStatus.INACTIVE: palette.text_muted}.get(status)
+from servesync.ui.widgets.elements import Avatar, FactList, Tag, divider, status_tone
+from servesync.ui.widgets.lists import RowList
+from servesync.ui.widgets.table import PERSON, TAG, Column, RecordTable
 
 
 def describe_availability(volunteer: Volunteer) -> str:
@@ -65,19 +63,38 @@ def describe_participation(stats: VolunteerParticipation | None) -> str:
 
 
 class VolunteerProfileCard(Panel):
-    """Everything about one volunteer, as short labeled lines (easy to scan)."""
+    """Everything about one volunteer: who they are at the top, then labeled details (easy to scan)."""
 
     def __init__(self, *, show_notes: bool) -> None:
-        super().__init__()
+        super().__init__(card=True)
         self._show_notes = show_notes
-        self.name = make_label("", "name", wrap=True)
+        top = QHBoxLayout()
+        top.setSpacing(14)
+        self.avatar = Avatar("", 52)
+        top.addWidget(self.avatar, 0, Qt.AlignmentFlag.AlignTop)
+        who = QVBoxLayout()
+        who.setSpacing(2)
+        self.name = make_label("", "heading", wrap=True)
         self.status = make_label("", "muted", wrap=True)
-        self.lines = make_label("", wrap=True, selectable=True)
-        for widget in (self.name, self.status, self.lines):
-            self.body.addWidget(widget)
+        who.addWidget(self.name)
+        who.addWidget(self.status)
+        who.addStretch(1)
+        top.addLayout(who, 1)
+        self.tag = Tag()
+        top.addWidget(self.tag, 0, Qt.AlignmentFlag.AlignTop)
+        self.body.addLayout(top)
+        self.body.addWidget(divider())
+        self.facts = FactList(label_width=132)
+        self.body.addWidget(self.facts)
+        #: Buttons for this person (the Volunteers page adds Edit, Approve, Archive, Delete here).
+        self.action_row = QHBoxLayout()
+        self.action_row.setSpacing(8)
+        self.body.addLayout(self.action_row)
 
     def show_volunteer(self, volunteer: Volunteer, stats: VolunteerParticipation | None) -> None:
+        self.avatar.set_name(volunteer.full_name)
         self.name.setText(volunteer.name_with_pronouns)
+        self.tag.set_tag(volunteer.status.label, status_tone(volunteer.status))
         age = volunteer.age()
         minor = tr(" (minor; guardian contact on file)") if volunteer.is_minor() else ""
         self.status.setText(
@@ -94,30 +111,34 @@ class VolunteerProfileCard(Panel):
             if volunteer.emergency_contact_name
             else tr("None listed")
         )
-        lines = [
-            tr("• Email: {email}", email=volunteer.email),
-            tr("• Phone: {phone}", phone=volunteer.display_phone),
-            tr("• Emergency contact: {emergency}", emergency=emergency),
-            tr("• Skills: {skills}", skills=", ".join(volunteer.sorted_skills()) or tr("None listed yet")),
-            tr("• Usually free: {describe_availability}", describe_availability=describe_availability(volunteer)),
-            tr("• Service: {service}", service=describe_participation(stats)),
-        ]
+        facts: list[tuple[str, str | list[str]]] = []
         if volunteer.preferred_name:
-            lines.insert(0, tr("• Legal name (for safety records): {legal_name}", legal_name=volunteer.legal_name))
+            facts.append((tr("Legal name (for safety records)"), volunteer.legal_name))
+        facts += [
+            (tr("Email"), volunteer.email),
+            (tr("Phone"), volunteer.display_phone),
+            (tr("Emergency contact"), emergency),
+            (tr("Skills"), list(volunteer.sorted_skills()) or tr("None listed yet")),
+            (tr("Usually free"), describe_availability(volunteer)),
+            (tr("Service"), describe_participation(stats)),
+        ]
         if volunteer.access_needs:
-            needs = ", ".join(need.label for need in AccessNeed if need in volunteer.access_needs)
-            lines.append(tr("• What helps: {needs}", needs=needs))
+            facts.append((tr("What helps"), [need.label for need in AccessNeed if need in volunteer.access_needs]))
         if self._show_notes:
-            lines.append(tr("• Heard about us: {label}", label=volunteer.recruitment_source.label))
+            facts.append((tr("Heard about us"), volunteer.recruitment_source.label))
             if volunteer.certifications:
                 held = sorted(volunteer.certifications, key=lambda c: c.name.casefold())
-                text = ", ".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held)
-                lines.append(tr("• Certifications: {text}", text=text))
+                facts.append(
+                    (
+                        tr("Certifications"),
+                        ", ".join(tr("{name} (to {day})", name=c.name, day=format_date(c.expires_on)) for c in held),
+                    )
+                )
             if volunteer.referred_by:
-                lines.append(tr("• Referred by: {name}", name=volunteer.referred_by))
+                facts.append((tr("Referred by"), volunteer.referred_by))
             if volunteer.notes:
-                lines.append(tr("• Notes: {notes}", notes=volunteer.notes))
-        self.lines.setText("\n".join(lines))
+                facts.append((tr("Notes"), volunteer.notes))
+        self.facts.set_facts(facts)
         self.setAccessibleName(tr("Profile of {full_name}", full_name=volunteer.full_name))
 
 
@@ -144,10 +165,12 @@ class VolunteersPage(Page):
             )
         )
         filters = QHBoxLayout()
+        filters.setSpacing(8)
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(tr("Search by name, email, or phone"))
         self.search_box.setAccessibleName(tr("Search volunteers"))
         self.search_box.setClearButtonEnabled(True)
+        add_search_icon(self.search_box)
         self.search_box.textChanged.connect(lambda _text: self.reload())
         self.status_filter: EnumComboBox[VolunteerStatus] = EnumComboBox(
             VolunteerStatus, all_label=tr("Everyone"), label=lambda status: f"{status.label}s"
@@ -163,11 +186,24 @@ class VolunteersPage(Page):
         self.layout_.addLayout(filters)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
         self.table: RecordTable[Volunteer] = RecordTable(
             [
-                Column(tr("Name"), lambda v: f"{v.last_name}, {v.given_name}", stretch=True),
-                Column(tr("Status"), lambda v: v.status.label, color=lambda v: status_color(v.status)),
-                Column(tr("Phone"), lambda v: v.display_phone),
+                Column(
+                    tr("Name"),
+                    lambda v: f"{v.last_name}, {v.given_name}",
+                    stretch=True,
+                    kind=PERSON,
+                    avatar=lambda v: v.full_name,
+                    secondary=lambda v: v.email,
+                ),
+                Column(
+                    tr("Status"),
+                    lambda v: v.status.label,
+                    kind=TAG,
+                    tone=lambda v: status_tone(v.status),
+                ),
+                Column(tr("Phone"), lambda v: v.display_phone, muted=True),
                 Column(
                     tr("Hours"),
                     lambda v: format_hours(self._hours(v)),
@@ -177,35 +213,47 @@ class VolunteersPage(Page):
             ],
             empty_message=tr("No volunteers match. Try clearing the search or filters."),
             accessible_name=tr("Volunteer list"),
+            empty_icon="users",
         )
         self.table.selection_changed.connect(lambda _v: self._show_selected())
         self.table.activated.connect(lambda _v: self._edit())
-        splitter.addWidget(self.table)
+        people = Panel(card=True, flush=True)
+        people.body.setContentsMargins(0, 4, 0, 10)
+        people.body.addWidget(self.table)
+        splitter.addWidget(people)
 
         right = QWidget()
         right_column = QVBoxLayout(right)
-        right_column.setContentsMargins(12, 0, 0, 0)
+        right_column.setContentsMargins(16, 0, 0, 0)
+        right_column.setSpacing(16)
         self.card = VolunteerProfileCard(show_notes=True)
         right_column.addWidget(self.card)
-        actions = QHBoxLayout()
-        self.edit_button = make_button(tr("Edit profile"), on_click=self._edit)
+        self.edit_button = make_button(tr("Edit profile"), on_click=self._edit, icon="pencil")
         self.approve_button = make_button(
             tr("Approve"), kind="secondary", on_click=lambda: self._change(VolunteerStatus.ACTIVE)
         )
         self.archive_button = make_button(tr("Archive"), on_click=lambda: self._change(VolunteerStatus.INACTIVE))
         self.delete_button = make_button(tr("Delete"), kind="danger", on_click=self._delete)
         for button in (self.edit_button, self.approve_button, self.archive_button, self.delete_button):
-            actions.addWidget(button)
-        actions.addStretch(1)
-        right_column.addLayout(actions)
-        self.history = Panel(tr("Recent service"))
+            self.card.action_row.addWidget(button)
+        self.card.action_row.addStretch(1)
+        self.history = Panel(tr("Recent service"), flush=True)
+        self.history_list = RowList(tr("Recent service"), interactive=False, min_row=50)
+        self.history.body.addWidget(self.history_list)
+        #: The same history as plain text (one line per shift), for screen readers and tests.
         self.history_text = make_label("", wrap=True)
-        self.history.body.addWidget(self.history_text)
+        self.history_text.hide()
         right_column.addWidget(self.history)
         right_column.addStretch(1)
-        splitter.addWidget(right)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(right)
+        splitter.addWidget(scroll)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([620, 440])
         self.layout_.addWidget(splitter, 1)
         self._show_selected()
 
@@ -266,6 +314,7 @@ class VolunteersPage(Page):
         can_delete = self.ctx.session.can(Permission.DELETE_RECORDS) and (stats is None or stats.total_hours == 0)
         self.delete_button.setVisible(can_delete)
         records = self.ctx.services.volunteers.history(self.ctx.session, volunteer.volunteer_id or 0)[:5]
+        self.history_list.clear()
         if records:
             self.history_text.setText(
                 "\n".join(
@@ -278,10 +327,20 @@ class VolunteersPage(Page):
                     for r in records
                 )
             )
+            for record in records:
+                attended = record.assignment.status is AssignmentStatus.ATTENDED
+                label = record.assignment.status.label
+                self.history_list.add_row(
+                    record.opportunity_title,
+                    format_when(record.starts_at),
+                    trailing=f"{label}, {format_hours(record.assignment.counted_hours)}" if attended else label,
+                    trailing_tone=status_tone(record.assignment.status),
+                )
         else:
-            self.history_text.setText(
-                tr("No shifts yet. Use Smart Match from any shift to find them a good first fit.")
-            )
+            message = tr("No shifts yet. Use Smart Match from any shift to find them a good first fit.")
+            self.history_text.setText(message)
+            self.history_list.set_empty(message)
+        self.history_list.fit_contents(maximum=320)
 
     @guarded
     def _edit(self) -> None:

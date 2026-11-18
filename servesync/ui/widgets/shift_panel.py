@@ -20,6 +20,7 @@ from servesync.ui.context import AppContext
 from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
 from servesync.ui.dialogs.shift_detail import open_shift
 from servesync.ui.widgets.common import Panel, format_hours, format_when, guarded, make_button, make_label, set_prop
+from servesync.ui.widgets.elements import FactList, SpotMeter, divider
 from servesync.ui.widgets.visuals import ProgramArt
 
 
@@ -27,24 +28,37 @@ class ShiftInfoPanel(Panel):
     changed = Signal()
 
     def __init__(self, ctx: AppContext) -> None:
-        super().__init__()
+        super().__init__(card=True)
         self._ctx = ctx
         self._overview: ShiftOverview | None = None
         self._story_url = ""
-        self.art = ProgramArt(260, 150)
+        self.art = ProgramArt(300, 150)
         self.body.addWidget(self.art)
-        self.title = make_label(tr("Select a shift"), "name", wrap=True)
+        self.title = make_label(tr("Select a shift"), "heading", wrap=True)
         self.when = make_label(tr("Choose a shift from the list to see the details here."), "muted", wrap=True)
+        self.meter = SpotMeter(bar_width=140)
+        self.description = make_label("", "muted", wrap=True)
+        self.rule = divider()
+        self.fact_list = FactList(label_width=110)
+        #: The same details as plain text, for screen readers.
         self.facts = make_label("", wrap=True)
-        self.description = make_label("", wrap=True)
-        for widget in (self.title, self.when, self.facts, self.description):
+        self.facts.hide()
+        for widget in (self.title, self.when, self.meter, self.description, self.rule, self.fact_list):
             self.body.addWidget(widget)
-        self.story_button = make_button(tr("Watch the story video"), kind="link", on_click=self._open_story)
+        links = QHBoxLayout()
+        links.setSpacing(16)
+        self.story_button = make_button(
+            tr("Watch the story video"), kind="link", on_click=self._open_story, icon="circle-play"
+        )
         self.story_button.setToolTip(tr("Opens in your web browser"))
-        self.body.addWidget(self.story_button)
-        self.calendar_button = make_button(tr("Add to calendar"), kind="link", on_click=self._add_to_calendar)
+        self.calendar_button = make_button(
+            tr("Add to calendar"), kind="link", on_click=self._add_to_calendar, icon="calendar-plus"
+        )
         self.calendar_button.setToolTip(tr("Saves a calendar file your phone or email app can open"))
-        self.body.addWidget(self.calendar_button)
+        links.addWidget(self.calendar_button)
+        links.addWidget(self.story_button)
+        links.addStretch(1)
+        self.body.addLayout(links)
         self.verdict = make_label("", wrap=True)
         self.body.addWidget(self.verdict)
         # Volunteers choose a role when a shift has several; ServeSync preselects the best fit for their skills.
@@ -57,7 +71,7 @@ class ShiftInfoPanel(Panel):
 
         actions = QHBoxLayout()
         self.primary = make_button(tr("Sign up"), kind="secondary", on_click=self._primary)
-        self.secondary = make_button(tr("Smart Match"), on_click=self._secondary)
+        self.secondary = make_button(tr("Smart Match"), on_click=self._secondary, icon="user-round-check")
         actions.addWidget(self.primary)
         actions.addWidget(self.secondary)
         actions.addStretch(1)
@@ -71,7 +85,16 @@ class ShiftInfoPanel(Panel):
     def show_shift(self, overview: ShiftOverview | None) -> None:
         self._overview = overview
         has = overview is not None
-        for widget in (self.art, self.facts, self.description, self.primary, self.verdict, self.calendar_button):
+        for widget in (
+            self.art,
+            self.meter,
+            self.rule,
+            self.fact_list,
+            self.description,
+            self.primary,
+            self.verdict,
+            self.calendar_button,
+        ):
             widget.setVisible(has)
         self.role_label.hide()
         self.role_box.hide()
@@ -90,7 +113,20 @@ class ShiftInfoPanel(Panel):
         self.title.setText(opportunity.title)
         self.when.setText(f"{format_when(shift.starts_at, shift.ends_at)} ({format_hours(shift.duration_hours)})")
         roles = services.scheduling.roles(session, shift.shift_id or 0)
-        skills = ", ".join(sorted(opportunity.required_skills, key=str.casefold)) or tr("None needed")
+        self.meter.set_spots(shift.capacity - overview.open_spots, shift.capacity)
+        needed = sorted(opportunity.required_skills, key=str.casefold)
+        self.fact_list.set_facts(
+            [
+                (tr("Where"), opportunity.location),
+                (tr("Coordinator"), opportunity.coordinator_name),
+                (tr("Ages"), tr("{min_age} and up", min_age=opportunity.min_age)),
+                (tr("Helpful skills"), needed or tr("None needed")),
+                (tr("Access"), _access_text(opportunity.access_features)),
+                (tr("Roles"), _roles_text(roles) if len(roles) > 1 else ""),
+                (tr("Note"), shift.notes),
+            ]
+        )
+        skills = ", ".join(needed) or tr("None needed")
         self.facts.setText(
             tr(
                 (
@@ -114,6 +150,7 @@ class ShiftInfoPanel(Panel):
             + ("\n" + tr("• Roles: {roles}", roles=_roles_text(roles)) if len(roles) > 1 else "")
         )
         self.description.setText(opportunity.description)
+        self.description.setVisible(bool(opportunity.description))
         self._story_url = opportunity.story_video_url
         self.story_button.setVisible(bool(self._story_url))
         if self._is_leader:

@@ -274,7 +274,7 @@ devtools.py              Command-line developer and demo tools
 
 | Principle | How ServeSync applies it |
 |---|---|
-| **1. A strong design system** | Three colors with one job each, defined once as tokens: deep indigo for actions and navigation, warm amber only to mark what needs attention, emerald only for good news (success, open spots, the Smart Match score). Two fonts: Atkinson Hyperlegible for text and Manrope for headings. One icon set (Lucide), with each idea keeping the same icon everywhere |
+| **1. A strong design system** | Three colors with one job each, defined once as tokens: cobalt blue for actions (and, as deep navy, the sidebar that frames the app), warm amber only to mark what needs attention, emerald only for good news (success, open spots, the Smart Match score). One typeface, Figtree, in four weights and one type scale, with Atkinson Hyperlegible available as an Easy-read option. People appear as initials avatars, statuses as worded tags, and shift capacity as spot meters. One icon set (Lucide), with each idea keeping the same icon everywhere |
 | **2. Visually pleasing, functional choices** | A calm, flat layout on an 8 px grid: sections separated by space and hairlines, cards only for separate objects, one filled button per screen; readable fonts; click targets at least 44 px tall; Gestalt grouping |
 | **3. Regularly updated content** | A dynamic *Happening next* banner (one featured event, never a carousel), a live activity feed, a shift calendar, and impact figures that update as hours are recorded |
 | **4. Images and video that build empathy** | Each program can show the organization's own photo, automatically resized under 300 kB; story-video links open only when someone chooses to watch (never autoplay); original category artwork when no photo is added |
@@ -307,7 +307,7 @@ the color claims are checked by `tests/test_theme.py`, which computes the contra
 | Keyboard only | Every action works without a mouse; charts are navigable with arrow keys; Ctrl+K reaches any page or answer | 2.1.3 AAA |
 | Screen readers | Accessible names on every control; changes announced through the platform screen reader without moving focus (polite vs. urgent, merged, never repeated); charts have text summaries and a matching table | 4.1.3, 1.1.1 |
 | Vestibular / motion sensitivity | Motion only answers your action; *Reduce motion* removes it entirely | 2.3.3 AAA |
-| Dyslexia | Atkinson Hyperlegible font; optional extra letter and word spacing | 1.4.12, 1.4.8 AAA |
+| Dyslexia | Optional Easy-read font (Atkinson Hyperlegible); optional extra letter and word spacing | 1.4.12, 1.4.8 AAA |
 | Attention / cognitive load | *Simplified layout* hides secondary panels; plain-language messages; one call to action per screen | 3.1.5 AAA |
 | Reading speed | Messages stay 6 s, 20 s, or until closed; pause while hovered; *Recent messages* keeps the last 30 | 2.2.1, 2.2.3 AAA |
 | Color vision | Status always has words or a shape; chart values printed on every bar | 1.4.1 |
@@ -559,8 +559,8 @@ Override with the `SERVESYNC_DATA_DIR` environment variable or `--data-dir`. Log
 | Python 3 standard library | Language runtime, `sqlite3`, `hashlib` | Python Software Foundation License |
 | SQLite                    | Embedded database engine     | Public domain                             |
 | PySide6 (Qt for Python)   | Desktop user interface       | LGPL v3 (used unmodified, as a library)   |
-| Atkinson Hyperlegible     | Interface font (Braille Institute) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
-| Manrope                   | Heading font (The Manrope Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| Atkinson Hyperlegible     | Easy-read font option (Braille Institute) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
+| Figtree                   | Interface font (The Figtree Project Authors) | SIL Open Font License 1.1 (`ui/assets/licenses`) |
 | Lucide icons              | Icon set                     | ISC License (`ui/assets/licenses`)        |
 | pytest-qt                 | Interface tests (development only) | MIT                                 |
 | PyInstaller               | Builds the standalone app (development only) | GPL v2 with bootloader exception — the built app may be distributed under any license |

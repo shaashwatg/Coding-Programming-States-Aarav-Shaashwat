@@ -1,19 +1,21 @@
 """
 Main window: a conventional nonprofit layout adapted to a desktop app.
 
-    [logo ServeSync]  | [ Ask a question or jump to a page ]    [ Call to action ]  [Account v]
-    [ organization ]  |--------------------------------------------------------------------
+    [logo ServeSync]  | [ Ask a question or jump to a page  Ctrl+K ]   [ Call to action ] (?) (AB) name v
+    [ organization ]  |-------------------------------------------------------------------------------
      Page             |
-     Page             |  page content
+     Page         (3) |  page content on a quiet canvas, in white cards
      ...              |
      Help             |
 
-* Logo top-left; pages in a sidebar that keeps your place visible; one visually
-  distinct call-to-action button in the upper-right corner (Add volunteer for
-  leaders, Find a shift for volunteers).
+* Logo top-left; pages in a deep navy sidebar that keeps your place visible;
+  one filled call-to-action button in the upper-right corner (Add volunteer
+  for leaders, Find a shift for volunteers).
+* The Volunteers item carries an amber count when applicants are waiting, so
+  the thing that needs a decision is visible from every page.
 * Responsive: if the window gets narrow (or text is enlarged), the sidebar
   shrinks to icons with tooltips and accessible names, so nothing is cut off.
-* A thin marker slides to the current page (spring motion; instant with
+* An amber marker slides to the current page (spring motion; instant with
   Reduce motion), so the change of place is easy to follow.
 * Keyboard: Ctrl+1..7 pages, Ctrl+K Ask ServeSync, Ctrl+N call to action,
   Ctrl+F search, Ctrl+= / Ctrl+- / Ctrl+0 text size, F1 help.
@@ -28,7 +30,7 @@ from functools import partial
 from typing import Any
 
 from PySide6.QtCore import QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QIcon, QKeySequence, QResizeEvent, QShortcut
+from PySide6.QtGui import QAction, QCloseEvent, QFontMetricsF, QIcon, QKeySequence, QResizeEvent, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -65,9 +67,11 @@ from servesync.ui.pages.shared_pages import CalendarPage, SettingsPage
 from servesync.ui.pages.staffing_page import StaffingPage
 from servesync.ui.pages.volunteer_pages import FindShiftsPage, HomePage, ProfilePage
 from servesync.ui.pages.volunteers_page import VolunteersPage
-from servesync.ui.theme import current_appearance, current_palette, current_scale
+from servesync.ui.theme import current_appearance, current_palette, current_scale, px, ui_font
 from servesync.ui.tour import TourGuide
-from servesync.ui.widgets.common import guarded
+from servesync.ui.widgets.common import apply_icons, guarded, make_label, set_icon
+from servesync.ui.widgets.elements import avatar_icon, divider
+from servesync.ui.widgets.visuals import ProgramArt, ShiftCalendar
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +82,8 @@ TEXT_STEPS = (0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
 #: Below this window width the sidebar shows icons only; it may take at most a quarter of the window.
 SIDEBAR_LABELS_MIN_WINDOW = 1180
 SIDEBAR_MAX_SHARE = 4
-SIDEBAR_MIN_WIDTH = 232
+SIDEBAR_MIN_WIDTH = 244
+SIDEBAR_PADDING = 12
 #: From this text size up, the organization's name is left out of the sidebar (the window title has the page).
 ORG_NAME_MAX_SCALE = 1.5
 
@@ -95,6 +100,7 @@ class MainWindow(QMainWindow):
         organization = ctx.services.settings.organization_name()
         self.setWindowTitle(f"{__app_name__} - {organization}")
         self.setMinimumSize(1080, 700)
+        self._applicants_waiting = 0
 
         page_types: list[type[Page]] = (
             [DashboardPage, VolunteersPage, ProgramsPage, CalendarPage, StaffingPage, ReportsPage, SettingsPage]
@@ -129,14 +135,16 @@ class MainWindow(QMainWindow):
         ctx.events.status_message.connect(self._confirm)
         ctx.events.announcement.connect(self.announcer.announce)
         ctx.events.appearance_changed.connect(self._restyle_icons)
-        self.statusBar().showMessage(
+        ctx.events.data_changed.connect(self._update_badges)
+        self._update_badges()
+        self.navigate(next(iter(self.pages)))
+        # Spoken, not shown: the window already says who is signed in (top right) and shows the Ctrl+K hint.
+        self.announcer.announce(
             tr(
                 ("Signed in as {username}. Press Ctrl+K to ask a question, or F1 for help."),
                 username=ctx.session.username,
-            ),
-            10000,
+            )
         )
-        self.navigate(next(iter(self.pages)))
         self._tour: TourGuide | None = None
         if offer_tour and not ctx.services.settings.tour_seen(ctx.session):
             QTimer.singleShot(TOUR_DELAY_MS, self.start_tour)  # once the window is on screen
@@ -148,15 +156,15 @@ class MainWindow(QMainWindow):
         bar.setObjectName("Sidebar")
         bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         column = QVBoxLayout(bar)
-        column.setContentsMargins(16, 16, 16, 16)
-        column.setSpacing(4)
+        column.setContentsMargins(SIDEBAR_PADDING, 18, SIDEBAR_PADDING, 12)
+        column.setSpacing(0)
 
         heading = QHBoxLayout()
-        heading.setContentsMargins(0, 0, 0, 16)
-        heading.setSpacing(8)
+        heading.setContentsMargins(8, 0, 4, 20)
+        heading.setSpacing(10)
         self.logo = QLabel()
         self.logo.setAccessibleName(tr("ServeSync logo"))
-        heading.addWidget(self.logo)
+        heading.addWidget(self.logo, 0, Qt.AlignmentFlag.AlignTop)
         self.brand = QWidget()
         names = QVBoxLayout(self.brand)
         names.setContentsMargins(0, 0, 0, 0)
@@ -175,6 +183,7 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self.nav_buttons: dict[str, QPushButton] = {}
+        self.nav_badges: dict[str, QLabel] = {}
         for page in self.pages.values():
             if page.key == "find":  # volunteers reach it through the call-to-action button
                 continue
@@ -184,7 +193,11 @@ class MainWindow(QMainWindow):
             self.nav_group.addButton(button)
             self.nav_buttons[page.key] = button
             column.addWidget(button)
+        if "volunteers" in self.nav_buttons:
+            self.nav_badges["volunteers"] = self._nav_badge(self.nav_buttons["volunteers"])
         column.addStretch(1)
+        column.addWidget(divider())
+        column.addSpacing(8)
         self.help_button = self._nav_button(tr("Help"))
         self.help_button.setToolTip(tr("Help (F1)"))
         self.help_button.clicked.connect(lambda _checked=False: self.show_help())
@@ -207,13 +220,50 @@ class MainWindow(QMainWindow):
         button.setToolTip(title)
         return button
 
+    @staticmethod
+    def _nav_badge(button: QPushButton) -> QLabel:
+        """A count at the right end of a sidebar item (hidden while it is zero)."""
+        badge = make_label("", "nav-badge")
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        slot = QHBoxLayout(button)
+        slot.setContentsMargins(0, 0, 10, 0)
+        slot.addStretch(1)
+        slot.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
+        badge.hide()
+        return badge
+
+    def _update_badges(self) -> None:
+        """Count applicants waiting for review, so the sidebar can flag them from any page."""
+        badge = self.nav_badges.get("volunteers")
+        if badge is None or not self.ctx.session.can(Permission.MANAGE_VOLUNTEERS):
+            return
+        try:
+            waiting = len(self.ctx.services.dashboard.leader_summary(self.ctx.session).applicants)
+        except ServeSyncError:  # a count is never worth an error message
+            logger.exception("Could not count applicants")
+            waiting = 0
+        self._applicants_waiting = waiting
+        title = self.pages["volunteers"].title
+        button = self.nav_buttons["volunteers"]
+        badge.setText(str(waiting))
+        if waiting:
+            described = tr("{title}, {count} waiting for review", title=title, count=waiting)
+            button.setAccessibleName(title)
+            button.setAccessibleDescription(described)
+            button.setToolTip(described)
+        else:
+            button.setAccessibleDescription("")
+            button.setToolTip(title)
+        self._fit_navigation()
+
     def _build_top_bar(self, leader: bool) -> QWidget:
         bar = QWidget()
         bar.setObjectName("TopBar")
         bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         row = QHBoxLayout(bar)
-        row.setContentsMargins(32, 8, 32, 8)
-        row.setSpacing(16)
+        row.setContentsMargins(32, 6, 20, 6)
+        row.setSpacing(8)
 
         self.ask_button = QPushButton()
         self.ask_button.setObjectName("AskButton")
@@ -221,6 +271,16 @@ class MainWindow(QMainWindow):
         self.ask_button.setAccessibleName(tr("Ask ServeSync"))
         self.ask_button.setToolTip(tr("Ask a question or jump to a page (Ctrl+K)"))
         self.ask_button.clicked.connect(self.show_assistant)
+        self.ask_button.setMaximumWidth(px(520))
+        self.ask_button.setText(tr("Ask"))  # so the icon keeps its gap; the full text is fitted on resize
+        set_icon(self.ask_button, "search", size=18)
+        # The shortcut, shown as a keycap at the end of the field (Cmd+K on a Mac).
+        self.ask_hint = make_label(QKeySequence("Ctrl+K").toString(QKeySequence.SequenceFormat.NativeText), "kbd")
+        self.ask_hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        slot = QHBoxLayout(self.ask_button)
+        slot.setContentsMargins(0, 0, 10, 0)
+        slot.addStretch(1)
+        slot.addWidget(self.ask_hint, 0, Qt.AlignmentFlag.AlignVCenter)
         row.addWidget(self.ask_button, 3)
         row.addStretch(1)
 
@@ -229,11 +289,12 @@ class MainWindow(QMainWindow):
         self.cta.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cta.setToolTip(tr("Register a new volunteer (Ctrl+N)") if leader else tr("Browse open shifts (Ctrl+N)"))
         self.cta.clicked.connect(self._call_to_action)
+        set_icon(self.cta, "user-plus" if leader else "search", token="on_cta", size=18)
         row.addWidget(self.cta)
+        row.addSpacing(4)
 
         self.page_help_button = QToolButton()
         self.page_help_button.setObjectName("PageHelp")
-        self.page_help_button.setText("?")
         self.page_help_button.setAccessibleName(tr("Help for this page"))
         self.page_help_button.setToolTip(tr("Help for this page"))
         self.page_help_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -243,6 +304,8 @@ class MainWindow(QMainWindow):
         self.account = QToolButton()
         self.account.setObjectName("UserMenu")
         self.account.setText(self.ctx.session.username)  # the stylesheet draws the menu chevron
+        self.account.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.account.setCursor(Qt.CursorShape.PointingHandCursor)
         self.account.setAccessibleName(tr("Account menu for {username}", username=self.ctx.session.username))
         self.account.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(self.account)
@@ -260,21 +323,27 @@ class MainWindow(QMainWindow):
     def _restyle_icons(self) -> None:
         """Recolor and resize icons for the current theme and text size."""
         palette = current_palette()
-        color = palette.sidebar_text
-        size = round(18 * current_scale())
-        self.logo.setPixmap(assets.logo_pixmap(palette.brand, 32))
-        # The current page's icon turns indigo along with its label (the "On" state of a checked button).
+        size = px(18)
+        self.logo.setPixmap(assets.logo_pixmap(palette.brand, px(34)))
+        # Sidebar icons are quiet until their page is current (the "On" state of a checked button).
         self._nav_icons = {
-            key: assets.two_state_icon(self.pages[key].icon_name, color, palette.sidebar_accent, size)
+            key: assets.two_state_icon(self.pages[key].icon_name, palette.sidebar_muted, palette.sidebar_text, size)
             for key in self.nav_buttons
         }
         for button in (*self.nav_buttons.values(), self.help_button):
             button.setIconSize(QSize(size, size))
-        self.help_button.setIcon(assets.icon("help", color, size))
-        self.cta.setIcon(assets.icon("user-plus" if self.ctx.session.is_leader else "search", palette.on_cta, size))
-        self.cta.setIconSize(QSize(size, size))
-        self.ask_button.setIcon(assets.icon("search", palette.text_muted, size))
-        self.ask_button.setIconSize(QSize(size, size))
+        self.help_button.setIcon(assets.icon("help", palette.sidebar_muted, size))
+        self.page_help_button.setIcon(assets.icon("help", palette.text_muted, px(20)))
+        self.page_help_button.setIconSize(QSize(px(20), px(20)))
+        avatar = px(26)
+        self.account.setIcon(avatar_icon(self.ctx.session.username, avatar))
+        self.account.setIconSize(QSize(avatar, avatar))
+        # Everything drawn once with theme colors is redrawn: button icons, artwork, calendars.
+        apply_icons(self)
+        for art in self.findChildren(ProgramArt):
+            art.restyle()
+        for calendar in self.findChildren(ShiftCalendar):
+            calendar.restyle()
         self._fit_navigation()
         QTimer.singleShot(0, lambda: self._move_indicator(animated=False))
 
@@ -384,7 +453,7 @@ class MainWindow(QMainWindow):
     def _focus_search(self) -> None:
         page = self.stack.currentWidget()
         if isinstance(page, Page) and not page.focus_search():
-            self.statusBar().showMessage(tr("This page has no search box."), 3000)
+            self.announcer.announce(tr("This page has no search box."))
 
     def show_help(self, tab: int = 0) -> None:
         HelpDialog(self.ctx.session.role, self, start_tab=tab).exec()
@@ -457,7 +526,6 @@ class MainWindow(QMainWindow):
         return items
 
     def _confirm(self, message: str) -> None:
-        self.statusBar().showMessage(message, 8000)
         self.toasts.show_message(message)
 
     @guarded
@@ -489,7 +557,7 @@ class MainWindow(QMainWindow):
     @guarded
     def _change_password(self) -> None:
         if ChangePasswordDialog(self.ctx.services, self.ctx.session, self).exec():
-            self.statusBar().showMessage(tr("Password changed."), 5000)
+            self._confirm(tr("Password changed."))
 
     def sign_out(self) -> None:
         self._signing_out = True
@@ -508,7 +576,7 @@ class MainWindow(QMainWindow):
         self._move_indicator(animated=False)
 
     def _move_indicator(self, *, animated: bool) -> None:
-        """Slide the marker under the current page's tab (hidden for pages without a tab)."""
+        """Slide the marker beside the current page's item (hidden for pages without one)."""
         if not hasattr(self, "indicator"):
             return
         page = self.stack.currentWidget()
@@ -517,7 +585,8 @@ class MainWindow(QMainWindow):
             self.indicator.hide()
             return
         geometry = button.geometry()
-        target = QRect(geometry.left() - 8, geometry.top() + 8, 4, max(geometry.height() - 16, 12))
+        height = min(max(geometry.height() - 24, 16), 24)
+        target = QRect(0, geometry.center().y() - height // 2 + 1, 4, height)
         self.indicator.show()
         self.indicator.raise_()
         if animated and self.indicator.geometry().width() > 0:
@@ -527,28 +596,30 @@ class MainWindow(QMainWindow):
 
     def _fit_navigation(self) -> None:
         """Labels when they fit (calm, scannable); icons with tooltips when space is tight."""
-        if not hasattr(self, "nav_buttons"):
+        if not hasattr(self, "nav_buttons") or not hasattr(self, "help_button"):
             return
         icon_width = self.help_button.iconSize().width()
-        bold = QFont(self.font())  # the current page's label is bold, so measure that width
-        bold.setBold(True)
-        labels_width = max(
-            QFontMetrics(bold).horizontalAdvance(f"  {self.pages[key].title}") for key in self.nav_buttons
-        )
-        width = max(SIDEBAR_MIN_WIDTH, labels_width + icon_width + 88)  # padding, icon gap, and margins
+        metrics = QFontMetricsF(ui_font(1.0, 600))  # the current page's label is heavier, so measure that
+        labels_width = max(metrics.horizontalAdvance(f"  {self.pages[key].title}") for key in self.nav_buttons)
+        width = max(px(SIDEBAR_MIN_WIDTH), round(labels_width) + icon_width + 96)  # padding, icon, badge, margins
         compact = self.width() < max(SIDEBAR_LABELS_MIN_WINDOW, width * SIDEBAR_MAX_SHARE)
         for key, button in self.nav_buttons.items():
             button.setText("" if compact else f"  {self.pages[key].title}")  # spaces: Qt styles have no icon gap
             button.setIcon(getattr(self, "_nav_icons", {}).get(key, QIcon()))
+        for badge in self.nav_badges.values():
+            badge.setVisible(self._applicants_waiting > 0 and not compact)
         self.help_button.setText("" if compact else f"  {tr('Help')}")
         self.brand.setVisible(not compact)
         self.org_name.setVisible(current_scale() < ORG_NAME_MAX_SCALE)  # no room beside the logo at large text
-        self.sidebar.setFixedWidth(icon_width + 64 if compact else width)
+        self.sidebar.setFixedWidth(icon_width + 2 * SIDEBAR_PADDING + 28 if compact else width)
         self._fit_ask_button(self.sidebar.width())
 
     def _fit_ask_button(self, sidebar_width: int) -> None:
         """The full invitation when it fits; the single word when the header is tight."""
         full = tr("Ask a question or jump to a page")
-        room = self.width() - sidebar_width - self.cta.sizeHint().width() - self.account.sizeHint().width() - 88
-        needed = self.ask_button.fontMetrics().horizontalAdvance(full) + self.ask_button.iconSize().width() + 48
-        self.ask_button.setText(full if needed <= room * 3 // 4 else tr("Ask"))
+        room = self.width() - sidebar_width - self.cta.sizeHint().width() - self.account.sizeHint().width() - 120
+        hint = self.ask_hint.sizeHint().width() + 24
+        needed = self.ask_button.fontMetrics().horizontalAdvance(full) + self.ask_button.iconSize().width() + 48 + hint
+        roomy = needed <= room * 3 // 4
+        self.ask_button.setText(full if roomy else tr("Ask"))
+        self.ask_hint.setVisible(roomy)

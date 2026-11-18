@@ -180,14 +180,14 @@ def self_check(data_dir: Path | None = None) -> int:
             )
     except DataStoreError as error:
         results.append((tr("Data file"), False, error.message))
-    body, heading = assets.load_fonts()
-    results.append((tr("Fonts"), bool(body and heading), f"{body or 'missing'}, {heading or 'missing'}"))
+    body, legible = assets.load_fonts()
+    results.append((tr("Fonts"), bool(body and legible), f"{body or 'missing'}, {legible or 'missing'}"))
     icons = list((assets.assets_dir() / "icons").glob("*.svg"))
     results.append((tr("Icons"), len(icons) >= 40, f"{len(icons)} found"))
     spanish = catalog(Language.SPANISH)
     results.append((tr("Translations"), len(spanish) > 500, f"{len(spanish)} Spanish messages"))
     try:
-        theme.build_stylesheet(theme.LIGHT, 13.0)
+        theme.build_stylesheet(theme.LIGHT, theme.BASE_TEXT_PX)
         results.append((tr("Design system"), True, tr("stylesheet builds")))
     except Exception as error:
         results.append((tr("Design system"), False, str(error)))
@@ -208,14 +208,13 @@ def run(argv: list[str] | None = None, *, data_dir: Path | None = None) -> int:
     qt_app.setApplicationName(__app_name__)
     qt_app.setApplicationVersion(__version__)
     qt_app.setOrganizationName(__app_name__)
-    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(theme.INDIGO, 256)))
+    qt_app.setWindowIcon(QIcon(assets.logo_pixmap(theme.LIGHT.brand, 256)))
 
     paths = AppPaths.resolve(data_dir)
     configure_logging(paths.log_dir)
     logger.info("Starting %s %s", __app_name__, __version__)
 
-    body, heading = assets.load_fonts()
-    theme.set_font_families(body, heading)
+    theme.set_font_families(*assets.load_fonts())
     try:
         store = DataStore.open(paths.database_file)
     except DataStoreError as error:

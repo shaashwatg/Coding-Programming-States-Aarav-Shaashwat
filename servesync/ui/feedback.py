@@ -17,7 +17,8 @@ Qt's accessibility announcement event, without moving keyboard focus.
 
 Toasts
 ------
-Small confirmations in the bottom-right corner that never take focus. They
+Small confirmations in the bottom-right corner that never take focus: a dark
+bar (the reverse of the page, so it reads as "on top") with a check mark. They
 stay up for the person's chosen time (6 s, 20 s, or until closed — WCAG 2.2.1
 Timing Adjustable), pause while the pointer or focus is on them, and can be
 closed with their button. At most three are shown; older ones make room.
@@ -28,13 +29,14 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QTimer, Signal
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from servesync.core.i18n import tr
 from servesync.ui.motion import DURATION_BASE, animate
 from servesync.ui.theme import current_appearance
+from servesync.ui.widgets.elements import Glyph, add_shadow
 
 COALESCE_MS = 150
 HISTORY_SIZE = 30
@@ -102,17 +104,21 @@ class Toast(QFrame):
         self.setObjectName("Toast")
         self.setAccessibleName(tr("Message"))
         self.setAccessibleDescription(message)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         row = QHBoxLayout(self)
-        row.setContentsMargins(16, 10, 10, 10)
-        row.setSpacing(12)
+        row.setContentsMargins(14, 10, 8, 10)
+        row.setSpacing(10)
+        row.addWidget(Glyph("circle-check", "on_inverse", 18), 0, Qt.AlignmentFlag.AlignTop)
         self.label = QLabel(message)
         self.label.setWordWrap(True)
         self.label.setMaximumWidth(420)
         row.addWidget(self.label, 1)
         close = QPushButton(tr("Close"))
         close.setAccessibleName(tr("Close message"))
+        close.setCursor(Qt.CursorShape.PointingHandCursor)
         close.clicked.connect(self.dismiss)
-        row.addWidget(close)
+        row.addWidget(close, 0, Qt.AlignmentFlag.AlignTop)
+        add_shadow(self, blur=28, offset=8, opacity=0.28)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.dismiss)
@@ -146,7 +152,7 @@ class Toast(QFrame):
 class ToastHost(QObject):
     """Stacks toasts in the bottom-right corner of a window and keeps them placed on resize."""
 
-    MARGIN = 20
+    MARGIN = 24
     GAP = 10
 
     def __init__(self, window: QWidget, announcer: Announcer) -> None:
@@ -175,7 +181,7 @@ class ToastHost(QObject):
             self._layout()
 
     def _layout(self, *, animate_newest: bool = False) -> None:
-        bottom = self._window.height() - self.MARGIN - 28  # stay clear of the status bar
+        bottom = self._window.height() - self.MARGIN
         for index, toast in enumerate(reversed(self.toasts)):
             toast.adjustSize()
             target = QPoint(self._window.width() - toast.width() - self.MARGIN, bottom - toast.height())

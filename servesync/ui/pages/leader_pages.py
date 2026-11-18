@@ -3,9 +3,10 @@ Leader home page: the dashboard.
 
 Laid out for scanning, top to bottom:
 1. Mission statement (why we're here)
-2. Impact strip (four live numbers)
+2. Impact strip (four live numbers; the ones that need action carry an amber bar)
 3. "Happening next" featured event (one spotlight, never a carousel)
-4. What needs action this week, plus the live activity feed
+4. What needs action this week (shifts with a spot meter, applicants, expiring
+   certifications), plus the live activity feed
 5. A calm callout panel at the bottom (no pop-ups)
 
 With **Simplified layout** on, the activity feed and callout are hidden, so
@@ -14,8 +15,7 @@ the page shows only what needs action.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QGridLayout, QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QGridLayout
 
 from servesync.core.i18n import format_long_day, mark, tr
 from servesync.models import ShiftOverview
@@ -37,7 +37,9 @@ from servesync.ui.widgets.common import (
     make_button,
     make_label,
 )
-from servesync.ui.widgets.table import Column, RecordTable
+from servesync.ui.widgets.elements import ATTENTION
+from servesync.ui.widgets.lists import RowList
+from servesync.ui.widgets.table import METER, Column, RecordTable
 from servesync.ui.widgets.visuals import ActivityFeed, Callout, FeaturedBanner
 
 
@@ -52,24 +54,28 @@ class DashboardPage(Page):
             tr("Dashboard"),
             "",
             [
-                make_button(tr("Tomorrow's reminders"), on_click=self._open_reminders),
-                make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk),
+                make_button(tr("Tomorrow's reminders"), on_click=self._open_reminders, icon="bell"),
+                make_button(tr("Open check-in kiosk"), on_click=self._open_kiosk, icon="clipboard-check"),
             ],
         )
         self.layout_.addWidget(self.header)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
 
-        self.strip = ImpactStrip(4)
+        self.strip = ImpactStrip(4, ["users", "user-plus", "calendar-clock", "clock"])
         self.layout_.addWidget(self.strip)
 
         self.banner = FeaturedBanner()
         self.layout_.addWidget(self.banner)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(18)
-        grid.setVerticalSpacing(18)
-        needs = Panel(tr("Shifts that need people this week"))
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(16)
+        needs = Panel(
+            tr("Shifts that need people this week"),
+            flush=True,
+            subtitle=tr("Double-click a shift to see its best matches."),
+        )
         self.needs: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
@@ -77,51 +83,53 @@ class DashboardPage(Page):
                     lambda o: format_when(o.shift.starts_at, o.shift.ends_at),
                     sort=lambda o: o.shift.starts_at,
                 ),
-                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True),
+                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True, strong=True),
                 Column(
                     tr("Open spots"),
                     lambda o: tr("{filled} of {capacity}", filled=o.open_spots, capacity=o.shift.capacity),
                     sort=lambda o: o.open_spots,
-                    align_right=True,
+                    kind=METER,
+                    meter=lambda o: (o.shift.capacity - o.open_spots, o.shift.capacity),
+                    tooltip=lambda o: tr(
+                        "{filled} of {capacity} filled",
+                        filled=o.shift.capacity - o.open_spots,
+                        capacity=o.shift.capacity,
+                    ),
                 ),
             ],
             empty_message=tr("Every shift this week is full. Nothing to do here."),
             accessible_name=tr("Shifts that need people this week"),
+            empty_icon="calendar-check",
         )
-        self.needs.setMinimumHeight(260)
+        self.needs.setMinimumHeight(280)
         self.needs.activated.connect(lambda overview: self._open(overview, smart=True))
         needs.body.addWidget(self.needs)
-        needs.body.addWidget(make_label(tr("Double-click a shift to see its best matches."), "hint"))
         grid.addWidget(needs, 0, 0, 2, 1)
 
-        applicants = Panel(tr("Applicants waiting for review"))
-        self.applicants = QListWidget()
-        self.applicants.setAccessibleName(tr("Applicants waiting for review"))
-        self.applicants.setMaximumHeight(150)
-        applicants.body.addWidget(self.applicants)
-        applicants.body.addWidget(
-            make_button(tr("Review applicants"), on_click=lambda: ctx.go("volunteers", status="APPLICANT")),
-            0,
-            Qt.AlignmentFlag.AlignLeft,
+        applicants = Panel(tr("Applicants waiting for review"), flush=True)
+        applicants.add_action(
+            make_button(tr("Review applicants"), kind="link", on_click=lambda: ctx.go("volunteers", status="APPLICANT"))
         )
+        self.applicants = RowList(tr("Applicants waiting for review"), interactive=False, title_weight=500)
+        applicants.body.addWidget(self.applicants)
         grid.addWidget(applicants, 0, 1)
 
-        activity = Panel(tr("Recent activity"))
+        activity = Panel(tr("Recent activity"), flush=True)
         self.activity_panel = activity
         self.feed = ActivityFeed()
-        self.feed.setMinimumHeight(220)
+        self.feed.setMinimumHeight(240)
         activity.body.addWidget(self.feed)
         grid.addWidget(activity, 1, 1)
-        expiring = Panel(tr("Certifications and waivers expiring in the next 30 days"))
-        self.expiring = QListWidget()
-        self.expiring.setAccessibleName(tr("Certifications and waivers expiring in the next 30 days"))
-        self.expiring.setMaximumHeight(150)
-        expiring.body.addWidget(self.expiring)
-        expiring.body.addWidget(
-            make_button(tr("Open the expiry report"), on_click=lambda: ctx.go("reports", kind="CERTIFICATION_EXPIRY")),
-            0,
-            Qt.AlignmentFlag.AlignLeft,
+        expiring = Panel(tr("Certifications and waivers expiring in the next 30 days"), flush=True)
+        expiring.add_action(
+            make_button(
+                tr("Open the expiry report"),
+                kind="link",
+                on_click=lambda: ctx.go("reports", kind="CERTIFICATION_EXPIRY"),
+            )
         )
+        self.expiring = RowList(tr("Certifications and waivers expiring in the next 30 days"), interactive=False)
+        expiring.body.addWidget(self.expiring)
         grid.addWidget(expiring, 2, 0, 1, 2)
         grid.setColumnStretch(0, 3)
         grid.setColumnStretch(1, 2)
@@ -140,7 +148,7 @@ class DashboardPage(Page):
         summary = services.dashboard.leader_summary(session)
         now = services.clock.now()
         self.header.set_title(summary.organization_name)
-        self.header.instructions.setText(
+        self.header.set_instructions(
             tr("Today is {day}. Here's what needs your attention.", day=format_long_day(now.date()))
         )
         mission = services.settings.mission_statement()
@@ -173,7 +181,10 @@ class DashboardPage(Page):
             self.banner.set_actions(
                 [
                     make_button(
-                        tr("Find volunteers"), kind="secondary", on_click=lambda: self._open(overview, smart=True)
+                        tr("Find volunteers"),
+                        kind="secondary",
+                        on_click=lambda: self._open(overview, smart=True),
+                        icon="user-round-check",
                     ),
                     make_button(tr("Open roster"), on_click=lambda: self._open(overview, smart=False)),
                 ]
@@ -182,26 +193,35 @@ class DashboardPage(Page):
         self.needs.set_records(list(summary.understaffed))
         self.applicants.clear()
         if not summary.applicants:
-            self.applicants.addItem(tr("No one is waiting. New applicants will appear here."))
+            self.applicants.set_empty(tr("No one is waiting. New applicants will appear here."))
         for volunteer in summary.applicants:
-            item = QListWidgetItem(
-                tr("{name} (applied {date})", name=volunteer.full_name, date=format_date(volunteer.joined_on))
+            self.applicants.add_row(
+                volunteer.full_name,
+                tr("Applied {date}", date=format_date(volunteer.joined_on)),
+                avatar=volunteer.full_name,
+                text=tr("{name} (applied {date})", name=volunteer.full_name, date=format_date(volunteer.joined_on)),
             )
-            self.applicants.addItem(item)
+        self.applicants.fit_contents(maximum=300)
         self.feed.set_items(services.dashboard.activity_feed(session, limit=8), now)
         self.expiring.clear()
         if not summary.expiring:
-            self.expiring.addItem(tr("Nothing runs out in the next 30 days."))
+            self.expiring.set_empty(tr("Nothing runs out in the next 30 days."))
         for volunteer, credential in summary.expiring:
-            self.expiring.addItem(
-                tr(
+            self.expiring.add_row(
+                f"{volunteer.full_name}: {credential.name}",
+                credential.kind.label,
+                icon="shield-check",
+                tone=ATTENTION,
+                trailing=tr("Expires {date}", date=format_date(credential.expires_on)),
+                text=tr(
                     "{name}: {item} ({kind}), expires {date}",
                     name=volunteer.full_name,
                     item=credential.name,
                     kind=credential.kind.label.lower(),
                     date=format_date(credential.expires_on),
-                )
+                ),
             )
+        self.expiring.fit_contents(maximum=232)
 
         insight = services.dashboard.recruitment_insight(session)
         if insight is not None:

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from functools import partial
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
@@ -33,6 +33,7 @@ from servesync.ui import assets
 from servesync.ui.context import AppContext
 from servesync.ui.theme import current_palette
 from servesync.ui.widgets.common import clear_layout, format_hours, format_when, make_button, make_label
+from servesync.ui.widgets.elements import avatar_icon
 
 CONTENT_WIDTH = 760
 LOGO_SIZE = 72
@@ -157,6 +158,8 @@ class KioskDialog(QDialog):
         for index, person in enumerate(people):
             button = make_button(f"{person.short_name}\n{_state_text(person)}", kind="kiosk")
             button.setAccessibleName(f"{person.short_name}. {_state_text(person)}")
+            button.setIcon(avatar_icon(person.short_name, 44))  # a face for each name, easy to spot
+            button.setIconSize(QSize(44, 44))
             button.setEnabled(person.state is not KioskState.DONE)
             button.clicked.connect(partial(self.tap, person))
             self.names.addWidget(button, index // 2, index % 2)

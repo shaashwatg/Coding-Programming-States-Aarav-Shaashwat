@@ -42,6 +42,9 @@ PLAN_LIST_HEIGHT = 300
 TABLE_HEIGHT = 300
 DRIFT_TABLE_HEIGHT = 190
 
+#: Icons for the four key figures, in order.
+STRIP_ICONS = ["calendar-clock", "user-round-check", "gauge", "triangle-alert"]
+
 
 def _outlook_color(forecast: ShiftForecast) -> str:
     palette = current_palette()
@@ -67,7 +70,7 @@ class StaffingPage(Page):
                 tr("See problems coming in the next two weeks, and fix them in a few clicks."),
             )
         )
-        self.strip = ImpactStrip(4)
+        self.strip = ImpactStrip(4, STRIP_ICONS)
         self.layout_.addWidget(self.strip)
         self._build_autopilot()
         self._build_forecast()

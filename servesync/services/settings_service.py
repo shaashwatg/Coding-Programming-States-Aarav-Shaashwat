@@ -63,6 +63,7 @@ class SettingsService(Service):
         reduce_motion: bool | None = None,
         text_spacing: bool | None = None,
         simplified: bool | None = None,
+        legible_font: bool | None = None,
         message_duration: MessageDuration | None = None,
         language: Language | None = None,
     ) -> Appearance:
@@ -79,6 +80,7 @@ class SettingsService(Service):
             reduce_motion=current.reduce_motion if reduce_motion is None else reduce_motion,
             text_spacing=current.text_spacing if text_spacing is None else text_spacing,
             simplified=current.simplified if simplified is None else simplified,
+            legible_font=current.legible_font if legible_font is None else legible_font,
             message_duration=current.message_duration if message_duration is None else message_duration,
             language=current.language if language is None else language,
         )

@@ -2,17 +2,19 @@
 Bundled design assets: fonts and icons.
 
 Fonts (SIL Open Font License, bundled so every computer looks the same):
-* **Atkinson Hyperlegible** — body and interface text. Designed by the Braille
-  Institute so similar letters (I/l/1, O/0, b/d) are easy to tell apart for
-  readers with low vision.
-* **Manrope** (SemiBold) — page and section titles and key figures. A plain,
-  modern sans with open shapes; it reads as calm and current next to Atkinson
-  without competing with it, and stays legible at the large sizes headings use.
+* **Figtree** — all interface text, in four weights (Regular, Medium,
+  SemiBold, Bold). A clean, friendly sans with open shapes and even spacing,
+  so it stays easy to read for hours; its tabular figures keep columns of
+  hours and dates lined up.
+* **Atkinson Hyperlegible** — the optional *Easy-read font* (Settings).
+  Designed by the Braille Institute so similar letters (I/l/1, O/0, b/d) are
+  easy to tell apart for readers with low vision.
 
 Icons: the open-source **Lucide** set (ISC license). Each area of the app uses
 one icon everywhere (people = "users", shifts = "calendar-days", ...), so
 users learn the visual language once. Icons are recolored on the fly to
-match the active theme.
+match the active theme, and drawn with a slightly finer line than Lucide's
+default so they sit quietly beside text.
 """
 
 from __future__ import annotations
@@ -30,8 +32,10 @@ from servesync.models import OpportunityCategory
 
 logger = logging.getLogger(__name__)
 
-BODY_FAMILY = "Atkinson Hyperlegible"
-HEADING_FAMILY = "Manrope"
+BODY_FAMILY = "Figtree"
+LEGIBLE_FAMILY = "Atkinson Hyperlegible"
+#: Lucide draws 2 px lines on a 24 px grid; at interface sizes a finer line reads as calmer.
+ICON_STROKE = "1.75"
 
 
 def assets_dir() -> Path:
@@ -40,8 +44,11 @@ def assets_dir() -> Path:
 
 
 def load_fonts() -> tuple[str, str]:
-    """Register the bundled fonts. Falls back to the system font if a file is missing."""
-    body, heading = "", ""
+    """
+    Register the bundled fonts and return (interface family, easy-read family).
+    Either is an empty string if its files are missing (the system font is used).
+    """
+    body, legible = "", ""
     for font_file in sorted((assets_dir() / "fonts").glob("*.ttf")):
         font_id = QFontDatabase.addApplicationFont(str(font_file))
         if font_id < 0:
@@ -50,9 +57,9 @@ def load_fonts() -> tuple[str, str]:
         families = QFontDatabase.applicationFontFamilies(font_id)
         if BODY_FAMILY in families:
             body = BODY_FAMILY
-        if HEADING_FAMILY in families:
-            heading = HEADING_FAMILY
-    return body, heading
+        if LEGIBLE_FAMILY in families:
+            legible = LEGIBLE_FAMILY
+    return body, legible
 
 
 # ------------------------------------------------------------------- icons
@@ -89,11 +96,26 @@ def _svg_bytes(name: str, color: str) -> bytes:
     except OSError:
         logger.warning("Missing icon %s", name)
         return b""
+    if name != "logo":
+        text = text.replace('stroke-width="2"', f'stroke-width="{ICON_STROKE}"')
     return text.replace("currentColor", color).encode("utf-8")
 
 
+_pixmaps: dict[tuple[str, str, int, float], QPixmap] = {}
+
+
 def pixmap(name: str, color: str, size: int = 20, ratio: float = 2.0) -> QPixmap:
-    """Render an icon at ``size`` logical pixels (sharp on Retina screens)."""
+    """Render an icon at ``size`` logical pixels (sharp on Retina screens). Results are cached."""
+    key = (name, color, size, ratio)
+    cached = _pixmaps.get(key)
+    if cached is not None:
+        return cached
+    image = _render(name, color, size, ratio)
+    _pixmaps[key] = image
+    return image
+
+
+def _render(name: str, color: str, size: int, ratio: float) -> QPixmap:
     image = QPixmap(int(size * ratio), int(size * ratio))
     image.fill(Qt.GlobalColor.transparent)
     data = _svg_bytes(name, color)

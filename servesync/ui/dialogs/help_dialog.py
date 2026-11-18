@@ -167,8 +167,8 @@ ABOUT = f"""
 FBLA Coding &amp; Programming event (2026-2027).</p>
 <h3>Credits</h3>
 <ul>
-<li>Fonts: Atkinson Hyperlegible (Braille Institute of America) for text and Manrope
-(The Manrope Project Authors) for headings, both under the SIL Open Font License 1.1.</li>
+<li>Fonts: Figtree (The Figtree Project Authors) for the interface and Atkinson Hyperlegible
+(Braille Institute of America) for the Easy-read option, both under the SIL Open Font License 1.1.</li>
 <li>Icons: Lucide, ISC License.</li>
 <li>Interface toolkit: Qt for Python (PySide6), LGPL v3.</li>
 <li>Value of a volunteer hour: Independent Sector and the Do Good Institute, University of
@@ -358,8 +358,8 @@ ABOUT_ES = f"""
 FBLA Coding &amp; Programming (2026-2027).</p>
 <h3>Créditos</h3>
 <ul>
-<li>Fuentes: Atkinson Hyperlegible (Braille Institute of America) para el texto y Manrope
-(The Manrope Project Authors) para los títulos, ambas bajo la SIL Open Font License 1.1.</li>
+<li>Fuentes: Figtree (The Figtree Project Authors) para la interfaz y Atkinson Hyperlegible
+(Braille Institute of America) para la opción de letra fácil de leer, ambas bajo la SIL Open Font License 1.1.</li>
 <li>Íconos: Lucide, licencia ISC.</li>
 <li>Herramientas de interfaz: Qt for Python (PySide6), LGPL v3.</li>
 <li>Valor de una hora de voluntariado: Independent Sector y el Do Good Institute, Universidad de

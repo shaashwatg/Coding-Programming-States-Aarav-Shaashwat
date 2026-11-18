@@ -13,64 +13,64 @@ page, widget or dialog hard-codes a color.
 
 ## Color
 
-Three colors, plus neutrals. Each color has one job, so its meaning stays clear.
+Three colors, plus cool neutrals. Each color has one job, so its meaning stays clear.
 
 | Color | Value | Job | Where it appears |
 |---|---|---|---|
-| Deep indigo | `#2F3E9E` | The working color | Navigation, the one filled button per screen, links, selected rows, keyboard focus |
-| Warm amber | `#F2A93B` | Look here | "Needs attention" markers, calendar dots for open days, the active chart bar, badges |
-| Emerald | `#0E9F6E` | Good news | Success messages, open spots, the Smart Match score, finished goals |
+| Cobalt | `#1D43C6` | The working color | The one filled button per screen, links, selected rows, keyboard focus; as deep navy (`#101C3F`), the sidebar that frames the app |
+| Warm amber | `#F4A62A` | Look here | "Needs attention" bars on key figures, the sidebar count of applicants waiting, calendar dots for days with open spots, the current page's marker |
+| Emerald | `#0E9F6E` | Good news | Open spots, the Smart Match score ring, attended shifts, finished goals |
 
-**Why these three.** Indigo reads as trustworthy and serious without the coldness of a
-corporate blue, and it holds 9:1 contrast on white, so it can be both a button fill and link
-text. Amber is indigo's warm complement, so a single amber mark stands out on an otherwise cool
-screen without needing to be large. Emerald is the conventional "done" color, and keeping it
-rare means a green number is worth reading.
+**Why these three.** Cobalt reads as trustworthy and capable, and holds 7.9:1 on white, so it can
+be both a button fill and link text. Amber is cobalt's complement on the color wheel, so a single
+amber mark stands out on an otherwise cool screen without needing to be large. Emerald is the
+conventional "done" color; keeping it rare means a green tag is worth reading.
 
 **Rules that keep it calm.**
 
-* Amber is never text on a light background (it measures under 2:1 on white). It is always a
-  shape: a 4 px bar beside a figure, a calendar dot, a chart bar. When amber is a fill, the text
-  on it is dark slate (7.8:1).
-* Emerald is 3.4:1 on white, which is fine for a bar or a dot but too light for text. Text that
-  should be emerald uses a deeper shade of the same hue, `#04553A`, which keeps the 7:1 the app
-  meets everywhere.
-* The brief's secondary text color `#5B6478` measures 5.6:1 on white. ServeSync's standard is
-  7:1 (WCAG AAA), so secondary text is one step darker, `#454D61`.
-* Errors stay red (`#8C2A1F`) and always come with a warning icon and words, never color alone.
+* Amber and emerald are too light to be text on white. They appear as shapes (a bar, a dot, a
+  ring, a meter); text that belongs to them uses a deeper shade of the same hue (`#6E4205` amber
+  text, `#055C3C` emerald text), which keeps the 7:1 contrast the app meets everywhere.
+* Statuses are worded tags on a soft tint of their hue: *Active* (emerald), *Applicant* (amber),
+  *Scheduled* (cobalt), *No-show* (red), *Inactive* (gray). The tint helps scanning; the word
+  carries the meaning, so nothing depends on color alone.
+* Errors stay red (`#9B1C13`) and always come with a warning icon and words.
 
-**Neutrals.** A cool off-white canvas (`#F7F8FB`), white surfaces for tables and cards, slate
-text (`#1E2433`), and hairline borders (`#E3E6EE`). The cool cast keeps white areas from looking
-yellow under office lighting and avoids the cream and beige backgrounds common in generated
-designs.
+**Neutrals.** A cool canvas (`#F4F6FA`), white cards with hairline borders (`#E4E8F0`), ink text
+(`#111A2E`) and slate secondary text (`#4A5264`, 7.1:1). Input borders are darker (`#828C9F`,
+3.1:1) so every field is easy to find.
 
-**Dark theme.** The canvas is `#14161F` and surfaces are `#1C1F2B`. The three brand colors
-become lighter tints of the same hues (indigo `#AEB8F5`, amber `#F5C878`, emerald `#6EDBB0`),
-so meaning carries over and every text color still reaches 7:1.
+**Dark theme.** Canvas `#0D111C`, cards `#151A28`, and lighter tints of the same three hues
+(cobalt `#A3B8FF`, amber `#F7C66E`, emerald `#63DCAB`), so meaning carries over and every text
+color still reaches 7:1.
 
 **High contrast theme.** Black, white and yellow with a 3 px cyan focus ring. People who choose
 it need maximum contrast more than they need brand colors, so it keeps its own palette.
 
 `tests/test_theme.py` computes every contrast ratio with the WCAG formula, for every theme:
-text 7:1 on every background it can sit on, borders and focus rings 3:1, and button labels 7:1.
+text 7:1 on every background it can sit on (including each status tag), borders and focus rings
+3:1, and button labels 7:1.
 
 ## Type
 
-| Role | Font | Size (at 100%) |
+One typeface, **Figtree** (SIL Open Font License), in four weights. It is clean and friendly,
+with open letter shapes and even spacing that stay comfortable over a long shift, and tabular
+figures so columns of hours and dates line up.
+
+| Role | Weight | Size at 100% |
 |---|---|---|
-| Page title | Manrope SemiBold | 1.6 x body |
-| Section title | Manrope SemiBold | 1.2 x body |
-| Body | Atkinson Hyperlegible | the person's chosen size |
-| Caption | Atkinson Hyperlegible | 0.88 x body |
+| Sign-in and kiosk headline | SemiBold | 28 px |
+| Page title | SemiBold | 24 px |
+| Key figure | SemiBold | 26 px |
+| Section and card title | SemiBold | 16 px |
+| Body | Regular | 14 px |
+| Labels, secondary text | Medium / Regular | 13 px |
+| Hints, table headers, tags | Regular / SemiBold | 12 px |
 
-**Atkinson Hyperlegible** (Braille Institute) is used for everything people read. It was
-designed so that easily confused characters (I, l and 1; O and 0; b and d) look different, which
-helps readers with low vision and anyone scanning a roster quickly.
-
-**Manrope** (SIL Open Font License) is used for headings and key figures. It is a plain, modern
-sans-serif with open shapes, so it pairs with Atkinson without competing with it, and its numbers
-are clear at large sizes. It replaces the earlier serif headings, which felt editorial rather than
-like a tool.
+Sizes are set in pixels, so the app looks the same on macOS and Windows (which count points
+differently). **Atkinson Hyperlegible** (Braille Institute) is one switch away in Settings as the
+*Easy-read font*: it makes easily confused characters (I, l and 1; O and 0) look different, which
+helps readers with low vision.
 
 Headings are sentence case. There are no all-caps or letter-spaced labels, because all caps are
 slower to read, especially for people with dyslexia. The whole scale grows with the person's text
@@ -78,32 +78,36 @@ size (85% to 200%), so nothing clips.
 
 ## Layout
 
-* **8 px grid.** Margins, gaps and padding are multiples of 8 (with a 4 px half step for a label
-  and its hint). Content is left-aligned so the eye always returns to the same edge.
-* **Flat surfaces.** Areas are separated by space and hairline borders. There are no gradients,
-  glows or heavy shadows.
-* **Cards only for objects.** A shift, a volunteer recommendation, or the featured event is a
-  card (white, hairline border, 10 px corners). Everything else, such as "Shifts that need people"
-  or "What stands out", is a plain section with a heading.
-* **Key figures** sit in a row, each set off by a hairline on its left. A figure that needs
-  action gets an amber bar instead, and screen readers hear "needs attention".
-* **Corners.** 6 px on buttons and inputs, 10 px on cards and dialogs.
+* **Three layers.** A cool canvas, white cards with hairline borders and 12 px corners, and the
+  navy sidebar. Only things that float (messages, the tour card) cast a shadow.
+* **8 px grid.** Margins, gaps and padding are multiples of 8 (with a 4 px half step). Content is
+  left-aligned so the eye always returns to the same edge.
+* **Key figures** sit in a row of tiles, each with an icon. A figure that needs action gets an
+  amber bar and an amber icon, and screen readers hear "needs attention".
+* **People look like people.** Every roster, applicant list and activity feed leads with initials
+  in a tinted circle, so a list reads as a team rather than rows of text.
+* **Capacity at a glance.** Shifts show a spot meter (one segment per spot) that turns emerald
+  when the shift is full.
+* **Controls.** Buttons and fields are drawn 36 px tall with 8 px corners, inside a 44 px target
+  (the rest is an invisible margin), so they look tidy but are easy to hit (WCAG 2.5.5 AAA).
 * **One filled button per screen.** In the main window, the header's action (*Add volunteer* for
-  leaders, *Find a shift* for volunteers) is the only filled indigo button. Other actions are
-  outlined; a dialog's single main action (Save, Sign in) is filled.
-* **Sidebar.** Light, with the current page marked by an indigo bar and indigo text and icon.
-* **Tables.** No zebra stripes; hairline dividers, 44 px rows (comfortable to read and a full
-  touch target), and a soft indigo tint on hover and selection. When text is large, the table
-  scrolls sideways rather than squeezing a column until its text is cut off.
-* **Charts.** Indigo first, then amber, then emerald, on neutral gridlines. The bar or point
-  being inspected turns amber. Values are printed on every bar, and each chart has a text summary
-  and a matching table.
+  leaders, *Find a shift* for volunteers) is the only filled button. A section's own action is a
+  soft blue tonal button; everything else is quiet white. A dialog's main action (Save, Sign in)
+  is filled.
+* **Sidebar.** Deep navy, with the current page on a lighter navy and an amber marker beside it.
+  The Volunteers item carries an amber count while applicants are waiting.
+* **Forms** put each label above its field: one straight edge to scan, room for long Spanish
+  labels, and errors in words directly under the field.
+* **Tables.** No zebra stripes or grid; hairline dividers, rows of 48 px or more, a soft tint
+  under the pointer and on the selected row. When text is large, the table scrolls sideways rather
+  than squeezing a column until its text is cut off.
+* **Charts.** Cobalt first, then amber, then emerald, on neutral gridlines. Values are printed on
+  every bar, and each chart has a text summary and a matching table.
 * **Ask ServeSync** looks like a search panel: a search box, then plain rows that pair each
-  question with its answer, separated by hairlines. It deliberately avoids chat bubbles, because
-  it looks up the organization's own records and should not suggest a person or general chatbot is
-  replying.
-* **Motion** only follows something the person did (a click, a key press): a page fades in, the
-  sidebar marker slides to the new page. *Reduce motion* removes all of it.
+  question with its answer. It deliberately avoids chat bubbles, because it looks up the
+  organization's own records and should not suggest a person or general chatbot is replying.
+* **Motion** only follows something the person did: a page fades in, the sidebar marker slides
+  to the new page. *Reduce motion* removes all of it.
 
 What we avoided, and why: cream backgrounds, terracotta accents, serif display headings, sparkle
 and magic-wand icons, emoji, purple-to-blue gradients, small labels above headings, pill chips,

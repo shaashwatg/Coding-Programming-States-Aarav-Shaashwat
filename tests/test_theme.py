@@ -84,19 +84,25 @@ def test_every_theme_has_a_palette_or_follows_the_system() -> None:
 
 
 def test_targets_grow_with_text_size() -> None:
-    normal = build_stylesheet(LIGHT, 13.0)
-    large = build_stylesheet(LIGHT, 26.0)
-    assert f"min-height: {MIN_TARGET - 8}px" in normal  # navigation: 44 px target minus padding
-    assert f"min-height: {MIN_TARGET * 2 - 8}px" in large
+    from servesync.ui.theme import BASE_TEXT_PX, CONTROL_HEIGHT
+
+    normal = build_stylesheet(LIGHT, BASE_TEXT_PX)
+    large = build_stylesheet(LIGHT, BASE_TEXT_PX * 2)
+    # Buttons and fields: drawn 36 px tall inside a 44 px target (the rest is an invisible margin).
+    gap = (MIN_TARGET - CONTROL_HEIGHT) // 2
+    assert f"margin: {gap}px 0px; min-height: {CONTROL_HEIGHT - 2}px" in normal
+    assert f"margin: {gap * 2}px 0px; min-height: {CONTROL_HEIGHT * 2 - 2}px" in large
+    assert f"min-height: {MIN_TARGET - 4}px" in normal  # navigation items, plus 2 px margins
+    assert f"min-height: {MIN_TARGET * 2 - 4}px" in large
 
 
 def test_brand_colors_are_defined_once_and_used_in_order() -> None:
-    """The three brand colors come from the brief; charts use them as indigo, amber, emerald."""
+    """The three brand colors come from the brief; charts use them as cobalt, amber, emerald."""
     from servesync.ui import theme
 
-    assert (theme.INDIGO, theme.AMBER, theme.EMERALD) == ("#2F3E9E", "#F2A93B", "#0E9F6E")
-    assert LIGHT.chart == (theme.INDIGO, theme.AMBER, theme.EMERALD)
-    assert LIGHT.primary == theme.INDIGO and LIGHT.attention_fill == theme.AMBER
+    assert (theme.COBALT, theme.AMBER, theme.EMERALD) == ("#1D43C6", "#F4A62A", "#0E9F6E")
+    assert LIGHT.chart == (theme.COBALT, theme.AMBER, theme.EMERALD)
+    assert LIGHT.primary == theme.COBALT and LIGHT.attention_fill == theme.AMBER
     assert LIGHT.success_fill == theme.EMERALD
 
 

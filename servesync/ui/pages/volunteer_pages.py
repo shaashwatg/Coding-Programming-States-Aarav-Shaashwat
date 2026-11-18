@@ -21,12 +21,12 @@ from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLineEdit, QS
 
 from servesync.core.i18n import mark, tr, tr_n
 from servesync.models import Announcement, AssignmentStatus, Notice, OpportunityCategory, ServiceRecord, ShiftOverview
+from servesync.ui import assets
 from servesync.ui.context import AppContext
 from servesync.ui.dialogs.auth_dialogs import ChangePasswordDialog
 from servesync.ui.dialogs.coordination_dialogs import save_calendar_file
 from servesync.ui.dialogs.data_dialogs import MyPrivacyPanel
 from servesync.ui.dialogs.goal_dialog import HourGoalPanel
-from servesync.ui.dialogs.shift_detail import status_color
 from servesync.ui.dialogs.volunteer_dialog import VolunteerDialog
 from servesync.ui.pages.base import Page
 from servesync.ui.pages.volunteers_page import VolunteerProfileCard
@@ -36,6 +36,7 @@ from servesync.ui.widgets.common import (
     ImpactStrip,
     PageHeader,
     Panel,
+    add_search_icon,
     clear_layout,
     confirm,
     format_hours,
@@ -45,9 +46,13 @@ from servesync.ui.widgets.common import (
     make_button,
     make_label,
 )
+from servesync.ui.widgets.elements import NEUTRAL, SUCCESS, status_tone
 from servesync.ui.widgets.shift_panel import ShiftInfoPanel, scrollable
-from servesync.ui.widgets.table import Column, RecordTable
+from servesync.ui.widgets.table import ICON, TAG, Column, RecordTable
 from servesync.ui.widgets.visuals import Callout, FactorLegend, FeaturedBanner, MatchCard, UpdatesPanel
+
+#: Icons for the four key figures, in order.
+STRIP_ICONS = ["clock", "calendar-check", "badge-check", "hand-heart"]
 
 
 class HomePage(Page):
@@ -63,7 +68,7 @@ class HomePage(Page):
         self.layout_.addWidget(self.updates)
         self.mission = make_label("", "mission", wrap=True)
         self.layout_.addWidget(self.mission)
-        self.strip = ImpactStrip(4)
+        self.strip = ImpactStrip(4, STRIP_ICONS)
         self.layout_.addWidget(self.strip)
         self.goal_panel = HourGoalPanel(ctx)
         self.layout_.addWidget(self.goal_panel)
@@ -71,12 +76,18 @@ class HomePage(Page):
         self.layout_.addWidget(self.banner)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(18)
-        upcoming = Panel(tr("Your upcoming shifts"))
+        grid.setHorizontalSpacing(16)
+        upcoming = Panel(tr("Your upcoming shifts"), flush=True)
         self.upcoming: RecordTable[ServiceRecord] = RecordTable(
             [
-                Column(tr("When"), lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
-                Column(tr("Program"), lambda r: r.opportunity_title, stretch=True),
+                Column(
+                    tr("Program"),
+                    lambda r: r.opportunity_title,
+                    stretch=True,
+                    strong=True,
+                    secondary=lambda r: format_when(r.starts_at, r.ends_at),
+                    sort=lambda r: r.starts_at,
+                ),
             ],
             empty_message=tr("Nothing scheduled yet. Choose Find a shift (top right) to sign up."),
             accessible_name=tr("Your upcoming shifts"),
@@ -84,21 +95,14 @@ class HomePage(Page):
         self.upcoming.setMinimumHeight(240)
         upcoming.body.addWidget(self.upcoming)
         self.cancel_button = make_button(tr("Cancel sign-up"), on_click=self._cancel)
-        self.calendar_button = make_button(tr("Add to calendar"), on_click=self._add_to_calendar)
-        upcoming_actions = QHBoxLayout()
-        upcoming_actions.addWidget(self.cancel_button)
-        upcoming_actions.addWidget(self.calendar_button)
-        upcoming_actions.addStretch(1)
-        upcoming.body.addLayout(upcoming_actions)
-        grid.addWidget(upcoming, 0, 0)
+        self.calendar_button = make_button(tr("Add to calendar"), on_click=self._add_to_calendar, icon="calendar-plus")
+        upcoming.add_row(self.calendar_button, self.cancel_button, top=4)
+        grid.addWidget(upcoming, 0, 0, Qt.AlignmentFlag.AlignTop)
 
-        picks = Panel(tr("Recommended for you"))
-        picks.body.addWidget(
-            make_label(
-                tr("Smart Match picks open shifts that fit your availability, skills, and experience."),
-                "muted",
-                wrap=True,
-            )
+        picks = Panel(
+            tr("Recommended for you"),
+            card=False,
+            subtitle=tr("Smart Match picks open shifts that fit your availability, skills, and experience."),
         )
         self.legend = FactorLegend()
         picks.body.addWidget(self.legend)
@@ -261,6 +265,7 @@ class FindShiftsPage(Page):
         self.search_box.setPlaceholderText(tr("Search by program or place"))
         self.search_box.setAccessibleName(tr("Search shifts"))
         self.search_box.setClearButtonEnabled(True)
+        add_search_icon(self.search_box)
         self.category: EnumComboBox[OpportunityCategory] = EnumComboBox(
             OpportunityCategory, all_label=tr("All kinds of work")
         )
@@ -297,15 +302,25 @@ class FindShiftsPage(Page):
         self.layout_.addLayout(toggles)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
         self.table: RecordTable[ShiftOverview] = RecordTable(
             [
                 Column(
-                    tr("When"),
-                    lambda o: format_when(o.shift.starts_at, o.shift.ends_at),
+                    tr("Program"),
+                    lambda o: o.opportunity_title,
+                    stretch=True,
+                    kind=ICON,
+                    icon=lambda o: assets.CATEGORY_ICONS[o.category],
+                    secondary=lambda o: format_when(o.shift.starts_at, o.shift.ends_at),
                     sort=lambda o: o.shift.starts_at,
                 ),
-                Column(tr("Program"), lambda o: o.opportunity_title, stretch=True),
-                Column(tr("Spots open"), lambda o: o.open_spots, align_right=True),
+                Column(
+                    tr("Spots open"),
+                    lambda o: tr("{count} open", count=o.open_spots) if o.open_spots else tr("Full"),
+                    sort=lambda o: o.open_spots,
+                    kind=TAG,
+                    tone=lambda o: SUCCESS if o.open_spots else NEUTRAL,
+                ),
                 Column(
                     tr("Fit"),
                     lambda o: self._fit.get(o.shift.shift_id or 0, ""),
@@ -324,13 +339,17 @@ class FindShiftsPage(Page):
             empty_message=tr("No shifts match these filters. Try turning a filter off."),
             accessible_name=tr("Open shifts"),
         )
-        splitter.addWidget(self.table)
+        shifts = Panel(card=True, flush=True)
+        shifts.body.setContentsMargins(0, 4, 0, 10)
+        shifts.body.addWidget(self.table)
+        splitter.addWidget(shifts)
         self.info = ShiftInfoPanel(ctx)
         self.info.changed.connect(self.reload)
         self.table.selection_changed.connect(lambda o: self.info.show_shift(o))
         splitter.addWidget(scrollable(self.info))
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([620, 440])
         self.layout_.addWidget(splitter, 1)
 
     def refresh(self) -> None:
@@ -399,16 +418,25 @@ class ProfilePage(Page):
             )
         )
         row = QHBoxLayout()
-        row.setSpacing(18)
+        row.setSpacing(16)
         self.card = VolunteerProfileCard(show_notes=False)
-        row.addWidget(self.card, 2)
-        history = Panel(tr("My service history"))
+        row.addWidget(self.card, 2, Qt.AlignmentFlag.AlignTop)
+        history = Panel(tr("My service history"), flush=True)
         self.history: RecordTable[ServiceRecord] = RecordTable(
             [
-                Column(tr("When"), lambda r: format_when(r.starts_at, r.ends_at), sort=lambda r: r.starts_at),
-                Column(tr("Program"), lambda r: r.opportunity_title, stretch=True),
                 Column(
-                    tr("Status"), lambda r: r.assignment.status.label, color=lambda r: status_color(r.assignment.status)
+                    tr("Program"),
+                    lambda r: r.opportunity_title,
+                    stretch=True,
+                    strong=True,
+                    secondary=lambda r: format_when(r.starts_at, r.ends_at),
+                    sort=lambda r: r.starts_at,
+                ),
+                Column(
+                    tr("Status"),
+                    lambda r: r.assignment.status.label,
+                    kind=TAG,
+                    tone=lambda r: status_tone(r.assignment.status),
                 ),
                 Column(
                     tr("Hours"),

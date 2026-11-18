@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -52,26 +53,41 @@ class FormDialog(QDialog):
         self._fields: dict[str, tuple[QWidget, QLabel]] = {}
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 20, 24, 20)
-        outer.setSpacing(12)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        header = QFrame()
+        header.setObjectName("DialogHeader")
+        top = QVBoxLayout(header)
+        top.setContentsMargins(32, 24, 32, 18)
+        top.setSpacing(6)
         heading = make_label(title, "title")
-        outer.addWidget(heading)
-        outer.addWidget(make_label(instructions, "subtitle", wrap=True))
+        top.addWidget(heading)
+        top.addWidget(make_label(instructions, "muted", wrap=True))
         self.banner = make_label("", "banner-error", wrap=True)
         self.banner.hide()
-        outer.addWidget(self.banner)
+        top.addWidget(self.banner)
+        outer.addWidget(header)
 
+        # Labels sit above their fields: one straight left edge to scan, and room for long labels in Spanish.
         body = QWidget()
         self.form = QFormLayout(body)
-        self.form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        self.form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        self.form.setContentsMargins(32, 12, 32, 20)
         self.form.setHorizontalSpacing(16)
-        self.form.setVerticalSpacing(6)
+        self.form.setVerticalSpacing(2)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(body)
         outer.addWidget(scroll, 1)
 
+        footer = QFrame()
+        footer.setObjectName("DialogFooter")
+        bottom = QHBoxLayout(footer)
+        bottom.setContentsMargins(32, 10, 32, 10)
         self.buttons = QDialogButtonBox()
         self.save_button = QPushButton(save_text or tr("Save"))
         self.save_button.setProperty("kind", "primary")
@@ -80,7 +96,8 @@ class FormDialog(QDialog):
         self.buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self._on_save)
         self.buttons.rejected.connect(self.reject)
-        outer.addWidget(self.buttons)
+        bottom.addWidget(self.buttons)
+        outer.addWidget(footer)
 
     # -------------------------------------------------------------- building
 
@@ -89,7 +106,7 @@ class FormDialog(QDialog):
         container = QWidget()
         container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         column = QVBoxLayout(container)
-        column.setContentsMargins(0, 0, 0, 4)
+        column.setContentsMargins(0, 0, 0, 10)
         column.setSpacing(3)
         column.addWidget(widget)
         if hint:
@@ -105,7 +122,9 @@ class FormDialog(QDialog):
         return widget
 
     def add_section(self, title: str) -> None:
-        self.form.addRow(make_label(title, "section"))
+        heading = make_label(title, "section")
+        heading.setContentsMargins(0, 14 if self.form.rowCount() else 0, 0, 4)
+        self.form.addRow(heading)
 
     # -------------------------------------------------------------- errors
 

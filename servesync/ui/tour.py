@@ -18,9 +18,10 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
 from servesync.core.i18n import tr
 from servesync.ui.help_topics import TourStep
 from servesync.ui.widgets.common import make_button, make_label
+from servesync.ui.widgets.elements import add_shadow
 
 CARD_WIDTH = 400
-CARD_MARGIN = 32
+CARD_MARGIN = 28
 OUTLINE_PADDING = 4
 
 
@@ -47,18 +48,20 @@ class TourGuide(QFrame):
         self.setFixedWidth(CARD_WIDTH)
         self.setAccessibleName(tr("Tour"))
         column = QVBoxLayout(self)
-        column.setContentsMargins(24, 24, 24, 16)
-        column.setSpacing(8)
-        self.counter = make_label("", "hint")
-        self.title = make_label("", "section", wrap=True)
-        self.text = make_label("", None, wrap=True)
+        column.setContentsMargins(24, 20, 24, 14)
+        column.setSpacing(6)
+        self.counter = make_label("", "eyebrow")
+        self.title = make_label("", "heading", wrap=True)
+        self.text = make_label("", "muted", wrap=True)
         for widget in (self.counter, self.title, self.text):
             column.addWidget(widget)
         row = QHBoxLayout()
-        row.setContentsMargins(0, 8, 0, 0)
+        row.setContentsMargins(0, 10, 0, 0)
+        row.setSpacing(8)
         self.skip_button = make_button(tr("Skip tour"), kind="link", on_click=lambda: self.finish())
         self.back_button = make_button(tr("Back"), on_click=lambda: self.show_step(self._index - 1))
         self.next_button = make_button(tr("Next"), kind="secondary", on_click=self._next)
+        add_shadow(self, blur=40, offset=14, opacity=0.22)
         row.addWidget(self.skip_button)
         row.addStretch(1)
         row.addWidget(self.back_button)
